@@ -429,8 +429,7 @@ export default function ReservationsPage({ params }: Props) {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full h-10 px-3 border border-gray-300 rounded-lg bg-white"
-              >
+                className="w-full h-10 px-3 border border-gray-300 rounded-lg bg-white">
                 <option value="all">Todos</option>
                 <option value="booked">Confirmadas</option>
                 <option value="pre_checkin">Pre check-in</option>
@@ -453,8 +452,7 @@ export default function ReservationsPage({ params }: Props) {
             <select
               value={unitFilter}
               onChange={(e) => setUnitFilter(e.target.value)}
-              className="w-full h-10 px-3 border border-gray-300 rounded-lg bg-white"
-            >
+              className="w-full h-10 px-3 border border-gray-300 rounded-lg bg-white">
               <option value="all">Todas las unidades</option>
               {units.map(u => (
                 <option key={u.id} value={u.id}>{u.name}</option>
@@ -587,8 +585,7 @@ export default function ReservationsPage({ params }: Props) {
                     size="sm" 
                     variant="outline" 
                     onClick={copyLinkToClipboard}
-                    className="flex-shrink-0"
-                  >
+                    className="flex-shrink-0">
                     {copied ? <CheckCircle className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
                   </Button>
                 </div>
@@ -715,8 +712,7 @@ export default function ReservationsPage({ params }: Props) {
                     <select
                       value={checkinData.paymentMethod}
                       onChange={(e) => setCheckinData({ ...checkinData, paymentMethod: e.target.value })}
-                      className="w-full h-10 px-3 border border-gray-300 rounded-lg bg-white"
-                    >
+                      className="w-full h-10 px-3 border border-gray-300 rounded-lg bg-white">
                       <option value="cash">💵 Efectivo</option>
                       <option value="transfer">🏦 Transferencia</option>
                       <option value="card">💳 Tarjeta</option>
@@ -856,8 +852,7 @@ export default function ReservationsPage({ params }: Props) {
                     <select
                       value={editingReservation.unit_id || ''}
                       onChange={(e) => setEditingReservation({ ...editingReservation, unit_id: e.target.value })}
-                      className="w-full h-10 px-3 border border-gray-300 rounded-lg bg-white"
-                    >
+                      className="w-full h-10 px-3 border border-gray-300 rounded-lg bg-white">
                       <option value="">Seleccionar</option>
                       {units.map(u => (
                         <option key={u.id} value={u.id}>{u.name}</option>
@@ -913,8 +908,7 @@ export default function ReservationsPage({ params }: Props) {
                     <select
                       value={editingReservation.payment_method || ''}
                       onChange={(e) => setEditingReservation({ ...editingReservation, payment_method: e.target.value })}
-                      className="w-full h-10 px-3 border border-gray-300 rounded-lg bg-white"
-                    >
+                      className="w-full h-10 px-3 border border-gray-300 rounded-lg bg-white">
                       <option value="">Seleccionar</option>
                       <option value="cash">💵 Efectivo</option>
                       <option value="transfer">🏦 Transferencia</option>
@@ -964,8 +958,7 @@ export default function ReservationsPage({ params }: Props) {
                     <button
                       key={index}
                       onClick={() => setWhatsappMessage(template.template(selectedReservation))}
-                      className="w-full text-left p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                    >
+                      className="w-full text-left p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
                       <p className="font-medium text-sm text-gray-900">{template.name}</p>
                     </button>
                   ))}
@@ -1004,8 +997,7 @@ export default function ReservationsPage({ params }: Props) {
             <div className="p-6 space-y-4">
               <button
                 onClick={() => setAddModalType('manual')}
-                className="w-full flex items-center gap-4 p-4 border-2 border-gray-200 rounded-lg hover:border-green-500 hover:bg-green-50 transition-all"
-              >
+                className="w-full flex items-center gap-4 p-4 border-2 border-gray-200 rounded-lg hover:border-green-500 hover:bg-green-50 transition-all">
                 <div className="bg-green-100 p-3 rounded-lg">
                   <Plus className="h-6 w-6 text-green-600" />
                 </div>
@@ -1016,8 +1008,7 @@ export default function ReservationsPage({ params }: Props) {
               </button>
               <button
                 onClick={() => setAddModalType('csv')}
-                className="w-full flex items-center gap-4 p-4 border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all"
-              >
+                className="w-full flex items-center gap-4 p-4 border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all">
                 <div className="bg-blue-100 p-3 rounded-lg">
                   <Upload className="h-6 w-6 text-blue-600" />
                 </div>
@@ -1028,8 +1019,7 @@ export default function ReservationsPage({ params }: Props) {
               </button>
               <button
                 onClick={() => setAddModalType('text')}
-                className="w-full flex items-center gap-4 p-4 border-2 border-gray-200 rounded-lg hover:border-purple-500 hover:bg-purple-50 transition-all"
-              >
+                className="w-full flex items-center gap-4 p-4 border-2 border-gray-200 rounded-lg hover:border-purple-500 hover:bg-purple-50 transition-all">
                 <div className="bg-purple-100 p-3 rounded-lg">
                   <FileText className="h-6 w-6 text-purple-600" />
                 </div>
