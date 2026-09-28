@@ -1,4 +1,7 @@
-"use client";
+const fs = require('fs');
+const path = require('path');
+
+const landingCode = `"use client";
 import { motion } from "framer-motion";
 import { Check, Wifi, MapPin, CloudSun, MessageCircle, CalendarCheck, CreditCard, Key, Star, ShoppingBag, UtensilsCrossed, Compass, Package, Clock, ShieldCheck, Zap, Heart, ArrowRight, Sparkles, Users, BarChart3, Bell, Camera, ExternalLink } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -103,7 +106,7 @@ const HowItWorks = () => {
             <motion.div key={i} initial={{ opacity: 0, y: 40 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.15, duration: 0.6 }} className="relative group">
               <div className="absolute -inset-1 bg-gradient-to-br from-[#0F766E]/10 to-[#EA580C]/10 rounded-3xl blur-xl opacity-0 group-hover:opacity-100 transition duration-500" />
               <div className="relative bg-white border border-gray-100 rounded-3xl p-8 shadow-sm hover:shadow-xl transition-all duration-300 h-full">
-                <div className={`${step.color} w-16 h-16 rounded-2xl flex items-center justify-center text-white mb-6 shadow-lg group-hover:scale-110 transition-transform duration-300`}>{step.icon}</div>
+                <div className={\`\${step.color} w-16 h-16 rounded-2xl flex items-center justify-center text-white mb-6 shadow-lg group-hover:scale-110 transition-transform duration-300\`}>{step.icon}</div>
                 <div className="absolute top-8 right-8 text-6xl font-bold text-gray-100">{i + 1}</div>
                 <h3 className="text-xl font-bold text-gray-900 mb-3">{step.title}</h3>
                 <p className="text-gray-600 leading-relaxed">{step.desc}</p>
@@ -133,7 +136,7 @@ const GuestJourney = () => {
         <div className="grid md:grid-cols-3 gap-6">
           {phases.map((phase, i) => (
             <motion.div key={i} initial={{ opacity: 0, y: 40 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.15 }} className="bg-white rounded-3xl p-8 shadow-lg border border-gray-100 hover:shadow-2xl transition-all duration-300">
-              <div className={`bg-gradient-to-br ${phase.color} w-14 h-14 rounded-2xl flex items-center justify-center text-white mb-5 shadow-lg`}>{phase.icon}</div>
+              <div className={\`bg-gradient-to-br \${phase.color} w-14 h-14 rounded-2xl flex items-center justify-center text-white mb-5 shadow-lg\`}>{phase.icon}</div>
               <h3 className="text-2xl font-bold text-gray-900 mb-5">{phase.phase}</h3>
               <ul className="space-y-3">
                 {phase.items.map((item, j) => (
@@ -392,3 +395,8 @@ export default function LandingPage() {
     </main>
   );
 }
+`;
+
+const filePath = path.join(__dirname, 'src', 'app', 'page.tsx');
+fs.writeFileSync(filePath, landingCode, 'utf8');
+console.log('✅ Archivo page.tsx regenerado correctamente');
