@@ -1,32 +1,18 @@
 "use client";
 import { motion } from "framer-motion";
-import {
-  Check, Wifi, MapPin, CloudSun, MessageCircle, CalendarCheck, CreditCard, Key, Star, ShoppingBag, UtensilsCrossed, Compass, Package, Clock, ShieldCheck, Zap, Heart, ArrowRight, Sparkles, Users, BarChart3, Bell, Camera, ExternalLink,
-} from "lucide-react";
+import { Check, Wifi, MapPin, CloudSun, MessageCircle, CalendarCheck, CreditCard, Key, Star, ShoppingBag, UtensilsCrossed, Compass, Package, Clock, ShieldCheck, Zap, Heart, ArrowRight, Sparkles, Users, BarChart3, Bell, Camera, ExternalLink } from "lucide-react";
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 
 const Logo = ({ size = 200 }: { size?: number }) => (
-  <Image
-    src="/logotransparente1.png"
-    alt="Mi Estadía"
-    width={size}
-    height={size}
-    className="drop-shadow-2xl"
-    priority
-    loading="eager"
-    style={{ width: "auto", height: "auto", mixBlendMode: "multiply" }}
-  />
+  <div className="relative inline-block">
+    <Image src="/logotransparente1.png" alt="Mi Estadía" width={size} height={size} className="drop-shadow-2xl" priority loading="eager" style={{ width: "auto", height: "auto", mixBlendMode: "multiply" }} />
+  </div>
 );
 
 const Navbar = () => (
-  <motion.nav
-    initial={{ y: -100, opacity: 0 }}
-    animate={{ y: 0, opacity: 1 }}
-    transition={{ duration: 0.6 }}
-    className="fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-100 shadow-sm"
-  >
+  <motion.nav initial={{ y: -100, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.6 }} className="fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-100 shadow-sm">
     <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
       <Link href="/" className="flex items-center gap-3">
         <Image src="/logotransparente.png" alt="Mi Estadía" width={40} height={40} className="rounded-lg" style={{ width: "auto", height: "auto", mixBlendMode: "multiply" }} />
@@ -46,36 +32,21 @@ const Navbar = () => (
   </motion.nav>
 );
 
-const slides = [
-  "/images/slides/slide-1.jpg",
-  "/images/slides/slide-2.jpg",
-  "/images/slides/slide-3.jpg",
-  "/images/slides/slide-4.jpg",
-  "/images/slides/slide-5.jpg",
-  "/images/slides/slide-6.jpg",
-];
+const slides = ["/images/slides/slide-1.jpg", "/images/slides/slide-2.jpg", "/images/slides/slide-3.jpg", "/images/slides/slide-4.jpg", "/images/slides/slide-5.jpg", "/images/slides/slide-6.jpg"];
 
 const Hero = () => {
   const [current, setCurrent] = useState(0);
   const [loadedImages, setLoadedImages] = useState<Set<number>>(new Set());
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrent((prev) => (prev + 1) % slides.length);
-    }, 4000);
+    const timer = setInterval(() => { setCurrent((prev) => (prev + 1) % slides.length); }, 4000);
     return () => clearInterval(timer);
   }, []);
 
   useEffect(() => {
     slides.forEach((src, i) => {
       const img = new window.Image();
-      img.onload = () => {
-        setLoadedImages((prev) => {
-          const next = new Set(prev);
-          next.add(i);
-          return next;
-        });
-      };
+      img.onload = () => { setLoadedImages((prev) => { const next = new Set(prev); next.add(i); return next; }); };
       img.src = src;
     });
   }, []);
@@ -101,28 +72,14 @@ const Hero = () => {
       <motion.div initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1, type: "spring", bounce: 0.3 }} className="relative z-10">
         <Logo size={220} />
       </motion.div>
-      <motion.h1 initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5, duration: 1 }} className="relative z-10 mt-8 text-5xl md:text-7xl font-bold text-white tracking-tight">
-        Mi Estadía
-      </motion.h1>
-      <motion.p initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.7, duration: 1 }} className="relative z-10 mt-4 text-xl md:text-2xl text-white font-medium">
-        Tu alojamiento, más cerca.
-      </motion.p>
-      <motion.p initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.9, duration: 1 }} className="relative z-10 mt-6 max-w-2xl text-lg text-white font-medium">
-        Dejá el caos de WhatsApp y las planillas. Gestioná reservas, check-ins, pagos y ofrecé una experiencia premium a tus huéspedes. <strong>Sin instalaciones, sin complicaciones.</strong>
-      </motion.p>
+      <motion.h1 initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5, duration: 1 }} className="relative z-10 mt-8 text-5xl md:text-7xl font-bold text-white tracking-tight">Mi Estadía</motion.h1>
+      <motion.p initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.7, duration: 1 }} className="relative z-10 mt-4 text-xl md:text-2xl text-white font-medium">Tu alojamiento, más cerca.</motion.p>
+      <motion.p initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.9, duration: 1 }} className="relative z-10 mt-6 max-w-2xl text-lg text-white font-medium">Dejá el caos de WhatsApp y las planillas. Gestioná reservas, check-ins, pagos y ofrecé una experiencia premium a tus huéspedes. <strong>Sin instalaciones, sin complicaciones.</strong></motion.p>
       <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.1, duration: 1 }} className="relative z-10 mt-10 flex flex-col sm:flex-row gap-4">
-        <Link href="/login" className="group px-8 py-4 rounded-full bg-[#EA580C] text-white font-bold text-lg hover:bg-[#C2410C] transition shadow-lg hover:shadow-xl flex items-center justify-center gap-2">
-          Probar gratis 30 días
-          <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition" />
-        </Link>
-        <a href="https://wa.me/5491131923742?text=Hola!%20Quiero%20mas%20info%20sobre%20Mi%20Estadia" target="_blank" rel="noopener noreferrer" className="px-8 py-4 rounded-full border-2 border-white text-white font-bold text-lg hover:bg-white hover:text-[#0F766E] transition flex items-center justify-center gap-2">
-          <MessageCircle className="w-5 h-5" />
-          Hablar por WhatsApp
-        </a>
+        <Link href="/login" className="group px-8 py-4 rounded-full bg-[#EA580C] text-white font-bold text-lg hover:bg-[#C2410C] transition shadow-lg hover:shadow-xl flex items-center justify-center gap-2">Probar gratis 30 días<ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition" /></Link>
+        <a href="https://wa.me/5491131923742?text=Hola!%20Quiero%20mas%20info%20sobre%20Mi%20Estadia" target="_blank" rel="noopener noreferrer" className="px-8 py-4 rounded-full border-2 border-white text-white font-bold text-lg hover:bg-white hover:text-[#0F766E] transition flex items-center justify-center gap-2"><MessageCircle className="w-5 h-5" />Hablar por WhatsApp</a>
       </motion.div>
-      <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.4 }} className="relative z-10 mt-5 text-sm text-white/90 font-medium">
-        Sin tarjeta de crédito - Sin instalaciones - Cancelás cuando quieras
-      </motion.p>
+      <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.4 }} className="relative z-10 mt-5 text-sm text-white/90 font-medium">Sin tarjeta de crédito - Sin instalaciones - Cancelás cuando quieras</motion.p>
     </section>
   );
 };
