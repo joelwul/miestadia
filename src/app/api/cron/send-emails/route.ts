@@ -85,7 +85,7 @@ export async function GET() {
 
           try {
             await resend.emails.send({
-              from: `${tenant.name} <${process.env.FROM_EMAIL || 'onboarding@resend.dev'}>`,
+              from: `${tenant.name} <${process.env.FROM_EMAIL || 'hola@miestadia.online'}>`,
               to: [res.guests?.email],
               subject: `Recordatorio: tu estadía en ${tenant.name} comienza en ${preCheckinDays} días`,
               html: `
@@ -171,7 +171,7 @@ export async function GET() {
 
           try {
             await resend.emails.send({
-              from: `${tenant.name} <${process.env.FROM_EMAIL || 'onboarding@resend.dev'}>`,
+              from: `${tenant.name} <${process.env.FROM_EMAIL || 'hola@miestadia.online'}>`,
               to: [res.guests?.email],
               subject: `Gracias por tu estadía en ${tenant.name}`,
               html: `
