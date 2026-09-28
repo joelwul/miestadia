@@ -1,8 +1,5 @@
 ﻿{
-  "crons": [
-    {
-      "path": "/api/cron/send-emails",
-      "schedule": "0 12 * * *"
-    }
-  ]
+  "framework": "nextjs",
+  "buildCommand": "next build",
+  "outputDirectory": ".next"
 }
