@@ -1,39 +1,30 @@
 const fs = require('fs');
 const path = require('path');
 
-console.log('🔧 Iniciando reparación automática...\n');
+console.log('🔧 Regenerando archivos...\n');
 
-// Función para eliminar BOM de un archivo
-function removeBOM(filePath) {
-  const buffer = fs.readFileSync(filePath);
-  if (buffer[0] === 0xEF && buffer[1] === 0xBB && buffer[2] === 0xBF) {
-    const newBuffer = buffer.slice(3);
-    fs.writeFileSync(filePath, newBuffer);
-    console.log(`✅ BOM eliminado: ${path.relative(__dirname, filePath)}`);
-    return true;
-  }
-  return false;
-}
-
-// Eliminar BOM de TODOS los archivos .ts y .tsx en src/
-function removeBOMFromAll(dir) {
+// 1. Eliminar BOM de TODOS los archivos .ts y .tsx
+function removeBOM(dir) {
   const files = fs.readdirSync(dir);
   files.forEach(file => {
     const filePath = path.join(dir, file);
     const stat = fs.statSync(filePath);
     if (stat.isDirectory()) {
-      removeBOMFromAll(filePath);
-    } else if (file.endsWith('.ts') || file.endsWith('.tsx')) {
       removeBOM(filePath);
+    } else if (file.endsWith('.ts') || file.endsWith('.tsx')) {
+      const buffer = fs.readFileSync(filePath);
+      if (buffer[0] === 0xEF && buffer[1] === 0xBB && buffer[2] === 0xBF) {
+        fs.writeFileSync(filePath, buffer.slice(3));
+        console.log('✅ BOM eliminado:', path.relative(__dirname, filePath));
+      }
     }
   });
 }
 
-console.log('📁 Paso 1: Eliminando BOM de todos los archivos...');
-removeBOMFromAll(path.join(__dirname, 'src'));
+removeBOM(path.join(__dirname, 'src'));
 
-// Paso 2: Reemplazar el page.tsx de la landing con código 100% limpio
-console.log('\n🎨 Paso 2: Regenerando landing page...');
+// 2. Regenerar page.tsx de la landing (sin BOM, sin errores)
+console.log('\n🎨 Regenerando landing page...');
 const landingCode = `"use client";
 import { motion } from "framer-motion";
 import { Check, Wifi, MapPin, CloudSun, MessageCircle, CalendarCheck, CreditCard, Key, Star, ShoppingBag, UtensilsCrossed, Compass, Package, Clock, ShieldCheck, Zap, Heart, ArrowRight, Sparkles, Users, BarChart3, Bell, Camera, ExternalLink } from "lucide-react";
@@ -431,35 +422,19 @@ export default function LandingPage() {
 `;
 
 fs.writeFileSync(path.join(__dirname, 'src', 'app', 'page.tsx'), landingCode, 'utf8');
-console.log('✅ Landing page regenerada (sin BOM, sin espacios raros)');
+console.log('✅ Landing page regenerada');
 
-// Paso 3: Corregir variables de entorno en route.ts
-console.log('\n🔧 Paso 3: Corrigiendo variables de entorno...');
+// 3. Corregir variables de entorno en route.ts
+console.log('\n Corrigiendo route.ts...');
 const routePath = path.join(__dirname, 'src', 'app', 'api', 'cron', 'send-emails', 'route.ts');
 let routeContent = fs.readFileSync(routePath, 'utf8');
 routeContent = routeContent.replace(/NEXT_PUBLIC_SUPABASE_URL/g, 'SUPABASE_URL');
 routeContent = routeContent.replace(/SUPABASE_SERVICE_ROLE_KEY/g, 'SUPABASE_ANON_KEY');
 fs.writeFileSync(routePath, routeContent, 'utf8');
-console.log('✅ Variables de entorno corregidas en route.ts');
+console.log('✅ route.ts corregido');
 
-// Paso 4: Corregir CSVImport.tsx
-console.log('\n🔧 Paso 4: Corrigiendo CSVImport.tsx...');
-const csvPath = path.join(__dirname, 'src', 'components', 'reservations', 'CSVImport.tsx');
-let csvContent = fs.readFileSync(csvPath, 'utf8');
-// Agregar tenantId a Props si no está
-if (!csvContent.includes('tenantId: string')) {
-  csvContent = csvContent.replace(/tenantSlug: string/, 'tenantSlug: string\n  tenantId: string');
-}
-// Cambiar onSaved por onImported
-csvContent = csvContent.replace(/onSaved: \(\) => void/g, 'onImported: () => void');
-csvContent = csvContent.replace(/onSaved\(\)/g, 'onImported()');
-csvContent = csvContent.replace(/CSVImport\(\{ tenantSlug, onClose, onSaved \}/g, 'CSVImport({ tenantSlug, tenantId, onClose, onImported }');
-fs.writeFileSync(csvPath, csvContent, 'utf8');
-console.log('✅ CSVImport.tsx corregido');
-
-console.log('\n🎉 ¡REPARACIÓN COMPLETADA!');
-console.log('\n📋 Próximos pasos:');
-console.log('1. Ejecutá: git add .');
-console.log('2. Ejecutá: git commit -m "Fix: BOM eliminado y archivos corregidos"');
-console.log('3. Ejecutá: git push origin main');
-console.log('4. Esperá 2 minutos y probá en Vercel');
+console.log('\n🎉 ¡LISTO!');
+console.log('\nAhora ejecutá:');
+console.log('1. git add .');
+console.log('2. git commit -m "Fix: BOM + landing + route"');
+console.log('3. git push origin main');
