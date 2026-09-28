@@ -521,14 +521,7 @@ const Footer = () => (
       <div className="grid md:grid-cols-3 gap-10 mb-12">
         <div className="md:col-span-2">
           <div className="flex items-center gap-3 mb-4">
-            <Image 
-              src="/logotransparente1.png" 
-              alt="Mi Estadía" 
-              width={48} 
-              height={48} 
-              className="rounded-lg" 
-              style={{ width: "auto", height: "auto", mixBlendMode: "multiply" }} 
-            />
+            <Image src="/logotransparente1.png" alt="Mi Estadía" width={48} height={48} className="rounded-lg" style={{ width: "auto", height: "auto", mixBlendMode: "multiply" }} />
             <span className="text-2xl font-bold">Mi Estadía</span>
           </div>
           <p className="text-gray-400 max-w-md leading-relaxed">Tu alojamiento, más cerca. La plataforma SaaS que profesionaliza la gestión de reservas y ofrece una experiencia premium a tus huéspedes.</p>
