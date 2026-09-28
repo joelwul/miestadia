@@ -5,8 +5,8 @@ import { Resend } from 'resend'
 const resend = new Resend(process.env.RESEND_API_KEY)
 
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
+  process.env.SUPABASE_URL!,
+  process.env.SUPABASE_ANON_KEY!
 )
 
 function replacePlaceholders(template: string, data: Record<string, string>): string {
@@ -31,6 +31,7 @@ export async function GET() {
 
     const today = new Date()
     today.setHours(0, 0, 0, 0)
+
     let processed = 0
     let errors = 0
 
@@ -40,6 +41,7 @@ export async function GET() {
         preCheckin: '¡Hola {{guestName}}! Tu reserva en {{propertyName}} está confirmada...',
         postCheckout: '¡Hola {{guestName}}! Gracias por elegir {{propertyName}}...'
       }
+
       const preCheckinDays = tenant.pre_checkin_days || 4
       const postCheckoutDays = tenant.post_checkout_days || 1
 
@@ -69,7 +71,7 @@ export async function GET() {
           if (existing) continue
 
           const loginUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/${tenant.slug}?code=${res.reservation_code}&lastName=${encodeURIComponent(res.guests?.last_name || '')}`
-          
+
           const emailBody = replacePlaceholders(templates.preCheckin, {
             guestName: res.guests?.first_name || 'Huésped',
             propertyName: tenant.name,
@@ -83,7 +85,7 @@ export async function GET() {
 
           try {
             await resend.emails.send({
-              from: `${tenant.name} <onboarding@resend.dev>`,
+              from: `${tenant.name} <${process.env.FROM_EMAIL || 'onboarding@resend.dev'}>`,
               to: [res.guests?.email],
               subject: `Recordatorio: tu estadía en ${tenant.name} comienza en ${preCheckinDays} días`,
               html: `
@@ -111,6 +113,7 @@ export async function GET() {
               status: 'sent',
               sent_at: new Date().toISOString(),
             })
+
             processed++
           } catch (err: any) {
             await supabase.from('message_logs').insert({
@@ -168,7 +171,7 @@ export async function GET() {
 
           try {
             await resend.emails.send({
-              from: `${tenant.name} <onboarding@resend.dev>`,
+              from: `${tenant.name} <${process.env.FROM_EMAIL || 'onboarding@resend.dev'}>`,
               to: [res.guests?.email],
               subject: `Gracias por tu estadía en ${tenant.name}`,
               html: `
@@ -198,6 +201,7 @@ export async function GET() {
               status: 'sent',
               sent_at: new Date().toISOString(),
             })
+
             processed++
           } catch (err: any) {
             await supabase.from('message_logs').insert({
