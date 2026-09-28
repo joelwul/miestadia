@@ -27,18 +27,15 @@ interface ParsedData {
 }
 
 function parseDate(dateStr: string): string | null {
-  // Intentar parsear fecha en formato DD/MM/YYYY
   const match = dateStr.match(/(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})/)
   if (!match) return null
   const day = parseInt(match[1])
-  const month = parseInt(match[2]) - 1 // Meses en JS van de 0-11
+  const month = parseInt(match[2]) - 1
   let year = parseInt(match[3])
-  // Si el año tiene 2 dígitos, asumir 2000s
   if (year < 100) {
     year += 2000
   }
   const date = new Date(year, month, day)
-  // Verificar que la fecha sea válida
   if (isNaN(date.getTime())) {
     return null
   }
@@ -75,7 +72,6 @@ export default function TextParser({ tenantSlug, tenantId, onClose, onCreated }:
     let found = 0
     const total = 6
 
-    // Nombre (buscar patrones como "hola arnold Wild" o "nombre: Juan")
     const nameMatch = text.match(/(?:hola|nombre|name|huésped|guest)[:\s]+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)?)/i)
     if (nameMatch) {
       const parts = nameMatch[1].split(' ')
@@ -84,21 +80,18 @@ export default function TextParser({ tenantSlug, tenantId, onClose, onCreated }:
       found++
     }
 
-    // Email
     const emailMatch = text.match(/[\w.-]+@[\w.-]+\.\w+/)
     if (emailMatch) {
       result.email = emailMatch[0]
       found++
     }
 
-    // Teléfono (formatos argentinos)
     const phoneMatch = text.match(/(?:\+?\d{1,3}[\s-]?)?\(?\d{2,4}\)?[\s-]?\d{3,4}[\s-]?\d{3,4}/)
     if (phoneMatch) {
       result.phone = phoneMatch[0].replace(/\s/g, '').replace(/\-/g, '')
       found++
     }
 
-    // Check-in (fechas en formato DD/MM/YYYY o DD-MM-YYYY)
     const checkInMatch = text.match(/(?:check[-\s]?in|ingresar|entrada|llegada)[:\s]+(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i)
     if (checkInMatch) {
       const parsedDate = parseDate(checkInMatch[1])
@@ -108,7 +101,6 @@ export default function TextParser({ tenantSlug, tenantId, onClose, onCreated }:
       }
     }
 
-    // Check-out
     const checkOutMatch = text.match(/(?:check[-\s]?out|salida)[:\s]+(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i)
     if (checkOutMatch) {
       const parsedDate = parseDate(checkOutMatch[1])
@@ -118,7 +110,6 @@ export default function TextParser({ tenantSlug, tenantId, onClose, onCreated }:
       }
     }
 
-    // Si no encontró check-in/check-out con palabras clave, buscar fechas sueltas
     if (!result.checkIn || !result.checkOut) {
       const allDates = text.matchAll(/(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/g)
       const dates = Array.from(allDates).map(m => m[1])
@@ -138,7 +129,6 @@ export default function TextParser({ tenantSlug, tenantId, onClose, onCreated }:
       }
     }
 
-    // Cantidad de huéspedes
     const guestsMatch = text.match(/(\d+)\s*(?:huéspedes|personas|guests|people|huespedes)/i)
     if (guestsMatch) {
       result.guests = parseInt(guestsMatch[1])
@@ -170,7 +160,6 @@ export default function TextParser({ tenantSlug, tenantId, onClose, onCreated }:
 
     setLoading(true)
 
-    // Crear huésped
     const { data: guest, error: guestError } = await supabase
       .from('guests')
       .insert({
@@ -188,7 +177,6 @@ export default function TextParser({ tenantSlug, tenantId, onClose, onCreated }:
       return
     }
 
-    // Crear reserva
     const { data: reservation, error: resError } = await supabase
       .from('reservations')
       .insert({
@@ -205,7 +193,6 @@ export default function TextParser({ tenantSlug, tenantId, onClose, onCreated }:
       .single()
 
     if (!resError && reservation) {
-      // Traer datos completos
       const { data: fullReservation } = await supabase
         .from('reservations')
         .select(`*, guests (first_name, last_name, email, phone), units (name, type)`)

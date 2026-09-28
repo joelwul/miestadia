@@ -1,5 +1,4 @@
 ﻿'use client'
-
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -9,11 +8,12 @@ import { X, Upload, AlertCircle } from 'lucide-react'
 
 interface Props {
   tenantSlug: string
+  tenantId: string
   onClose: () => void
-  onSaved: () => void
+  onImported: () => void
 }
 
-export default function CSVImport({ tenantSlug, onClose, onSaved }: Props) {
+export default function CSVImport({ tenantSlug, tenantId, onClose, onImported }: Props) {
   const [file, setFile] = useState<File | null>(null)
   const [preview, setPreview] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
@@ -22,37 +22,27 @@ export default function CSVImport({ tenantSlug, onClose, onSaved }: Props) {
 
   useEffect(() => {
     loadUnits()
-  }, [tenantSlug])
+  }, [tenantId])
 
   async function loadUnits() {
-    const { data: tenant } = await supabase
-      .from('tenants')
-      .select('id')
-      .eq('slug', tenantSlug)
-      .single()
-
-    if (tenant) {
-      const { data } = await supabase
-        .from('units')
-        .select('id, name')
-        .eq('tenant_id', tenant.id)
-        .eq('status', 'active')
-      
-      if (data) setUnits(data)
-    }
+    const { data } = await supabase
+      .from('units')
+      .select('id, name')
+      .eq('tenant_id', tenantId)
+      .eq('status', 'active')
+    if (data) setUnits(data)
   }
 
   function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
-
     setFile(file)
+
     const reader = new FileReader()
     reader.onload = (event) => {
       const text = event.target?.result as string
       const lines = text.split('\n')
       const headers = lines[0].split(',').map(h => h.trim())
-      
       const data = lines.slice(1).map(line => {
         const values = line.split(',').map(v => v.trim())
         const row: any = {}
@@ -61,7 +51,6 @@ export default function CSVImport({ tenantSlug, onClose, onSaved }: Props) {
         })
         return row
       })
-
       setPreview(data)
     }
     reader.readAsText(file)
@@ -69,7 +58,7 @@ export default function CSVImport({ tenantSlug, onClose, onSaved }: Props) {
 
   function generateCode() {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-    let code = 'CEP-'
+    let code = tenantSlug.substring(0, 3).toUpperCase() + '-'
     for (let i = 0; i < 5; i++) {
       code += chars.charAt(Math.floor(Math.random() * chars.length))
     }
@@ -78,27 +67,14 @@ export default function CSVImport({ tenantSlug, onClose, onSaved }: Props) {
 
   async function handleImport() {
     if (!file || preview.length === 0) return
-
     setLoading(true)
 
-    const { data: tenant } = await supabase
-      .from('tenants')
-      .select('id')
-      .eq('slug', tenantSlug)
-      .single()
-
-    if (!tenant) {
-      setLoading(false)
-      return
-    }
-
     let successCount = 0
-
     for (const row of preview) {
       const { data: guest } = await supabase
         .from('guests')
         .insert({
-          tenant_id: tenant.id,
+          tenant_id: tenantId,
           first_name: row.nombre || row.firstName || 'Huésped',
           last_name: row.apellido || row.lastName || 'Sin apellido',
           email: row.email || '',
@@ -112,7 +88,7 @@ export default function CSVImport({ tenantSlug, onClose, onSaved }: Props) {
         await supabase
           .from('reservations')
           .insert({
-            tenant_id: tenant.id,
+            tenant_id: tenantId,
             reservation_code: generateCode(),
             guest_id: guest.id,
             unit_id: units[0]?.id,
@@ -121,16 +97,14 @@ export default function CSVImport({ tenantSlug, onClose, onSaved }: Props) {
             status: 'booked',
             source: 'csv_import',
           })
-        
         successCount++
       }
     }
 
     if (successCount > 0) {
-      onSaved()
+      onImported()
       onClose()
     }
-
     setLoading(false)
   }
 
@@ -192,7 +166,6 @@ export default function CSVImport({ tenantSlug, onClose, onSaved }: Props) {
                   </div>
                 )}
               </div>
-
               <div className="flex gap-3 pt-4">
                 <Button onClick={handleImport} disabled={loading} className="flex-1">
                   {loading ? 'Importando...' : `Importar ${preview.length} Reservas`}

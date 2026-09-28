@@ -7,7 +7,7 @@ export async function GET() {
   try {
     const data = await resend.emails.send({
       from: 'Mi Estadía <onboarding@resend.dev>',
-      to: ['tu-email@ejemplo.com'], // ← CAMBIÁ POR TU EMAIL
+      to: ['tu-email@ejemplo.com'],
       subject: 'Prueba de email - Mi Estadía',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
