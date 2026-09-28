@@ -9,6 +9,7 @@ import { X, Upload, AlertCircle } from 'lucide-react'
 interface Props {
   tenantSlug: string
   tenantId: string
+  tenantId: string
   onClose: () => void
   onImported: () => void
 }

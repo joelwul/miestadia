@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 import { motion } from "framer-motion";
 import { ArrowRight, MessageCircle, CalendarCheck, Bell, BarChart3 } from "lucide-react";
 import Link from "next/link";
@@ -26,36 +26,31 @@ export default function Home() {
           initial={{ opacity: 0, y: 40 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.5, duration: 1 }}
-          className="text-5xl md:text-7xl font-bold text-white tracking-tight"
-        >
+          className="text-5xl md:text-7xl font-bold text-white tracking-tight">
           Mi Estadía
         </motion.h1>
         <motion.p
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.7, duration: 1 }}
-          className="mt-4 text-xl md:text-2xl text-white font-medium"
-        >
+          className="mt-4 text-xl md:text-2xl text-white font-medium">
           Tu alojamiento, más cerca.
         </motion.p>
         <motion.p
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.9, duration: 1 }}
-          className="mt-6 max-w-2xl text-lg text-white font-medium"
-        >
+          className="mt-6 max-w-2xl text-lg text-white font-medium">
           Dejá el caos de WhatsApp y las planillas. Gestioná reservas, check-ins, pagos y ofrecé una experiencia premium a tus huéspedes.
         </motion.p>
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 1.1, duration: 1 }}
-          className="mt-10 flex flex-col sm:flex-row gap-4"
-        >
+          className="mt-10 flex flex-col sm:flex-row gap-4">
           <Link
             href="/login"
-            className="group px-8 py-4 rounded-full bg-[#EA580C] text-white font-bold text-lg hover:bg-[#C2410C] transition shadow-lg flex items-center justify-center gap-2"
-          >
+            className="group px-8 py-4 rounded-full bg-[#EA580C] text-white font-bold text-lg hover:bg-[#C2410C] transition shadow-lg flex items-center justify-center gap-2">
             Probar gratis 30 días
             <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition" />
           </Link>
@@ -63,8 +58,7 @@ export default function Home() {
             href="https://wa.me/5491131923742"
             target="_blank"
             rel="noopener noreferrer"
-            className="px-8 py-4 rounded-full border-2 border-white text-white font-bold text-lg hover:bg-white hover:text-[#0F766E] transition flex items-center justify-center gap-2"
-          >
+            className="px-8 py-4 rounded-full border-2 border-white text-white font-bold text-lg hover:bg-white hover:text-[#0F766E] transition flex items-center justify-center gap-2">
             <MessageCircle className="w-5 h-5" />
             Hablar por WhatsApp
           </a>
@@ -86,8 +80,7 @@ export default function Home() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: i * 0.15 }}
-                className="bg-white border border-gray-100 rounded-3xl p-8 shadow-lg"
-              >
+                className="bg-white border border-gray-100 rounded-3xl p-8 shadow-lg">
                 <div className={`${step.color} w-16 h-16 rounded-2xl flex items-center justify-center text-white mb-6`}>{step.icon}</div>
                 <h3 className="text-xl font-bold text-gray-900 mb-3">{step.title}</h3>
                 <p className="text-gray-600">{step.desc}</p>

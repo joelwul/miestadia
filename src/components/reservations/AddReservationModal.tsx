@@ -210,8 +210,7 @@ export default function AddReservationModal({ tenantSlug, tenantId, onClose, onC
                               setSelectedGuest(guest)
                               setStep('details')
                             }}
-                            className="w-full text-left p-3 hover:bg-gray-50 border-b border-gray-100 last:border-0"
-                          >
+                            className="w-full text-left p-3 hover:bg-gray-50 border-b border-gray-100 last:border-0">
                             <p className="font-medium text-gray-900">{guest.first_name} {guest.last_name}</p>
                             <p className="text-sm text-gray-500">{guest.email} • {guest.phone}</p>
                           </button>
@@ -302,8 +301,7 @@ export default function AddReservationModal({ tenantSlug, tenantId, onClose, onC
                     <select
                       value={selectedUnitId}
                       onChange={(e) => setSelectedUnitId(e.target.value)}
-                      className="w-full h-10 px-3 border border-gray-300 rounded-lg bg-white"
-                    >
+                      className="w-full h-10 px-3 border border-gray-300 rounded-lg bg-white">
                       <option value="">Seleccionar unidad</option>
                       {units.map(unit => (
                         <option key={unit.id} value={unit.id}>

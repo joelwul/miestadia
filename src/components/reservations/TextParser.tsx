@@ -289,8 +289,7 @@ export default function TextParser({ tenantSlug, tenantId, onClose, onCreated }:
                 <select
                   value={selectedUnitId}
                   onChange={(e) => setSelectedUnitId(e.target.value)}
-                  className="w-full h-10 px-3 border border-gray-300 rounded-lg bg-white"
-                >
+                  className="w-full h-10 px-3 border border-gray-300 rounded-lg bg-white">
                   <option value="">Seleccionar unidad</option>
                   {units.map(unit => (
                     <option key={unit.id} value={unit.id}>{unit.name}</option>
@@ -302,8 +301,7 @@ export default function TextParser({ tenantSlug, tenantId, onClose, onCreated }:
                 <Button
                   onClick={handleConfirm}
                   disabled={loading || !selectedUnitId}
-                  className="flex-1"
-                >
+                  className="flex-1">
                   {loading ? 'Creando...' : 'Confirmar Reserva'}
                 </Button>
                 <Button variant="outline" onClick={onClose}>

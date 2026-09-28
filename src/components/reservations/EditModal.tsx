@@ -106,8 +106,7 @@ export default function EditReservationModal({ reservation, tenantSlug, units, o
                   value={formData.unitId}
                   onChange={(e) => setFormData({ ...formData, unitId: e.target.value })}
                   required
-                  className="w-full h-10 px-3 border border-gray-300 rounded-lg bg-white"
-                >
+                  className="w-full h-10 px-3 border border-gray-300 rounded-lg bg-white">
                   <option value="">Seleccionar</option>
                   {units.map(u => (
                     <option key={u.id} value={u.id}>{u.name}</option>

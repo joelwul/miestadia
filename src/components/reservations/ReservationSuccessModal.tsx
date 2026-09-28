@@ -66,8 +66,7 @@ export default function ReservationSuccessModal({ reservation, tenantSlug, onClo
           </div>
           <button 
             onClick={onClose} 
-            className="text-gray-500 hover:text-gray-700 p-2 hover:bg-gray-100 rounded-lg"
-          >
+            className="text-gray-500 hover:text-gray-700 p-2 hover:bg-gray-100 rounded-lg">
             <X className="h-6 w-6" />
           </button>
         </div>
@@ -165,8 +164,7 @@ export default function ReservationSuccessModal({ reservation, tenantSlug, onClo
               variant="outline" 
               className="w-full" 
               onClick={onClose}
-              size="lg"
-            >
+              size="lg">
               Cerrar
             </Button>
           </div>

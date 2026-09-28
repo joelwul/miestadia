@@ -167,8 +167,7 @@ export default function ManualReservationForm({ tenantSlug, onClose, onSaved }: 
               value={formData.unitId}
               onChange={(e) => setFormData({ ...formData, unitId: e.target.value })}
               required
-              className="w-full h-10 px-3 border border-gray-300 rounded-lg"
-            >
+              className="w-full h-10 px-3 border border-gray-300 rounded-lg">
               <option value="">Seleccionar unidad</option>
               {units.map(unit => (
                 <option key={unit.id} value={unit.id}>{unit.name}</option>
