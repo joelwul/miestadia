@@ -28,99 +28,203 @@ export default function LoginPage() {
   const router = useRouter();
   const supabase = createClient();
 
+  // ============================================
+  // LOGIN: Busca el tenant del usuario y redirige
+  // ============================================
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError("");
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    try {
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    if (error) {
-      setError(error.message);
+      if (authError) {
+        setError(authError.message);
+        setLoading(false);
+        return;
+      }
+
+      if (authData.user) {
+        // Estrategia 1: Buscar tenant por owner_email (usuarios existentes como Centro El Progreso)
+        const { data: tenantByEmail, error: emailError } = await supabase
+          .from("tenants")
+          .select("slug")
+          .eq("owner_email", email)
+          .single();
+
+        if (tenantByEmail && !emailError) {
+          router.push(`/${tenantByEmail.slug}/admin/dashboard`);
+          return;
+        }
+
+        // Estrategia 2: Buscar tenant por owner_id (usuarios que se registraron desde la app)
+        const { data: tenantById, error: idError } = await supabase
+          .from("tenants")
+          .select("slug")
+          .eq("owner_id", authData.user.id)
+          .single();
+
+        if (tenantById && !idError) {
+          router.push(`/${tenantById.slug}/admin/dashboard`);
+          return;
+        }
+
+        // No se encontró ningún tenant asociado
+        setError("No se encontró un panel asociado a esta cuenta. Contactá soporte.");
+        setLoading(false);
+      }
+    } catch (err: any) {
+      setError("Error inesperado: " + err.message);
       setLoading(false);
-    } else {
-      router.push("/dashboard");
     }
   };
 
+  // ============================================
+  // REGISTRO: Crea usuario y tenant automáticamente
+  // ============================================
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError("");
 
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          full_name: fullName,
-          property_name: propertyName,
-        },
-      },
-    });
+    try {
+      // Validar que el email no esté registrado
+      const { data: existingTenant } = await supabase
+        .from("tenants")
+        .select("id")
+        .eq("owner_email", email)
+        .single();
 
-    if (error) {
-      setError(error.message);
-      setLoading(false);
-    } else if (data.user) {
-      // Crear tenant inicial
-      const { error: tenantError } = await supabase.from("tenants").insert({
-        id: data.user.id,
-        name: propertyName || "Mi Propiedad",
-        slug:
-          propertyName?.toLowerCase().replace(/\s+/g, "-") || "mi-propiedad",
-        owner_id: data.user.id,
-        settings: {
-          currency: "USD",
-          timezone: "America/Argentina/Buenos_Aires",
-          language: "es",
-        },
-        branding: {
-          primaryColor: "#0F766E",
-          secondaryColor: "#EA580C",
+      if (existingTenant) {
+        setError("Ya existe una cuenta con este email. Por favor iniciá sesión.");
+        setLoading(false);
+        return;
+      }
+
+      // Crear usuario en Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: fullName,
+            property_name: propertyName,
+          },
         },
       });
 
-      if (tenantError) {
-        setError("Error al crear tu propiedad. Contacta soporte.");
+      if (authError) {
+        setError(authError.message);
         setLoading(false);
-      } else {
+        return;
+      }
+
+      if (authData.user) {
+        // Generar slug único
+        const baseSlug = propertyName?.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "") || "mi-propiedad";
+        let slug = baseSlug;
+        let counter = 1;
+
+        // Verificar que el slug no exista
+        while (true) {
+          const { data: existingSlug } = await supabase
+            .from("tenants")
+            .select("id")
+            .eq("slug", slug)
+            .single();
+
+          if (!existingSlug) break;
+          slug = `${baseSlug}-${counter}`;
+          counter++;
+        }
+
+        // Calcular fecha de fin de trial (30 días desde ahora)
+        const trialEndsAt = new Date();
+        trialEndsAt.setDate(trialEndsAt.getDate() + 30);
+
+        // Crear tenant con configuración inicial
+        const { error: tenantError } = await supabase.from("tenants").insert({
+          name: propertyName || "Mi Propiedad",
+          slug: slug,
+          owner_id: authData.user.id,
+          owner_email: email,
+          owner_name: fullName,
+          subscription_status: "trial",
+          trial_ends_at: trialEndsAt.toISOString(),
+          settings: {
+            currency: "USD",
+            timezone: "America/Argentina/Buenos_Aires",
+            language: "es",
+          },
+          branding: {
+            primaryColor: "#0F766E",
+            secondaryColor: "#EA580C",
+          },
+          auto_email_enabled: true,
+          pre_checkin_days: 2,
+          post_checkout_days: 1,
+        });
+
+        if (tenantError) {
+          console.error("Error creando tenant:", tenantError);
+          setError("Error al crear tu propiedad. Contacta soporte.");
+          setLoading(false);
+          return;
+        }
+
+        // Éxito
         setSuccessMessage(
-          "¡Cuenta creada! Revisá tu email para verificar tu cuenta."
+          "¡Cuenta creada exitosamente! Revisá tu email para verificar tu cuenta. Luego podrás ingresar."
         );
         setView("success");
         setLoading(false);
       }
+    } catch (err: any) {
+      console.error("Error en registro:", err);
+      setError("Error inesperado: " + err.message);
+      setLoading(false);
     }
   };
 
+  // ============================================
+  // RECUPERAR CONTRASEÑA
+  // ============================================
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError("");
 
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/login`,
-    });
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/login`,
+      });
 
-    if (error) {
-      setError(error.message);
-      setLoading(false);
-    } else {
-      setSuccessMessage(
-        "Email de recuperación enviado. Revisá tu bandeja de entrada."
-      );
-      setView("success");
+      if (error) {
+        setError(error.message);
+        setLoading(false);
+      } else {
+        setSuccessMessage(
+          "Email de recuperación enviado. Revisá tu bandeja de entrada (y spam)."
+        );
+        setView("success");
+        setLoading(false);
+      }
+    } catch (err: any) {
+      setError("Error inesperado: " + err.message);
       setLoading(false);
     }
   };
 
+  // ============================================
+  // RENDERIZADO
+  // ============================================
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#0F766E] via-[#166534] to-[#0F766E] flex items-center justify-center p-4">
-      {/* Logo de fondo decorativo */}
+      {/* Fondo decorativo */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-10 left-10 w-64 h-64 bg-white/5 rounded-full blur-3xl" />
         <div className="absolute bottom-10 right-10 w-96 h-96 bg-white/5 rounded-full blur-3xl" />
@@ -135,7 +239,6 @@ export default function LoginPage() {
         {/* Panel izquierdo - Branding */}
         <div className="hidden md:flex flex-col justify-between p-12 bg-gradient-to-br from-[#0F766E] to-[#166534] text-white">
           <div>
-            {/* Logo */}
             <div className="flex items-center gap-3 mb-8">
               <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
                 <Building2 className="w-7 h-7 text-white" />
@@ -143,7 +246,6 @@ export default function LoginPage() {
               <span className="text-2xl font-bold">Mi Estadía</span>
             </div>
 
-            {/* Título y descripción */}
             <h1 className="text-4xl font-bold mb-4 leading-tight">
               Tu alojamiento,
               <br />
@@ -154,7 +256,6 @@ export default function LoginPage() {
               pagos y ofrecer una experiencia premium a tus huéspedes.
             </p>
 
-            {/* Features */}
             <div className="space-y-4">
               {[
                 "Gestión completa de reservas",
@@ -177,7 +278,6 @@ export default function LoginPage() {
             </div>
           </div>
 
-          {/* Footer */}
           <div className="mt-8 pt-8 border-t border-white/20">
             <p className="text-sm text-white/70">
               © 2026 Mi Estadía. Todos los derechos reservados.
@@ -185,9 +285,10 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* Panel derecho - Formulario */}
+        {/* Panel derecho - Formularios */}
         <div className="p-8 md:p-12 flex flex-col justify-center">
           <AnimatePresence mode="wait">
+            {/* LOGIN */}
             {view === "login" && (
               <motion.div
                 key="login"
@@ -196,7 +297,6 @@ export default function LoginPage() {
                 exit={{ opacity: 0, x: -20 }}
                 className="space-y-6"
               >
-                {/* Header mobile */}
                 <div className="md:hidden text-center mb-8">
                   <div className="inline-flex items-center gap-3 mb-4">
                     <div className="w-12 h-12 bg-[#0F766E] rounded-xl flex items-center justify-center">
@@ -320,6 +420,7 @@ export default function LoginPage() {
               </motion.div>
             )}
 
+            {/* REGISTRO */}
             {view === "register" && (
               <motion.div
                 key="register"
@@ -443,6 +544,7 @@ export default function LoginPage() {
               </motion.div>
             )}
 
+            {/* RECUPERAR CONTRASEÑA */}
             {view === "forgot" && (
               <motion.div
                 key="forgot"
@@ -514,6 +616,7 @@ export default function LoginPage() {
               </motion.div>
             )}
 
+            {/* ÉXITO */}
             {view === "success" && (
               <motion.div
                 key="success"
