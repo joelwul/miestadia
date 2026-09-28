@@ -1,5 +1,4 @@
 ﻿'use client'
-
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -29,25 +28,20 @@ interface ParsedData {
 
 function parseDate(dateStr: string): string | null {
   // Intentar parsear fecha en formato DD/MM/YYYY
-  const match = dateStr.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/)
+  const match = dateStr.match(/(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})/)
   if (!match) return null
-  
   const day = parseInt(match[1])
   const month = parseInt(match[2]) - 1 // Meses en JS van de 0-11
   let year = parseInt(match[3])
-  
   // Si el año tiene 2 dígitos, asumir 2000s
   if (year < 100) {
     year += 2000
   }
-  
   const date = new Date(year, month, day)
-  
   // Verificar que la fecha sea válida
   if (isNaN(date.getTime())) {
     return null
   }
-  
   return date.toISOString().split('T')[0]
 }
 
@@ -69,7 +63,6 @@ export default function TextParser({ tenantSlug, tenantId, onClose, onCreated }:
       .select('id, name')
       .eq('tenant_id', tenantId)
       .eq('status', 'active')
-    
     if (data) setUnits(data)
   }
 
@@ -80,7 +73,7 @@ export default function TextParser({ tenantSlug, tenantId, onClose, onCreated }:
     }
 
     let found = 0
-    let total = 6
+    const total = 6
 
     // Nombre (buscar patrones como "hola arnold Wild" o "nombre: Juan")
     const nameMatch = text.match(/(?:hola|nombre|name|huésped|guest)[:\s]+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+)?)/i)
@@ -108,29 +101,40 @@ export default function TextParser({ tenantSlug, tenantId, onClose, onCreated }:
     // Check-in (fechas en formato DD/MM/YYYY o DD-MM-YYYY)
     const checkInMatch = text.match(/(?:check[-\s]?in|ingresar|entrada|llegada)[:\s]+(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i)
     if (checkInMatch) {
-      result.checkIn = parseDate(checkInMatch[1])
-      if (result.checkIn) found++
+      const parsedDate = parseDate(checkInMatch[1])
+      if (parsedDate) {
+        result.checkIn = parsedDate
+        found++
+      }
     }
 
     // Check-out
     const checkOutMatch = text.match(/(?:check[-\s]?out|salida)[:\s]+(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i)
     if (checkOutMatch) {
-      result.checkOut = parseDate(checkOutMatch[1])
-      if (result.checkOut) found++
+      const parsedDate = parseDate(checkOutMatch[1])
+      if (parsedDate) {
+        result.checkOut = parsedDate
+        found++
+      }
     }
 
     // Si no encontró check-in/check-out con palabras clave, buscar fechas sueltas
     if (!result.checkIn || !result.checkOut) {
       const allDates = text.matchAll(/(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/g)
       const dates = Array.from(allDates).map(m => m[1])
-      
       if (dates.length >= 1 && !result.checkIn) {
-        result.checkIn = parseDate(dates[0])
-        if (result.checkIn) found++
+        const parsedDate = parseDate(dates[0])
+        if (parsedDate) {
+          result.checkIn = parsedDate
+          found++
+        }
       }
       if (dates.length >= 2 && !result.checkOut) {
-        result.checkOut = parseDate(dates[1])
-        if (result.checkOut) found++
+        const parsedDate = parseDate(dates[1])
+        if (parsedDate) {
+          result.checkOut = parsedDate
+          found++
+        }
       }
     }
 
@@ -143,7 +147,6 @@ export default function TextParser({ tenantSlug, tenantId, onClose, onCreated }:
 
     result.confidence = Math.round((found / total) * 100)
     result.missingFields = []
-
     if (!result.firstName) result.missingFields.push('Nombre')
     if (!result.lastName) result.missingFields.push('Apellido')
     if (!result.email) result.missingFields.push('Email')
@@ -208,7 +211,7 @@ export default function TextParser({ tenantSlug, tenantId, onClose, onCreated }:
         .select(`*, guests (first_name, last_name, email, phone), units (name, type)`)
         .eq('id', reservation.id)
         .single()
-      
+
       onCreated(fullReservation || reservation)
     }
 
