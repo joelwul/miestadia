@@ -46,6 +46,7 @@ export default function LoginPage() {
       }
 
       if (authData.user) {
+        // Buscar tenant por owner_email
         const { data: tenant, error: tenantError } = await supabase
           .from("tenants")
           .select("slug")
@@ -55,8 +56,19 @@ export default function LoginPage() {
         if (tenant && !tenantError) {
           router.push(`/${tenant.slug}/admin/dashboard`);
         } else {
-          setError("No se encontró un panel asociado a esta cuenta. Contactá soporte.");
-          setLoading(false);
+          // Buscar por tenant_users
+          const { data: tenantUser } = await supabase
+            .from("tenant_users")
+            .select("tenants(slug)")
+            .eq("user_id", authData.user.id)
+            .single();
+
+          if (tenantUser?.tenants?.slug) {
+            router.push(`/${tenantUser.tenants.slug}/admin/dashboard`);
+          } else {
+            setError("No se encontró un panel asociado a esta cuenta. Contactá soporte.");
+            setLoading(false);
+          }
         }
       }
     } catch (err: any) {
@@ -71,18 +83,7 @@ export default function LoginPage() {
     setError("");
 
     try {
-      const { data: existingTenant } = await supabase
-        .from("tenants")
-        .select("id")
-        .eq("owner_email", email)
-        .single();
-
-      if (existingTenant) {
-        setError("Ya existe una cuenta con este email. Por favor iniciá sesión.");
-        setLoading(false);
-        return;
-      }
-
+      // 1. Crear usuario en Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
@@ -100,27 +101,41 @@ export default function LoginPage() {
         return;
       }
 
-      if (authData.user) {
-        const baseSlug = propertyName?.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "") || "mi-propiedad";
-        let slug = baseSlug;
-        let counter = 1;
+      if (!authData.user) {
+        setError("No se pudo crear el usuario. Verificá tu email.");
+        setLoading(false);
+        return;
+      }
 
-        while (true) {
-          const { data: existingSlug } = await supabase
-            .from("tenants")
-            .select("id")
-            .eq("slug", slug)
-            .single();
+      // 2. Generar slug único
+      const baseSlug = propertyName
+        ?.toLowerCase()
+        .replace(/\s+/g, "-")
+        .replace(/[^a-z0-9-]/g, "") || "mi-propiedad";
+      
+      let slug = baseSlug;
+      let counter = 1;
 
-          if (!existingSlug) break;
-          slug = `${baseSlug}-${counter}`;
-          counter++;
-        }
+      while (true) {
+        const { data: existingSlug } = await supabase
+          .from("tenants")
+          .select("id")
+          .eq("slug", slug)
+          .single();
 
-        const trialEndsAt = new Date();
-        trialEndsAt.setDate(trialEndsAt.getDate() + 30);
+        if (!existingSlug) break;
+        slug = `${baseSlug}-${counter}`;
+        counter++;
+      }
 
-        const { error: tenantError } = await supabase.from("tenants").insert({
+      // 3. Calcular fecha de fin de trial (30 días)
+      const trialEndsAt = new Date();
+      trialEndsAt.setDate(trialEndsAt.getDate() + 30);
+
+      // 4. Crear tenant (SIN owner_id, usando owner_email y owner_name)
+      const { data: newTenant, error: tenantError } = await supabase
+        .from("tenants")
+        .insert({
           name: propertyName || "Mi Propiedad",
           slug: slug,
           owner_email: email,
@@ -131,6 +146,8 @@ export default function LoginPage() {
             currency: "USD",
             timezone: "America/Argentina/Buenos_Aires",
             language: "es",
+            checkInTime: "15:00",
+            checkOutTime: "10:00",
           },
           branding: {
             primaryColor: "#0F766E",
@@ -139,19 +156,40 @@ export default function LoginPage() {
           auto_email_enabled: true,
           pre_checkin_days: 2,
           post_checkout_days: 1,
-        });
+        })
+        .select()
+        .single();
 
-        if (tenantError) {
-          setError("Error al crear tu propiedad. Contacta soporte.");
-          setLoading(false);
-          return;
-        }
-
-        setSuccessMessage("¡Cuenta creada exitosamente! Revisá tu email para verificar tu cuenta.");
-        setView("success");
+      if (tenantError) {
+        console.error("Error creando tenant:", tenantError);
+        setError("Error al crear tu propiedad: " + tenantError.message);
         setLoading(false);
+        return;
       }
+
+      // 5. Crear relación en tenant_users
+      if (newTenant?.id) {
+        const { error: tuError } = await supabase
+          .from("tenant_users")
+          .insert({
+            user_id: authData.user.id,
+            tenant_id: newTenant.id,
+            role: "owner",
+          });
+
+        if (tuError) {
+          console.error("Error creando tenant_users:", tuError);
+        }
+      }
+
+      // 6. Éxito
+      setSuccessMessage(
+        "¡Cuenta creada exitosamente! Revisá tu email para verificar tu cuenta. Luego podrás ingresar."
+      );
+      setView("success");
+      setLoading(false);
     } catch (err: any) {
+      console.error("Error en registro:", err);
       setError("Error inesperado: " + err.message);
       setLoading(false);
     }
@@ -171,7 +209,9 @@ export default function LoginPage() {
         setError(error.message);
         setLoading(false);
       } else {
-        setSuccessMessage("Email de recuperación enviado. Revisá tu bandeja de entrada.");
+        setSuccessMessage(
+          "Email de recuperación enviado. Revisá tu bandeja de entrada (y spam)."
+        );
         setView("success");
         setLoading(false);
       }
@@ -194,6 +234,7 @@ export default function LoginPage() {
         transition={{ duration: 0.6 }}
         className="relative z-10 w-full max-w-5xl grid md:grid-cols-2 bg-white rounded-3xl shadow-2xl overflow-hidden"
       >
+        {/* Panel izquierdo - Branding */}
         <div className="hidden md:flex flex-col justify-between p-12 bg-gradient-to-br from-[#0F766E] to-[#166534] text-white">
           <div>
             <div className="flex items-center gap-3 mb-8">
@@ -242,6 +283,7 @@ export default function LoginPage() {
           </div>
         </div>
 
+        {/* Panel derecho - Formularios */}
         <div className="p-8 md:p-12 flex flex-col justify-center">
           <AnimatePresence mode="wait">
             {view === "login" && (
@@ -257,19 +299,13 @@ export default function LoginPage() {
                     <div className="w-12 h-12 bg-[#0F766E] rounded-xl flex items-center justify-center">
                       <Building2 className="w-7 h-7 text-white" />
                     </div>
-                    <span className="text-2xl font-bold text-gray-900">
-                      Mi Estadía
-                    </span>
+                    <span className="text-2xl font-bold text-gray-900">Mi Estadía</span>
                   </div>
                 </div>
 
                 <div>
-                  <h2 className="text-3xl font-bold text-gray-900 mb-2">
-                    ¡Bienvenido!
-                  </h2>
-                  <p className="text-gray-600">
-                    Ingresá a tu panel de administración
-                  </p>
+                  <h2 className="text-3xl font-bold text-gray-900 mb-2">¡Bienvenido!</h2>
+                  <p className="text-gray-600">Ingresá a tu panel de administración</p>
                 </div>
 
                 {error && (
@@ -285,9 +321,7 @@ export default function LoginPage() {
 
                 <form onSubmit={handleLogin} className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Email
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
                     <div className="relative">
                       <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                       <input
@@ -302,9 +336,7 @@ export default function LoginPage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Contraseña
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Contraseña</label>
                     <div className="relative">
                       <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                       <input
@@ -320,10 +352,7 @@ export default function LoginPage() {
 
                   <div className="flex items-center justify-between">
                     <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        className="w-4 h-4 rounded border-gray-300"
-                      />
+                      <input type="checkbox" className="w-4 h-4 rounded border-gray-300" />
                       <span className="text-sm text-gray-600">Recordarme</span>
                     </label>
                     <button
@@ -356,9 +385,7 @@ export default function LoginPage() {
                     <div className="w-full border-t border-gray-200" />
                   </div>
                   <div className="relative flex justify-center text-sm">
-                    <span className="px-4 bg-white text-gray-500">
-                      ¿Nuevo en Mi Estadía?
-                    </span>
+                    <span className="px-4 bg-white text-gray-500">¿Nuevo en Mi Estadía?</span>
                   </div>
                 </div>
 
@@ -384,12 +411,8 @@ export default function LoginPage() {
                 className="space-y-6"
               >
                 <div>
-                  <h2 className="text-3xl font-bold text-gray-900 mb-2">
-                    Crear cuenta
-                  </h2>
-                  <p className="text-gray-600">
-                    Comenzá tu prueba gratis de 30 días
-                  </p>
+                  <h2 className="text-3xl font-bold text-gray-900 mb-2">Crear cuenta</h2>
+                  <p className="text-gray-600">Comenzá tu prueba gratis de 30 días</p>
                 </div>
 
                 {error && (
@@ -405,9 +428,7 @@ export default function LoginPage() {
 
                 <form onSubmit={handleRegister} className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Nombre completo
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Nombre completo</label>
                     <div className="relative">
                       <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                       <input
@@ -422,9 +443,7 @@ export default function LoginPage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Nombre de tu propiedad
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Nombre de tu propiedad</label>
                     <div className="relative">
                       <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                       <input
@@ -439,9 +458,7 @@ export default function LoginPage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Email
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
                     <div className="relative">
                       <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                       <input
@@ -456,9 +473,7 @@ export default function LoginPage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Contraseña
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Contraseña</label>
                     <div className="relative">
                       <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                       <input
@@ -507,12 +522,8 @@ export default function LoginPage() {
                 className="space-y-6"
               >
                 <div>
-                  <h2 className="text-3xl font-bold text-gray-900 mb-2">
-                    Recuperar contraseña
-                  </h2>
-                  <p className="text-gray-600">
-                    Te enviaremos un link para restablecer tu contraseña
-                  </p>
+                  <h2 className="text-3xl font-bold text-gray-900 mb-2">Recuperar contraseña</h2>
+                  <p className="text-gray-600">Te enviaremos un link para restablecer tu contraseña</p>
                 </div>
 
                 {error && (
@@ -528,9 +539,7 @@ export default function LoginPage() {
 
                 <form onSubmit={handleForgotPassword} className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Email
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
                     <div className="relative">
                       <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                       <input
@@ -580,9 +589,7 @@ export default function LoginPage() {
                   <CheckCircle className="w-12 h-12 text-green-600" />
                 </div>
                 <div>
-                  <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                    ¡Listo!
-                  </h2>
+                  <h2 className="text-2xl font-bold text-gray-900 mb-2">¡Listo!</h2>
                   <p className="text-gray-600">{successMessage}</p>
                 </div>
                 <button
