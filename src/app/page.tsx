@@ -129,7 +129,7 @@ const Hero = () => {
         <Logo size={220} />
       </motion.div>
       <motion.h1 initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3, duration: 1 }} className="relative z-10 mt-8 text-5xl md:text-7xl font-bold text-white tracking-tight leading-tight">
-        Menos trabajo para vos.
+        Más simple para vos.
         <br />
         <span className="text-yellow-300">Más experiencia</span> para tus huéspedes.
       </motion.h1>
