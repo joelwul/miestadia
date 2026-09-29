@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useParams } from "next/navigation";
@@ -10,7 +10,6 @@ import {
   AlertCircle,
   X,
   Package,
-  DollarSign,
   CheckCircle,
 } from "lucide-react";
 
@@ -352,4 +351,4 @@ export default function ServicesPage() {
       )}
     </div>
   );
-} 
+}

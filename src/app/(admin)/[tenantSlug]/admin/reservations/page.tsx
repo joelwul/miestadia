@@ -178,12 +178,10 @@ export default function ReservationsPage() {
     if (dateFrom && checkIn < new Date(dateFrom)) return false;
     if (dateTo && checkIn > new Date(dateTo)) return false;
 
-    // Si está en modo "ver checkouts", mostrar solo checked_out
     if (showCheckedOut) {
       return res.status === "checked_out";
     }
 
-    // Por defecto: NO mostrar checked_out
     if (res.status === "checked_out") return false;
 
     switch (filter) {
@@ -191,7 +189,7 @@ export default function ReservationsPage() {
       case "tomorrow": return checkIn.toDateString() === tomorrow.toDateString();
       case "nextweek": return checkIn >= nextWeekStart && checkIn <= nextWeekEnd;
       case "checkedout": return res.status === "checked_out";
-      default: return true; // "active" = todas las no checked_out
+      default: return true;
     }
   });
 
@@ -236,7 +234,7 @@ export default function ReservationsPage() {
     const code = reservation.reservation_code;
     const firstName = reservation.guest.first_name;
     switch (type) {
-      case "reminder": return `¡Hola ${firstName}! \n\nTe recordamos tu próxima reserva en *${tenant.name}*:\n\n📅 Check-in: ${checkIn}\n📅 Check-out: ${checkOut}\n🏠 Unidad: ${unitName}\n🔑 Código: ${code}\n\nAccedé a tu panel de huésped: ${guestPanelUrl}\n\n¡Te esperamos!\n\n— ${tenant.name}`;
+      case "reminder": return `¡Hola ${firstName}! 👋\n\nTe recordamos tu próxima reserva en *${tenant.name}*:\n\n📅 Check-in: ${checkIn}\n📅 Check-out: ${checkOut}\n🏠 Unidad: ${unitName}\n🔑 Código: ${code}\n\nAccedé a tu panel de huésped: ${guestPanelUrl}\n\n¡Te esperamos!\n\n— ${tenant.name}`;
       case "precheckin": return `¡Hola ${firstName}! \n\nTu check-in en *${tenant.name}* se acerca (${checkIn}).\n\nPara agilizar tu llegada, completá el pre check-in digital:\n${guestPanelUrl}\n\nAsí llegás directo a tu unidad sin trámites.\n\n— ${tenant.name}`;
       case "during": return `¡Hola ${firstName}! 😊\n\nEsperamos que estés disfrutando tu estadía en *${tenant.name}*.\n\nSi necesitás algo, no dudes en contactarnos.\n\nPanel de huésped: ${guestPanelUrl}\n\n— ${tenant.name}`;
       case "checkout": return `¡Hola ${firstName}! 🌅\n\nTe recordamos que tu check-out en *${tenant.name}* es el ${checkOut}.\n\nPor favor dejá la unidad en las condiciones acordadas.\n\n¡Gracias por elegirnos!\n\n— ${tenant.name}`;
@@ -376,6 +374,16 @@ export default function ReservationsPage() {
   };
 
   const handleCreateReservation = async () => {
+    // Validar fechas
+    if (formData.check_in && formData.check_out) {
+      const checkIn = new Date(formData.check_in);
+      const checkOut = new Date(formData.check_out);
+      if (checkOut <= checkIn) {
+        alert("La fecha de check-out debe ser posterior a la fecha de check-in.");
+        return;
+      }
+    }
+
     setActionLoading("create");
     try {
       let guestId = formData.guest_id;
@@ -434,6 +442,16 @@ export default function ReservationsPage() {
   };
 
   const handleUpdateReservation = async () => {
+    // Validar fechas
+    if (formData.check_in && formData.check_out) {
+      const checkIn = new Date(formData.check_in);
+      const checkOut = new Date(formData.check_out);
+      if (checkOut <= checkIn) {
+        alert("La fecha de check-out debe ser posterior a la fecha de check-in.");
+        return;
+      }
+    }
+
     if (!selectedReservation) return;
     setActionLoading("update");
     try {
@@ -868,5 +886,5 @@ export default function ReservationsPage() {
         </div>
       )}
     </div>
-  ); 
+  );
 }

@@ -261,7 +261,7 @@ export default function GuestPage() {
           
           if (weatherData.daily) {
             const weatherIcons: Record<number, string> = {
-              0: "️", 1: "🌤️", 2: "⛅", 3: "☁️",
+              0: "☀️", 1: "🌤️", 2: "⛅", 3: "☁️",
               45: "🌫️", 48: "️", 51: "🌦️", 53: "🌦️", 55: "🌧️",
               61: "🌧️", 63: "🌧️", 65: "🌧️", 71: "️", 73: "🌨️", 75: "❄️",
               80: "🌦️", 81: "🌧️", 82: "🌧️", 95: "️", 96: "⛈️", 99: "⛈️",
@@ -508,7 +508,7 @@ export default function GuestPage() {
                   {checkInDate.toLocaleDateString("es-AR", { weekday: "short", day: "numeric", month: "short" })}
                 </p>
                 {isCheckInToday ? (
-                  <p className="text-xs text-[#0F766E] mt-1 font-bold"> HOY</p>
+                  <p className="text-xs text-[#0F766E] mt-1 font-bold">📍 HOY</p>
                 ) : daysUntilCheckIn > 0 ? (
                   <p className="text-xs text-[#0F766E] mt-1">En {daysUntilCheckIn} {daysUntilCheckIn === 1 ? "día" : "días"}</p>
                 ) : null}
