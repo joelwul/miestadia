@@ -30,7 +30,6 @@ import {
   DollarSign,
   Globe,
   Clock4,
-  Camera,
 } from "lucide-react";
 
 interface Guest {
@@ -228,12 +227,11 @@ export default function GuestPage() {
           .order("sort_order", { ascending: true });
         setDestinationPlaces(placesData || []);
 
-        // Cargar clima real usando Open-Meteo (sin API key)
+        // Cargar clima real usando Open-Meteo
         const settings = tenantData.settings || {};
         const lat = settings.latitude || -34.6037;
         const lon = settings.longitude || -58.3816;
         
-        // Intentar extraer nombre de ubicación de la URL de Google Maps
         let locationName = "Tu destino";
         if (settings.googleMapsUrl) {
           try {
@@ -244,7 +242,6 @@ export default function GuestPage() {
               locationName = decodeURIComponent(pathParts[placeIndex + 1].replace(/\+/g, " "));
             }
           } catch (e) {
-            // Usar nombre del tenant como fallback
             locationName = tenantData.name;
           }
         }
@@ -264,10 +261,10 @@ export default function GuestPage() {
           
           if (weatherData.daily) {
             const weatherIcons: Record<number, string> = {
-              0: "☀️", 1: "🌤️", 2: "⛅", 3: "☁️",
-              45: "🌫️", 48: "🌫️", 51: "🌦️", 53: "🌦️", 55: "️",
-              61: "️", 63: "🌧️", 65: "🌧️", 71: "🌨️", 73: "🌨️", 75: "❄️",
-              80: "🌦️", 81: "🌧️", 82: "️", 95: "⛈️", 96: "⛈️", 99: "⛈️",
+              0: "️", 1: "🌤️", 2: "⛅", 3: "☁️",
+              45: "🌫️", 48: "️", 51: "🌦️", 53: "🌦️", 55: "🌧️",
+              61: "🌧️", 63: "🌧️", 65: "🌧️", 71: "️", 73: "🌨️", 75: "❄️",
+              80: "🌦️", 81: "🌧️", 82: "🌧️", 95: "️", 96: "⛈️", 99: "⛈️",
             };
             const weatherConditions: Record<number, string> = {
               0: "Despejado", 1: "Mayormente despejado", 2: "Parcialmente nublado", 3: "Nublado",
@@ -281,7 +278,7 @@ export default function GuestPage() {
               temp_max: Math.round(weatherData.daily.temperature_2m_max[i]),
               temp_min: Math.round(weatherData.daily.temperature_2m_min[i]),
               condition: weatherConditions[weatherData.daily.weathercode[i]] || "Desconocido",
-              icon: weatherIcons[weatherData.daily.weathercode[i]] || "️",
+              icon: weatherIcons[weatherData.daily.weathercode[i]] || "🌡️",
             }));
             setWeather(days);
           }
@@ -370,7 +367,6 @@ export default function GuestPage() {
 
   const whatsappMessage = `Hola ${tenant.name}! Soy ${reservation.guest?.first_name} ${reservation.guest?.last_name} (código ${reservation.reservation_code}). Necesito ayuda.`;
 
-  // Generar URL de embed de Google Maps desde coordenadas
   const getMapsEmbedUrl = () => {
     const lat = settings.latitude;
     const lon = settings.longitude;
@@ -384,7 +380,6 @@ export default function GuestPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header compacto */}
       <header className="bg-gradient-to-r from-[#0F766E] to-[#166534] text-white py-6 px-4">
         <div className="max-w-4xl mx-auto">
           <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="text-center">
@@ -396,7 +391,7 @@ export default function GuestPage() {
       </header>
 
       <div className="max-w-4xl mx-auto px-4 py-6 space-y-4">
-        {/* TARJETA DE PAGO - Compacta */}
+        {/* TARJETA DE PAGO */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
           <div className="bg-gradient-to-r from-[#0F766E] to-[#166534] px-4 py-3">
             <div className="flex items-center justify-between">
@@ -468,7 +463,7 @@ export default function GuestPage() {
           </div>
         </motion.div>
 
-        {/* TARJETA DE CLIMA - Día por día con ubicación real */}
+        {/* TARJETA DE CLIMA */}
         {weather.length > 0 && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             <div className="bg-gradient-to-r from-[#00B4D8] to-[#0077B6] px-4 py-3">
@@ -513,7 +508,7 @@ export default function GuestPage() {
                   {checkInDate.toLocaleDateString("es-AR", { weekday: "short", day: "numeric", month: "short" })}
                 </p>
                 {isCheckInToday ? (
-                  <p className="text-xs text-[#0F766E] mt-1 font-bold">📍 HOY</p>
+                  <p className="text-xs text-[#0F766E] mt-1 font-bold"> HOY</p>
                 ) : daysUntilCheckIn > 0 ? (
                   <p className="text-xs text-[#0F766E] mt-1">En {daysUntilCheckIn} {daysUntilCheckIn === 1 ? "día" : "días"}</p>
                 ) : null}
@@ -536,7 +531,6 @@ export default function GuestPage() {
               </div>
             </div>
             
-            {/* Unidad con inventario desplegable */}
             <div className="bg-gray-50 rounded-lg p-3">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
@@ -556,7 +550,7 @@ export default function GuestPage() {
               )}
               {showUnitDetails && reservation.unit?.description && (
                 <div className="mt-3 pt-3 border-t border-gray-200">
-                  <p className="text-xs text-gray-700">{reservation.unit.description}</p>
+                  <p className="text-xs text-gray-700 whitespace-pre-line">{reservation.unit.description}</p>
                 </div>
               )}
             </div>
@@ -654,7 +648,7 @@ export default function GuestPage() {
           </motion.div>
         )}
 
-        {/* GUÍA DEL DESTINO - Con detalles desplegables */}
+        {/* GUÍA DEL DESTINO - Desplegable */}
         {destinationPlaces.length > 0 && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             <div className="bg-gradient-to-r from-[#F59E0B] to-[#D97706] px-4 py-3">
@@ -720,7 +714,7 @@ export default function GuestPage() {
                           )}
                           {place.tips && (
                             <div className="bg-white rounded-lg p-2 border border-gray-200">
-                              <p className="text-xs font-semibold text-gray-700 mb-1"> Tips</p>
+                              <p className="text-xs font-semibold text-gray-700 mb-1">💡 Tips</p>
                               <p className="text-xs text-gray-600">{place.tips}</p>
                             </div>
                           )}
@@ -862,7 +856,6 @@ export default function GuestPage() {
           </div>
         </motion.div>
 
-        {/* Footer */}
         <div className="text-center py-6 text-xs text-gray-500">
           <p>Gestionado con Mi Estadía</p>
           <p className="mt-1">{tenant.name}</p>

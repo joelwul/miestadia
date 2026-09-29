@@ -15,6 +15,7 @@ import {
   Home,
   UserCheck,
   ArrowUpRight,
+  LogOut,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -46,14 +47,15 @@ export default function DashboardPage() {
   const [tenant, setTenant] = useState<Tenant | null>(null);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
-    activeReservations: 0,
+    arrivalsToday: 0,
+    departuresToday: 0,
     guestsCheckedIn: 0,
-    pendingCheckins: 0,
-    pendingCheckouts: 0,
-    revenue: 0,
+    upcomingReservations: 0,
+    occupancy: 0,
   });
   const [upcomingArrivals, setUpcomingArrivals] = useState<Reservation[]>([]);
   const [currentGuests, setCurrentGuests] = useState<Reservation[]>([]);
+  const [totalUnits, setTotalUnits] = useState(0);
   const supabase = createClient();
 
   useEffect(() => {
@@ -76,14 +78,47 @@ export default function DashboardPage() {
         today.setHours(0, 0, 0, 0);
         const todayStr = today.toISOString().split("T")[0];
 
-        // Reservas activas (booked, pre_checkin, checked_in)
-        const { data: activeRes } = await supabase
+        // Auto check-out: marcar como checked_out las reservas con check_out < hoy y status checked_in
+        const { data: overdueCheckouts } = await supabase
           .from("reservations")
           .select("id")
           .eq("tenant_id", tenantData.id)
-          .in("status", ["booked", "pre_checkin", "checked_in"]);
+          .eq("status", "checked_in")
+          .lt("check_out", todayStr);
 
-        // Huéspedes actualmente alojados (checked_in con check_out >= hoy)
+        if (overdueCheckouts && overdueCheckouts.length > 0) {
+          await supabase
+            .from("reservations")
+            .update({ status: "checked_out" })
+            .in("id", overdueCheckouts.map(r => r.id));
+        }
+
+        // Total de unidades activas
+        const { count: unitsCount } = await supabase
+          .from("units")
+          .select("*", { count: "exact", head: true })
+          .eq("tenant_id", tenantData.id)
+          .eq("status", "active");
+
+        setTotalUnits(unitsCount || 0);
+
+        // Llegadas hoy: check_in = hoy, status booked o pre_checkin
+        const { data: arrivalsToday } = await supabase
+          .from("reservations")
+          .select("id")
+          .eq("tenant_id", tenantData.id)
+          .eq("check_in", todayStr)
+          .in("status", ["booked", "pre_checkin"]);
+
+        // Salidas hoy: check_out = hoy, status checked_in
+        const { data: departuresToday } = await supabase
+          .from("reservations")
+          .select("id")
+          .eq("tenant_id", tenantData.id)
+          .eq("check_out", todayStr)
+          .eq("status", "checked_in");
+
+        // Huéspedes alojados: status = checked_in y check_out >= hoy
         const { data: checkedInRes } = await supabase
           .from("reservations")
           .select("id, guest_id, check_out")
@@ -91,39 +126,26 @@ export default function DashboardPage() {
           .eq("status", "checked_in")
           .gte("check_out", todayStr);
 
-        // Check-ins pendientes para hoy
-        const { data: pendingCheckins } = await supabase
+        // Próximas reservas: check_in > hoy, status booked o pre_checkin
+        const { data: upcomingRes } = await supabase
           .from("reservations")
           .select("id")
           .eq("tenant_id", tenantData.id)
-          .in("status", ["booked", "pre_checkin"])
-          .eq("check_in", todayStr);
+          .gt("check_in", todayStr)
+          .in("status", ["booked", "pre_checkin"]);
 
-        // Check-outs pendientes para hoy
-        const { data: pendingCheckouts } = await supabase
-          .from("reservations")
-          .select("id")
-          .eq("tenant_id", tenantData.id)
-          .eq("status", "checked_in")
-          .eq("check_out", todayStr);
+        // Próximas llegadas (próximos 7 días)
+        const nextWeek = new Date(today);
+        nextWeek.setDate(nextWeek.getDate() + 7);
+        const nextWeekStr = nextWeek.toISOString().split("T")[0];
 
-        // Ingresos del mes
-        const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString();
-        const { data: payments } = await supabase
-          .from("reservations")
-          .select("paid_amount")
-          .eq("tenant_id", tenantData.id)
-          .gte("created_at", firstOfMonth);
-
-        const totalRevenue = (payments || []).reduce((sum: number, r: any) => sum + (r.paid_amount || 0), 0);
-
-        // Próximas llegadas (check_in >= hoy, ordenadas por check_in)
         const { data: upcomingData } = await supabase
           .from("reservations")
           .select("id, reservation_code, guest_id, unit_id, check_in, check_out, status, total_amount, paid_amount")
           .eq("tenant_id", tenantData.id)
           .in("status", ["booked", "pre_checkin", "checked_in"])
           .gte("check_in", todayStr)
+          .lte("check_in", nextWeekStr)
           .order("check_in", { ascending: true })
           .limit(5);
 
@@ -158,12 +180,15 @@ export default function DashboardPage() {
         setUpcomingArrivals(enrichReservations(upcomingData));
         setCurrentGuests(enrichReservations(currentData));
 
+        // Calcular ocupación
+        const occupancy = totalUnits > 0 && checkedInRes ? Math.round((checkedInRes.length / totalUnits) * 100) : 0;
+
         setStats({
-          activeReservations: activeRes?.length || 0,
+          arrivalsToday: arrivalsToday?.length || 0,
+          departuresToday: departuresToday?.length || 0,
           guestsCheckedIn: checkedInRes?.length || 0,
-          pendingCheckins: pendingCheckins?.length || 0,
-          pendingCheckouts: pendingCheckouts?.length || 0,
-          revenue: totalRevenue,
+          upcomingReservations: upcomingRes?.length || 0,
+          occupancy,
         });
       } catch (err) {
         console.error("Error loading dashboard:", err);
@@ -245,16 +270,16 @@ export default function DashboardPage() {
             <Calendar className="w-8 h-8 text-[#0F766E]" />
             <span className="text-xs bg-[#0F766E]/10 text-[#0F766E] px-2 py-1 rounded-full">Hoy</span>
           </div>
-          <p className="text-3xl font-bold text-gray-900">{stats.pendingCheckins}</p>
+          <p className="text-3xl font-bold text-gray-900">{stats.arrivalsToday}</p>
           <p className="text-sm text-gray-500 mt-1">Llegadas hoy</p>
         </div>
 
         <div className="bg-white border border-gray-200 rounded-xl p-6">
           <div className="flex items-center justify-between mb-4">
-            <Clock className="w-8 h-8 text-[#EA580C]" />
+            <LogOut className="w-8 h-8 text-[#EA580C]" />
             <span className="text-xs bg-[#EA580C]/10 text-[#EA580C] px-2 py-1 rounded-full">Hoy</span>
           </div>
-          <p className="text-3xl font-bold text-gray-900">{stats.pendingCheckouts}</p>
+          <p className="text-3xl font-bold text-gray-900">{stats.departuresToday}</p>
           <p className="text-sm text-gray-500 mt-1">Salidas hoy</p>
         </div>
 
@@ -270,19 +295,19 @@ export default function DashboardPage() {
         <div className="bg-white border border-gray-200 rounded-xl p-6">
           <div className="flex items-center justify-between mb-4">
             <TrendingUp className="w-8 h-8 text-[#7C3AED]" />
-            <span className="text-xs bg-[#7C3AED]/10 text-[#7C3AED] px-2 py-1 rounded-full">Activas</span>
+            <span className="text-xs bg-[#7C3AED]/10 text-[#7C3AED] px-2 py-1 rounded-full">Futuras</span>
           </div>
-          <p className="text-3xl font-bold text-gray-900">{stats.activeReservations}</p>
+          <p className="text-3xl font-bold text-gray-900">{stats.upcomingReservations}</p>
           <p className="text-sm text-gray-500 mt-1">Próximas reservas</p>
         </div>
 
         <div className="bg-white border border-gray-200 rounded-xl p-6">
           <div className="flex items-center justify-between mb-4">
-            <DollarSign className="w-8 h-8 text-[#059669]" />
-            <span className="text-xs bg-[#059669]/10 text-[#059669] px-2 py-1 rounded-full">Mes</span>
+            <Home className="w-8 h-8 text-[#059669]" />
+            <span className="text-xs bg-[#059669]/10 text-[#059669] px-2 py-1 rounded-full">Ocupación</span>
           </div>
-          <p className="text-3xl font-bold text-gray-900">${stats.revenue.toLocaleString("es-AR")}</p>
-          <p className="text-sm text-gray-500 mt-1">Ingresos</p>
+          <p className="text-3xl font-bold text-gray-900">{stats.occupancy}%</p>
+          <p className="text-sm text-gray-500 mt-1">Unidades ocupadas</p>
         </div>
       </div>
 
