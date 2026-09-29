@@ -55,6 +55,8 @@ export default function ReservationsPage() {
   const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [filter, setFilter] = useState<FilterType>("all");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const supabase = createClient();
 
   useEffect(() => {
@@ -74,7 +76,6 @@ export default function ReservationsPage() {
 
         setTenant(tenantData);
 
-        // Ordenadas por created_at DESC (más recientes primero)
         const { data: reservationsData, error: reservationsError } = await supabase
           .from("reservations")
           .select("*")
@@ -138,6 +139,15 @@ export default function ReservationsPage() {
       res.unit_name.toLowerCase().includes(searchTerm.toLowerCase());
 
     if (!matchesSearch) return false;
+
+    if (dateFrom) {
+      const fromDate = new Date(dateFrom);
+      if (checkIn < fromDate) return false;
+    }
+    if (dateTo) {
+      const toDate = new Date(dateTo);
+      if (checkIn > toDate) return false;
+    }
 
     switch (filter) {
       case "today":
@@ -239,17 +249,34 @@ export default function ReservationsPage() {
         </button>
       </div>
 
-      {/* Barra de búsqueda y filtros */}
       <div className="bg-white border border-gray-200 rounded-xl p-4">
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input
               type="text"
-              placeholder="Buscar por nombre, código o unidad..."
+              placeholder="Buscar por nombre, apellido, código o unidad..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E] focus:border-transparent"
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
+              placeholder="Desde"
+            />
+            <span className="text-gray-500">-</span>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
+              placeholder="Hasta"
             />
           </div>
 
@@ -290,13 +317,12 @@ export default function ReservationsPage() {
         </div>
       </div>
 
-      {/* Lista de reservas */}
       {filteredReservations.length === 0 ? (
         <div className="bg-white border border-gray-200 rounded-xl p-12 text-center">
           <Calendar className="w-16 h-16 text-gray-300 mx-auto mb-4" />
           <h3 className="text-xl font-bold text-gray-900 mb-2">No hay reservas</h3>
           <p className="text-gray-600">
-            {searchTerm || filter !== "all"
+            {searchTerm || filter !== "all" || dateFrom || dateTo
               ? "No se encontraron reservas con los filtros aplicados."
               : "Comenzá agregando tu primera reserva."}
           </p>

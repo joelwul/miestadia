@@ -8,7 +8,6 @@ import {
   Home,
   Settings,
   MessageCircle,
-  BarChart3,
   CreditCard,
 } from "lucide-react";
 
@@ -20,14 +19,14 @@ export default function Sidebar({ tenantSlug }: SidebarProps) {
   const pathname = usePathname();
 
   const menuItems = [
-  { href: `/${tenantSlug}/admin/dashboard`, label: "Dashboard", icon: LayoutDashboard },
-  { href: `/${tenantSlug}/admin/reservations`, label: "Reservas", icon: Calendar },
-  { href: `/${tenantSlug}/admin/guests`, label: "Huéspedes", icon: Users },
-  { href: `/${tenantSlug}/admin/units`, label: "Unidades", icon: Home },
-  { href: `/${tenantSlug}/admin/messages`, label: "Mensajes", icon: MessageCircle },
-  { href: `/${tenantSlug}/admin/billing`, label: "Pagos y Suscripción", icon: CreditCard },
-  { href: `/${tenantSlug}/admin/settings`, label: "Configuración", icon: Settings },
-];
+    { href: `/${tenantSlug}/admin/dashboard`, label: "Dashboard", icon: LayoutDashboard },
+    { href: `/${tenantSlug}/admin/reservations`, label: "Reservas", icon: Calendar },
+    { href: `/${tenantSlug}/admin/guests`, label: "Huéspedes", icon: Users },
+    { href: `/${tenantSlug}/admin/units`, label: "Unidades", icon: Home },
+    { href: `/${tenantSlug}/admin/messages`, label: "Mensajes", icon: MessageCircle },
+    { href: `/${tenantSlug}/admin/billing`, label: "Pagos y Suscripción", icon: CreditCard },
+    { href: `/${tenantSlug}/admin/settings`, label: "Configuración", icon: Settings },
+  ];
 
   return (
     <aside className="w-64 bg-white border-r border-gray-200 flex flex-col">
@@ -61,15 +60,17 @@ export default function Sidebar({ tenantSlug }: SidebarProps) {
         })}
       </nav>
 
-<div className="p-4 border-t border-gray-200">
-  <a
-    href={`https://miestadia.online/${tenantSlug}`}
-    target="_blank"
-    rel="noopener noreferrer"
-    className="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"
-  >
-    <Home className="w-5 h-5" />
-    <span className="font-medium">Ver sitio público</span>
-  </a>
-</div>
+      <div className="p-4 border-t border-gray-200">
+        <a
+          href={`https://miestadia.online/${tenantSlug}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"
+        >
+          <Home className="w-5 h-5" />
+          <span className="font-medium">Ver sitio público</span>
+        </a>
+      </div>
+    </aside>
+  );
 }

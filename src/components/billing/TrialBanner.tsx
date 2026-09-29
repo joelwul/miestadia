@@ -42,7 +42,6 @@ export default function TrialBanner({ tenantId, compact = false }: TrialBannerPr
   const isExpired = daysLeft <= 0;
 
   if (compact) {
-    // Versión compacta para mostrar fija abajo a la izquierda
     return (
       <div className={`rounded-lg shadow-lg border p-3 max-w-xs ${
         isExpired
@@ -82,6 +81,5 @@ export default function TrialBanner({ tenantId, compact = false }: TrialBannerPr
     );
   }
 
-  // Versión completa (ya no se usa, pero la dejo por si acaso)
   return null;
 }

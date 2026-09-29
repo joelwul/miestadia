@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import Sidebar from "@/components/admin/Sidebar";
 import TrialBanner from "@/components/billing/TrialBanner";
 
 export default function AdminLayout({
@@ -41,7 +42,7 @@ export default function AdminLayout({
 
   return (
     <div className="flex h-screen bg-gray-50">
-      {/* El sidebar ya existe en otro lado, NO lo renderizamos acá */}
+      <Sidebar tenantSlug={tenantSlug} />
       <div className="flex-1 overflow-auto">
         <div className="p-8">
           {children}
@@ -50,7 +51,7 @@ export default function AdminLayout({
 
       {/* Banner de trial FIJO abajo a la izquierda */}
       {tenantId && (
-        <div className="fixed bottom-4 left-4 z-50">
+        <div className="fixed bottom-4 left-72 z-50">
           <TrialBanner tenantId={tenantId} compact />
         </div>
       )}
