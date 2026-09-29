@@ -30,6 +30,7 @@ import {
   Bell,
   DollarSign,
   History,
+  Archive,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -82,7 +83,7 @@ interface Tenant {
   slug: string;
 }
 
-type FilterType = "all" | "today" | "tomorrow" | "nextweek";
+type FilterType = "active" | "today" | "tomorrow" | "nextweek" | "checkedout";
 type ModalType = "none" | "add" | "edit" | "qr" | "delete" | "checkin" | "checkout" | "whatsapp" | "payment";
 type WhatsAppType = "reminder" | "precheckin" | "during" | "checkout" | "postcheckout";
 type AddMethod = "manual" | "csv" | "text";
@@ -98,7 +99,8 @@ export default function ReservationsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
-  const [filter, setFilter] = useState<FilterType>("all");
+  const [filter, setFilter] = useState<FilterType>("active");
+  const [showCheckedOut, setShowCheckedOut] = useState(false);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [activeModal, setActiveModal] = useState<ModalType>("none");
@@ -175,11 +177,21 @@ export default function ReservationsPage() {
     if (!matchesSearch) return false;
     if (dateFrom && checkIn < new Date(dateFrom)) return false;
     if (dateTo && checkIn > new Date(dateTo)) return false;
+
+    // Si está en modo "ver checkouts", mostrar solo checked_out
+    if (showCheckedOut) {
+      return res.status === "checked_out";
+    }
+
+    // Por defecto: NO mostrar checked_out
+    if (res.status === "checked_out") return false;
+
     switch (filter) {
       case "today": return checkIn.toDateString() === today.toDateString();
       case "tomorrow": return checkIn.toDateString() === tomorrow.toDateString();
       case "nextweek": return checkIn >= nextWeekStart && checkIn <= nextWeekEnd;
-      default: return true;
+      case "checkedout": return res.status === "checked_out";
+      default: return true; // "active" = todas las no checked_out
     }
   });
 
@@ -224,7 +236,7 @@ export default function ReservationsPage() {
     const code = reservation.reservation_code;
     const firstName = reservation.guest.first_name;
     switch (type) {
-      case "reminder": return `¡Hola ${firstName}! 👋\n\nTe recordamos tu próxima reserva en *${tenant.name}*:\n\n📅 Check-in: ${checkIn}\n📅 Check-out: ${checkOut}\n🏠 Unidad: ${unitName}\n🔑 Código: ${code}\n\nAccedé a tu panel de huésped: ${guestPanelUrl}\n\n¡Te esperamos!\n\n— ${tenant.name}`;
+      case "reminder": return `¡Hola ${firstName}! \n\nTe recordamos tu próxima reserva en *${tenant.name}*:\n\n📅 Check-in: ${checkIn}\n📅 Check-out: ${checkOut}\n🏠 Unidad: ${unitName}\n🔑 Código: ${code}\n\nAccedé a tu panel de huésped: ${guestPanelUrl}\n\n¡Te esperamos!\n\n— ${tenant.name}`;
       case "precheckin": return `¡Hola ${firstName}! \n\nTu check-in en *${tenant.name}* se acerca (${checkIn}).\n\nPara agilizar tu llegada, completá el pre check-in digital:\n${guestPanelUrl}\n\nAsí llegás directo a tu unidad sin trámites.\n\n— ${tenant.name}`;
       case "during": return `¡Hola ${firstName}! 😊\n\nEsperamos que estés disfrutando tu estadía en *${tenant.name}*.\n\nSi necesitás algo, no dudes en contactarnos.\n\nPanel de huésped: ${guestPanelUrl}\n\n— ${tenant.name}`;
       case "checkout": return `¡Hola ${firstName}! 🌅\n\nTe recordamos que tu check-out en *${tenant.name}* es el ${checkOut}.\n\nPor favor dejá la unidad en las condiciones acordadas.\n\n¡Gracias por elegirnos!\n\n— ${tenant.name}`;
@@ -271,7 +283,6 @@ export default function ReservationsPage() {
       const { error } = await supabase.from("reservations").update(updates).eq("id", selectedReservation.id);
       if (error) throw error;
 
-      // Registrar pago adicional si hay
       if (checkinData.additional_payment && parseFloat(checkinData.additional_payment) > 0) {
         const { error: payError } = await supabase.from("payments").insert({
           tenant_id: tenant!.id,
@@ -464,7 +475,9 @@ export default function ReservationsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Reservas</h1>
-          <p className="text-gray-500 mt-1">{filteredReservations.length} {filteredReservations.length === 1 ? "reserva" : "reservas"}</p>
+          <p className="text-gray-500 mt-1">
+            {showCheckedOut ? `${filteredReservations.length} reservas con check-out` : `${filteredReservations.length} ${filteredReservations.length === 1 ? "reserva activa" : "reservas activas"}`}
+          </p>
         </div>
         <button onClick={() => { setAddMethod("manual"); setActiveModal("add"); }} className="flex items-center gap-2 px-4 py-2 bg-[#0F766E] text-white rounded-lg text-sm font-medium hover:bg-[#0F766E]/90 transition-colors">
           <Plus className="w-4 h-4" />Nueva reserva
@@ -483,10 +496,14 @@ export default function ReservationsPage() {
             <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0F766E]" />
           </div>
           <div className="flex flex-wrap gap-2">
-            <button onClick={() => setFilter("today")} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === "today" ? "bg-[#0F766E] text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}>Hoy</button>
-            <button onClick={() => setFilter("tomorrow")} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === "tomorrow" ? "bg-[#0F766E] text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}>Mañana</button>
-            <button onClick={() => setFilter("nextweek")} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === "nextweek" ? "bg-[#0F766E] text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}>Semana que viene</button>
-            <button onClick={() => setFilter("all")} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === "all" ? "bg-[#0F766E] text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}>Todas</button>
+            <button onClick={() => { setFilter("active"); setShowCheckedOut(false); }} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === "active" && !showCheckedOut ? "bg-[#0F766E] text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}>Activas</button>
+            <button onClick={() => { setFilter("today"); setShowCheckedOut(false); }} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === "today" && !showCheckedOut ? "bg-[#0F766E] text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}>Hoy</button>
+            <button onClick={() => { setFilter("tomorrow"); setShowCheckedOut(false); }} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === "tomorrow" && !showCheckedOut ? "bg-[#0F766E] text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}>Mañana</button>
+            <button onClick={() => { setFilter("nextweek"); setShowCheckedOut(false); }} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === "nextweek" && !showCheckedOut ? "bg-[#0F766E] text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}>Semana</button>
+            <button onClick={() => setShowCheckedOut(!showCheckedOut)} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1 ${showCheckedOut ? "bg-gray-600 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}>
+              <Archive className="w-4 h-4" />
+              {showCheckedOut ? "Ocultar check-outs" : "Ver check-outs"}
+            </button>
           </div>
         </div>
       </div>
@@ -495,12 +512,12 @@ export default function ReservationsPage() {
         <div className="bg-white border border-gray-200 rounded-xl p-12 text-center">
           <Calendar className="w-16 h-16 text-gray-300 mx-auto mb-4" />
           <h3 className="text-xl font-bold text-gray-900 mb-2">No hay reservas</h3>
-          <p className="text-gray-600">{searchTerm || filter !== "all" || dateFrom || dateTo ? "No se encontraron reservas con los filtros aplicados." : "Comenzá agregando tu primera reserva."}</p>
+          <p className="text-gray-600">{searchTerm || filter !== "active" || dateFrom || dateTo || showCheckedOut ? "No se encontraron reservas con los filtros aplicados." : "Comenzá agregando tu primera reserva."}</p>
         </div>
       ) : (
         <div className="space-y-3">
           {filteredReservations.map((reservation) => (
-            <div key={reservation.id} className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-md transition-shadow">
+            <div key={reservation.id} className={`bg-white border rounded-xl p-6 hover:shadow-md transition-shadow ${reservation.status === "checked_out" ? "border-gray-300 opacity-75" : "border-gray-200"}`}>
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-3">
@@ -537,7 +554,7 @@ export default function ReservationsPage() {
         </div>
       )}
 
-      {/* MODAL: Check-in mejorado */}
+      {/* MODAL: Check-in */}
       {activeModal === "checkin" && selectedReservation && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
@@ -611,12 +628,13 @@ export default function ReservationsPage() {
                   <p className="text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1"><History className="w-3 h-3" />Historial de pagos</p>
                   <div className="space-y-2 max-h-40 overflow-y-auto">
                     {getReservationPayments(selectedReservation.id).map((p) => (
-                      <div key={p.id} className="bg-gray-50 rounded-lg p-3 flex items-center justify-between">
-                        <div>
+                      <div key={p.id} className="bg-gray-50 rounded-lg p-3">
+                        <div className="flex items-center justify-between mb-1">
                           <p className="font-semibold text-gray-900">${p.amount.toLocaleString("es-AR")}</p>
-                          <p className="text-xs text-gray-500">{getPaymentMethodLabel(p.method)} • {new Date(p.date).toLocaleDateString("es-AR")}</p>
+                          <span className="text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded-full">{getPaymentMethodLabel(p.method)}</span>
                         </div>
-                        {p.notes && <p className="text-xs text-gray-600 max-w-[200px] truncate">{p.notes}</p>}
+                        <p className="text-xs text-gray-500">{new Date(p.date).toLocaleDateString("es-AR", { weekday: "short", year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
+                        {p.notes && <p className="text-xs text-gray-600 mt-1 italic">"{p.notes}"</p>}
                       </div>
                     ))}
                   </div>

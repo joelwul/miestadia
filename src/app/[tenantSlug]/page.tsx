@@ -18,8 +18,6 @@ import {
   Wifi,
   MapPin,
   Compass,
-  ShoppingBag,
-  UtensilsCrossed,
   Star,
   Package,
   ExternalLink,
@@ -30,6 +28,9 @@ import {
   ChevronUp,
   History,
   DollarSign,
+  Globe,
+  Clock4,
+  Camera,
 } from "lucide-react";
 
 interface Guest {
@@ -94,11 +95,19 @@ interface DestinationPlace {
   category?: string;
   is_favorite: boolean;
   google_maps_url?: string;
+  address?: string;
+  phone?: string;
+  website?: string;
+  hours?: string;
+  tips?: string;
+  image_url?: string;
+  contact_info?: any;
 }
 
 interface WeatherData {
   date: string;
-  temp: number;
+  temp_max: number;
+  temp_min: number;
   condition: string;
   icon: string;
 }
@@ -119,8 +128,10 @@ export default function GuestPage() {
   const [services, setServices] = useState<Service[]>([]);
   const [destinationPlaces, setDestinationPlaces] = useState<DestinationPlace[]>([]);
   const [weather, setWeather] = useState<WeatherData[]>([]);
+  const [weatherLocation, setWeatherLocation] = useState("");
   const [showPaymentHistory, setShowPaymentHistory] = useState(false);
   const [showUnitDetails, setShowUnitDetails] = useState(false);
+  const [expandedPlace, setExpandedPlace] = useState<string | null>(null);
   const supabase = createClient();
 
   const [formData, setFormData] = useState({
@@ -139,7 +150,6 @@ export default function GuestPage() {
       }
 
       try {
-        // Cargar tenant
         const { data: tenantData, error: tenantError } = await supabase
           .from("tenants")
           .select("id, name, slug, settings, branding")
@@ -154,7 +164,6 @@ export default function GuestPage() {
 
         setTenant(tenantData);
 
-        // Cargar reserva
         const { data: reservationData, error: reservationError } = await supabase
           .from("reservations")
           .select("*")
@@ -168,14 +177,12 @@ export default function GuestPage() {
           return;
         }
 
-        // Cargar huésped
         const { data: guestData } = await supabase
           .from("guests")
           .select("id, first_name, last_name, email, phone")
           .eq("id", reservationData.guest_id)
           .single();
 
-        // Cargar unidad
         const { data: unitData } = await supabase
           .from("units")
           .select("id, name, type, capacity, description")
@@ -188,7 +195,6 @@ export default function GuestPage() {
           unit: unitData || undefined,
         };
 
-        // Validar apellido
         if (lastNameParam && enriched.guest?.last_name) {
           if (enriched.guest.last_name.toLowerCase() !== lastNameParam.toLowerCase()) {
             setError("El apellido no coincide con la reserva.");
@@ -205,7 +211,6 @@ export default function GuestPage() {
           .select("id, amount, method, date, notes")
           .eq("reservation_id", reservationData.id)
           .order("date", { ascending: false });
-
         setPayments(paymentsData || []);
 
         // Cargar servicios
@@ -213,43 +218,82 @@ export default function GuestPage() {
           .from("services")
           .select("id, name, description, price, is_requestable")
           .eq("tenant_id", tenantData.id);
-
         setServices(servicesData || []);
 
         // Cargar lugares del destino
         const { data: placesData } = await supabase
           .from("destination_places")
-          .select("id, name, description, category, is_favorite, google_maps_url")
+          .select("*")
           .eq("tenant_id", tenantData.id)
-          .order("is_favorite", { ascending: false });
-
+          .order("sort_order", { ascending: true });
         setDestinationPlaces(placesData || []);
 
-        // Cargar clima (simulado por ahora - en producción usarías una API real)
+        // Cargar clima real usando Open-Meteo (sin API key)
+        const settings = tenantData.settings || {};
+        const lat = settings.latitude || -34.6037;
+        const lon = settings.longitude || -58.3816;
+        
+        // Intentar extraer nombre de ubicación de la URL de Google Maps
+        let locationName = "Tu destino";
+        if (settings.googleMapsUrl) {
+          try {
+            const url = new URL(settings.googleMapsUrl);
+            const pathParts = url.pathname.split("/");
+            const placeIndex = pathParts.findIndex(p => p === "place");
+            if (placeIndex !== -1 && pathParts[placeIndex + 1]) {
+              locationName = decodeURIComponent(pathParts[placeIndex + 1].replace(/\+/g, " "));
+            }
+          } catch (e) {
+            // Usar nombre del tenant como fallback
+            locationName = tenantData.name;
+          }
+        }
+        setWeatherLocation(locationName);
+
         const checkIn = new Date(reservationData.check_in);
         const checkOut = new Date(reservationData.check_out);
-        const days: WeatherData[] = [];
-        const currentDate = new Date(checkIn);
         
-        while (currentDate <= checkOut) {
-          days.push({
-            date: currentDate.toISOString().split("T")[0],
-            temp: 24, // Temperatura simulada
-            condition: "Parcialmente nublado",
-            icon: "",
-          });
-          currentDate.setDate(currentDate.getDate() + 1);
-        }
-        
-        setWeather(days);
+        const startDate = checkIn.toISOString().split("T")[0];
+        const endDate = checkOut.toISOString().split("T")[0];
 
+        try {
+          const weatherRes = await fetch(
+            `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=temperature_2m_max,temperature_2m_min,weathercode&timezone=auto&start_date=${startDate}&end_date=${endDate}`
+          );
+          const weatherData = await weatherRes.json();
+          
+          if (weatherData.daily) {
+            const weatherIcons: Record<number, string> = {
+              0: "☀️", 1: "🌤️", 2: "⛅", 3: "☁️",
+              45: "🌫️", 48: "🌫️", 51: "🌦️", 53: "🌦️", 55: "️",
+              61: "️", 63: "🌧️", 65: "🌧️", 71: "🌨️", 73: "🌨️", 75: "❄️",
+              80: "🌦️", 81: "🌧️", 82: "️", 95: "⛈️", 96: "⛈️", 99: "⛈️",
+            };
+            const weatherConditions: Record<number, string> = {
+              0: "Despejado", 1: "Mayormente despejado", 2: "Parcialmente nublado", 3: "Nublado",
+              45: "Niebla", 48: "Niebla con escarcha", 51: "Llovizna leve", 53: "Llovizna moderada", 55: "Llovizna intensa",
+              61: "Lluvia leve", 63: "Lluvia moderada", 65: "Lluvia intensa", 71: "Nevada leve", 73: "Nevada moderada", 75: "Nevada intensa",
+              80: "Chubascos leves", 81: "Chubascos moderados", 82: "Chubascos violentos", 95: "Tormenta", 96: "Tormenta con granizo", 99: "Tormenta con granizo intenso",
+            };
+
+            const days: WeatherData[] = weatherData.daily.time.map((date: string, i: number) => ({
+              date,
+              temp_max: Math.round(weatherData.daily.temperature_2m_max[i]),
+              temp_min: Math.round(weatherData.daily.temperature_2m_min[i]),
+              condition: weatherConditions[weatherData.daily.weathercode[i]] || "Desconocido",
+              icon: weatherIcons[weatherData.daily.weathercode[i]] || "️",
+            }));
+            setWeather(days);
+          }
+        } catch (e) {
+          console.error("Error cargando clima:", e);
+        }
       } catch (err: any) {
         setError("Error al cargar los datos: " + err.message);
       } finally {
         setLoading(false);
       }
     }
-
     loadData();
   }, [tenantSlug, code, lastNameParam]);
 
@@ -259,12 +303,8 @@ export default function GuestPage() {
     try {
       const { error } = await supabase
         .from("reservations")
-        .update({
-          status: "pre_checkin",
-          notes: formData.special_requests,
-        })
+        .update({ status: "pre_checkin", notes: formData.special_requests })
         .eq("id", reservation.id);
-
       if (error) throw error;
       alert("Pre check-in guardado correctamente.");
     } catch (err: any) {
@@ -306,8 +346,14 @@ export default function GuestPage() {
   const checkInDate = new Date(reservation.check_in);
   const checkOutDate = new Date(reservation.check_out);
   const now = new Date();
-  const daysUntilCheckIn = Math.ceil((checkInDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-  const daysUntilCheckOut = Math.ceil((checkOutDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  now.setHours(0, 0, 0, 0);
+  const checkInDateOnly = new Date(reservation.check_in);
+  checkInDateOnly.setHours(0, 0, 0, 0);
+  const checkOutDateOnly = new Date(reservation.check_out);
+  checkOutDateOnly.setHours(0, 0, 0, 0);
+  
+  const daysUntilCheckIn = Math.ceil((checkInDateOnly.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  const daysUntilCheckOut = Math.ceil((checkOutDateOnly.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 
   const isCheckInToday = daysUntilCheckIn === 0;
   const isCheckOutToday = daysUntilCheckOut === 0;
@@ -322,8 +368,19 @@ export default function GuestPage() {
     }
   };
 
-  const guestPanelUrl = `https://miestadia.online/${tenantSlug}?code=${reservation.reservation_code}&lastName=${encodeURIComponent(reservation.guest?.last_name || "")}`;
   const whatsappMessage = `Hola ${tenant.name}! Soy ${reservation.guest?.first_name} ${reservation.guest?.last_name} (código ${reservation.reservation_code}). Necesito ayuda.`;
+
+  // Generar URL de embed de Google Maps desde coordenadas
+  const getMapsEmbedUrl = () => {
+    const lat = settings.latitude;
+    const lon = settings.longitude;
+    if (lat && lon) {
+      return `https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3000!2d${lon}!3d${lat}!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2z${lat},${lon}!5e0!3m2!1ses!2sar!4v1`;
+    }
+    return null;
+  };
+
+  const mapsEmbedUrl = getMapsEmbedUrl();
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -348,10 +405,7 @@ export default function GuestPage() {
                 <h2 className="text-lg font-bold text-white">Estado de Pago</h2>
               </div>
               {payments.length > 0 && (
-                <button
-                  onClick={() => setShowPaymentHistory(!showPaymentHistory)}
-                  className="text-white text-xs flex items-center gap-1 hover:underline"
-                >
+                <button onClick={() => setShowPaymentHistory(!showPaymentHistory)} className="text-white text-xs flex items-center gap-1 hover:underline">
                   <History className="w-3 h-3" />
                   {showPaymentHistory ? "Ocultar" : "Ver historial"} ({payments.length})
                 </button>
@@ -394,18 +448,18 @@ export default function GuestPage() {
               </div>
             )}
 
-            {/* Historial de pagos */}
             {showPaymentHistory && payments.length > 0 && (
               <div className="mt-4 pt-4 border-t border-gray-200">
                 <p className="text-xs font-semibold text-gray-700 mb-2">Historial de pagos</p>
                 <div className="space-y-2">
                   {payments.map((payment) => (
-                    <div key={payment.id} className="bg-gray-50 rounded-lg p-3 flex items-center justify-between">
-                      <div>
+                    <div key={payment.id} className="bg-gray-50 rounded-lg p-3">
+                      <div className="flex items-center justify-between mb-1">
                         <p className="text-sm font-bold text-gray-900">${payment.amount.toLocaleString("es-AR")}</p>
-                        <p className="text-xs text-gray-500">{getPaymentMethodLabel(payment.method)} • {new Date(payment.date).toLocaleDateString("es-AR")}</p>
+                        <span className="text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded-full">{getPaymentMethodLabel(payment.method)}</span>
                       </div>
-                      {payment.notes && <p className="text-xs text-gray-600 max-w-[150px] truncate">{payment.notes}</p>}
+                      <p className="text-xs text-gray-500">{new Date(payment.date).toLocaleDateString("es-AR", { weekday: "short", year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
+                      {payment.notes && <p className="text-xs text-gray-600 mt-1 italic">"{payment.notes}"</p>}
                     </div>
                   ))}
                 </div>
@@ -414,13 +468,13 @@ export default function GuestPage() {
           </div>
         </motion.div>
 
-        {/* TARJETA DE CLIMA - Día por día */}
+        {/* TARJETA DE CLIMA - Día por día con ubicación real */}
         {weather.length > 0 && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             <div className="bg-gradient-to-r from-[#00B4D8] to-[#0077B6] px-4 py-3">
               <div className="flex items-center gap-2">
                 <CloudSun className="w-5 h-5 text-white" />
-                <h2 className="text-lg font-bold text-white">Clima durante tu estadía</h2>
+                <h2 className="text-lg font-bold text-white">Clima en {weatherLocation}</h2>
               </div>
             </div>
             <div className="p-4">
@@ -430,8 +484,8 @@ export default function GuestPage() {
                     <p className="text-xs text-gray-500 mb-1">
                       {new Date(day.date).toLocaleDateString("es-AR", { weekday: "short", day: "numeric", month: "short" })}
                     </p>
-                    <p className="text-2xl mb-1">{day.icon}</p>
-                    <p className="text-sm font-bold text-gray-900">{day.temp}°C</p>
+                    <p className="text-3xl mb-1">{day.icon}</p>
+                    <p className="text-sm font-bold text-gray-900">{day.temp_max}° / {day.temp_min}°</p>
                     <p className="text-xs text-gray-600">{day.condition}</p>
                   </div>
                 ))}
@@ -457,9 +511,12 @@ export default function GuestPage() {
                 </div>
                 <p className="text-sm font-bold text-gray-900">
                   {checkInDate.toLocaleDateString("es-AR", { weekday: "short", day: "numeric", month: "short" })}
-                  {isCheckInToday && <span className="text-[#0F766E] ml-1">(HOY)</span>}
                 </p>
-                {daysUntilCheckIn > 0 && <p className="text-xs text-[#0F766E] mt-1">En {daysUntilCheckIn} {daysUntilCheckIn === 1 ? "día" : "días"}</p>}
+                {isCheckInToday ? (
+                  <p className="text-xs text-[#0F766E] mt-1 font-bold">📍 HOY</p>
+                ) : daysUntilCheckIn > 0 ? (
+                  <p className="text-xs text-[#0F766E] mt-1">En {daysUntilCheckIn} {daysUntilCheckIn === 1 ? "día" : "días"}</p>
+                ) : null}
                 <p className="text-xs text-gray-500 mt-1">Desde las {settings.checkInTime || "15:00"}</p>
               </div>
               <div className="bg-gray-50 rounded-lg p-3">
@@ -469,9 +526,12 @@ export default function GuestPage() {
                 </div>
                 <p className="text-sm font-bold text-gray-900">
                   {checkOutDate.toLocaleDateString("es-AR", { weekday: "short", day: "numeric", month: "short" })}
-                  {isCheckOutToday && <span className="text-[#EA580C] ml-1">(HOY)</span>}
                 </p>
-                {daysUntilCheckOut > 0 && daysUntilCheckOut <= 3 && <p className="text-xs text-[#EA580C] mt-1">En {daysUntilCheckOut} {daysUntilCheckOut === 1 ? "día" : "días"}</p>}
+                {isCheckOutToday ? (
+                  <p className="text-xs text-[#EA580C] mt-1 font-bold">📍 HOY</p>
+                ) : daysUntilCheckOut > 0 && daysUntilCheckOut <= 3 ? (
+                  <p className="text-xs text-[#EA580C] mt-1">En {daysUntilCheckOut} {daysUntilCheckOut === 1 ? "día" : "días"}</p>
+                ) : null}
                 <p className="text-xs text-gray-500 mt-1">Hasta las {settings.checkOutTime || "10:00"}</p>
               </div>
             </div>
@@ -484,10 +544,7 @@ export default function GuestPage() {
                   <span className="text-xs text-gray-600">Unidad</span>
                 </div>
                 {reservation.unit?.description && (
-                  <button
-                    onClick={() => setShowUnitDetails(!showUnitDetails)}
-                    className="text-xs text-[#0F766E] flex items-center gap-1 hover:underline"
-                  >
+                  <button onClick={() => setShowUnitDetails(!showUnitDetails)} className="text-xs text-[#0F766E] flex items-center gap-1 hover:underline">
                     {showUnitDetails ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                     {showUnitDetails ? "Ocultar detalles" : "Ver detalles"}
                   </button>
@@ -497,7 +554,6 @@ export default function GuestPage() {
               {reservation.unit && (
                 <p className="text-xs text-gray-500 mt-1">{reservation.unit.type} • {reservation.unit.capacity} personas</p>
               )}
-              
               {showUnitDetails && reservation.unit?.description && (
                 <div className="mt-3 pt-3 border-t border-gray-200">
                   <p className="text-xs text-gray-700">{reservation.unit.description}</p>
@@ -531,7 +587,7 @@ export default function GuestPage() {
         )}
 
         {/* TARJETA DE UBICACIÓN Y MAPA */}
-        {settings.googleMapsUrl && (
+        {mapsEmbedUrl && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             <div className="bg-gradient-to-r from-[#EF4444] to-[#DC2626] px-4 py-3">
               <div className="flex items-center gap-2">
@@ -548,24 +604,22 @@ export default function GuestPage() {
               )}
               <div className="rounded-lg overflow-hidden border border-gray-200 mb-3">
                 <iframe
-                  src={settings.googleMapsUrl}
+                  src={mapsEmbedUrl}
                   width="100%"
-                  height="200"
+                  height="250"
                   style={{ border: 0 }}
                   allowFullScreen
                   loading="lazy"
                   referrerPolicy="no-referrer-when-downgrade"
+                  title="Mapa de ubicación"
                 />
               </div>
-              <a
-                href={settings.googleMapsUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full bg-[#EF4444] text-white py-2 rounded-lg font-medium hover:bg-[#DC2626] transition-colors flex items-center justify-center gap-2 text-sm"
-              >
-                <Navigation className="w-4 h-4" />
-                Abrir en Google Maps
-              </a>
+              {settings.googleMapsUrl && (
+                <a href={settings.googleMapsUrl} target="_blank" rel="noopener noreferrer" className="w-full bg-[#EF4444] text-white py-2 rounded-lg font-medium hover:bg-[#DC2626] transition-colors flex items-center justify-center gap-2 text-sm">
+                  <Navigation className="w-4 h-4" />
+                  Abrir en Google Maps
+                </a>
+              )}
             </div>
           </motion.div>
         )}
@@ -600,7 +654,7 @@ export default function GuestPage() {
           </motion.div>
         )}
 
-        {/* GUÍA DEL DESTINO */}
+        {/* GUÍA DEL DESTINO - Con detalles desplegables */}
         {destinationPlaces.length > 0 && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             <div className="bg-gradient-to-r from-[#F59E0B] to-[#D97706] px-4 py-3">
@@ -611,31 +665,84 @@ export default function GuestPage() {
             </div>
             <div className="p-4">
               <div className="space-y-3">
-                {destinationPlaces.map((place) => (
-                  <div key={place.id} className={`rounded-lg p-3 ${place.is_favorite ? "bg-yellow-50 border border-yellow-200" : "bg-gray-50"}`}>
-                    <div className="flex items-start justify-between mb-1">
-                      <div>
-                        <p className="text-sm font-bold text-gray-900 flex items-center gap-2">
-                          {place.name}
-                          {place.is_favorite && <Star className="w-3 h-3 text-yellow-600 fill-yellow-600" />}
-                        </p>
-                        {place.category && <p className="text-xs text-gray-500">{place.category}</p>}
+                {destinationPlaces.map((place) => {
+                  const isExpanded = expandedPlace === place.id;
+                  return (
+                    <div key={place.id} className={`rounded-lg border ${place.is_favorite ? "bg-yellow-50 border-yellow-200" : "bg-gray-50 border-gray-200"}`}>
+                      <div className="p-3">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <p className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                              {place.name}
+                              {place.is_favorite && <Star className="w-3 h-3 text-yellow-600 fill-yellow-600" />}
+                            </p>
+                            {place.category && <p className="text-xs text-gray-500">{place.category}</p>}
+                            {place.description && <p className="text-xs text-gray-600 mt-1">{place.description}</p>}
+                          </div>
+                          {(place.address || place.phone || place.hours || place.website || place.tips || place.image_url || place.google_maps_url) && (
+                            <button onClick={() => setExpandedPlace(isExpanded ? null : place.id)} className="text-xs text-[#F59E0B] flex items-center gap-1 hover:underline ml-2 flex-shrink-0">
+                              {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                              {isExpanded ? "Menos" : "Más info"}
+                            </button>
+                          )}
+                        </div>
                       </div>
+                      {isExpanded && (
+                        <div className="px-3 pb-3 border-t border-gray-200 pt-3 space-y-2">
+                          {place.image_url && (
+                            <div className="rounded-lg overflow-hidden">
+                              <img src={place.image_url} alt={place.name} className="w-full h-40 object-cover" />
+                            </div>
+                          )}
+                          {place.address && (
+                            <div className="flex items-start gap-2">
+                              <MapPin className="w-3 h-3 text-gray-500 mt-0.5 flex-shrink-0" />
+                              <p className="text-xs text-gray-700">{place.address}</p>
+                            </div>
+                          )}
+                          {place.hours && (
+                            <div className="flex items-start gap-2">
+                              <Clock4 className="w-3 h-3 text-gray-500 mt-0.5 flex-shrink-0" />
+                              <p className="text-xs text-gray-700">{place.hours}</p>
+                            </div>
+                          )}
+                          {place.phone && (
+                            <div className="flex items-start gap-2">
+                              <Phone className="w-3 h-3 text-gray-500 mt-0.5 flex-shrink-0" />
+                              <a href={`tel:${place.phone}`} className="text-xs text-[#F59E0B] hover:underline">{place.phone}</a>
+                            </div>
+                          )}
+                          {place.website && (
+                            <div className="flex items-start gap-2">
+                              <Globe className="w-3 h-3 text-gray-500 mt-0.5 flex-shrink-0" />
+                              <a href={place.website} target="_blank" rel="noopener noreferrer" className="text-xs text-[#F59E0B] hover:underline">{place.website}</a>
+                            </div>
+                          )}
+                          {place.tips && (
+                            <div className="bg-white rounded-lg p-2 border border-gray-200">
+                              <p className="text-xs font-semibold text-gray-700 mb-1"> Tips</p>
+                              <p className="text-xs text-gray-600">{place.tips}</p>
+                            </div>
+                          )}
+                          {place.contact_info && typeof place.contact_info === "object" && Object.keys(place.contact_info).length > 0 && (
+                            <div className="bg-white rounded-lg p-2 border border-gray-200">
+                              <p className="text-xs font-semibold text-gray-700 mb-1">ℹ️ Información</p>
+                              {Object.entries(place.contact_info).map(([key, value]) => (
+                                <p key={key} className="text-xs text-gray-600"><span className="font-medium capitalize">{key}:</span> {String(value)}</p>
+                              ))}
+                            </div>
+                          )}
+                          {place.google_maps_url && (
+                            <a href={place.google_maps_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-[#F59E0B] hover:underline">
+                              <Navigation className="w-3 h-3" />
+                              Ver en Google Maps
+                            </a>
+                          )}
+                        </div>
+                      )}
                     </div>
-                    {place.description && <p className="text-xs text-gray-600 mt-1">{place.description}</p>}
-                    {place.google_maps_url && (
-                      <a
-                        href={place.google_maps_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-[#F59E0B] hover:underline mt-2 inline-flex items-center gap-1"
-                      >
-                        <ExternalLink className="w-3 h-3" />
-                        Ver en mapa
-                      </a>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </motion.div>
@@ -732,15 +839,12 @@ export default function GuestPage() {
             </div>
           </div>
           <div className="p-4">
-            <a
-              href={`https://wa.me/${settings.whatsappNumber || "5491131923742"}?text=${encodeURIComponent(whatsappMessage)}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-full bg-[#25D366] text-white py-2 rounded-lg font-medium hover:bg-[#128C7E] transition-colors flex items-center justify-center gap-2 text-sm"
-            >
-              <MessageCircle className="w-4 h-4" />
-              Contactar anfitrión por WhatsApp
-            </a>
+            {settings.whatsappNumber && (
+              <a href={`https://wa.me/${settings.whatsappNumber}?text=${encodeURIComponent(whatsappMessage)}`} target="_blank" rel="noopener noreferrer" className="w-full bg-[#25D366] text-white py-2 rounded-lg font-medium hover:bg-[#128C7E] transition-colors flex items-center justify-center gap-2 text-sm">
+                <MessageCircle className="w-4 h-4" />
+                Contactar anfitrión por WhatsApp
+              </a>
+            )}
             <div className="mt-3 space-y-2 text-sm">
               {settings.phone && (
                 <div className="flex items-center gap-2 text-gray-600">
