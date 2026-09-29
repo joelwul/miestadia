@@ -30,6 +30,7 @@ import {
   DollarSign,
   Globe,
   Clock4,
+  Send,
 } from "lucide-react";
 
 interface Guest {
@@ -111,6 +112,8 @@ interface WeatherData {
   icon: string;
 }
 
+type SectionKey = "arrival" | "guide" | "services" | "checkout" | "emergency" | "contact";
+
 export default function GuestPage() {
   const params = useParams();
   const searchParams = useSearchParams();
@@ -131,6 +134,14 @@ export default function GuestPage() {
   const [showPaymentHistory, setShowPaymentHistory] = useState(false);
   const [showUnitDetails, setShowUnitDetails] = useState(false);
   const [expandedPlace, setExpandedPlace] = useState<string | null>(null);
+  const [expandedSections, setExpandedSections] = useState<Record<SectionKey, boolean>>({
+    arrival: false,
+    guide: false,
+    services: false,
+    checkout: false,
+    emergency: false,
+    contact: false,
+  });
   const supabase = createClient();
 
   const [formData, setFormData] = useState({
@@ -139,6 +150,10 @@ export default function GuestPage() {
     emergency_contact: "",
     special_requests: "",
   });
+
+  const toggleSection = (key: SectionKey) => {
+    setExpandedSections((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
 
   useEffect(() => {
     async function loadData() {
@@ -204,7 +219,6 @@ export default function GuestPage() {
 
         setReservation(enriched);
 
-        // Cargar pagos
         const { data: paymentsData } = await supabase
           .from("payments")
           .select("id, amount, method, date, notes")
@@ -212,14 +226,12 @@ export default function GuestPage() {
           .order("date", { ascending: false });
         setPayments(paymentsData || []);
 
-        // Cargar servicios
         const { data: servicesData } = await supabase
           .from("services")
           .select("id, name, description, price, is_requestable")
           .eq("tenant_id", tenantData.id);
         setServices(servicesData || []);
 
-        // Cargar lugares del destino
         const { data: placesData } = await supabase
           .from("destination_places")
           .select("*")
@@ -227,17 +239,17 @@ export default function GuestPage() {
           .order("sort_order", { ascending: true });
         setDestinationPlaces(placesData || []);
 
-        // Cargar clima real usando Open-Meteo
+        // Clima real con Open-Meteo
         const settings = tenantData.settings || {};
         const lat = settings.latitude || -34.6037;
         const lon = settings.longitude || -58.3816;
-        
+
         let locationName = "Tu destino";
         if (settings.googleMapsUrl) {
           try {
             const url = new URL(settings.googleMapsUrl);
             const pathParts = url.pathname.split("/");
-            const placeIndex = pathParts.findIndex(p => p === "place");
+            const placeIndex = pathParts.findIndex((p) => p === "place");
             if (placeIndex !== -1 && pathParts[placeIndex + 1]) {
               locationName = decodeURIComponent(pathParts[placeIndex + 1].replace(/\+/g, " "));
             }
@@ -249,7 +261,6 @@ export default function GuestPage() {
 
         const checkIn = new Date(reservationData.check_in);
         const checkOut = new Date(reservationData.check_out);
-        
         const startDate = checkIn.toISOString().split("T")[0];
         const endDate = checkOut.toISOString().split("T")[0];
 
@@ -258,12 +269,12 @@ export default function GuestPage() {
             `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=temperature_2m_max,temperature_2m_min,weathercode&timezone=auto&start_date=${startDate}&end_date=${endDate}`
           );
           const weatherData = await weatherRes.json();
-          
+
           if (weatherData.daily) {
             const weatherIcons: Record<number, string> = {
-              0: "☀️", 1: "🌤️", 2: "⛅", 3: "☁️",
-              45: "🌫️", 48: "️", 51: "🌦️", 53: "🌦️", 55: "🌧️",
-              61: "🌧️", 63: "🌧️", 65: "🌧️", 71: "️", 73: "🌨️", 75: "❄️",
+              0: "☀️", 1: "️", 2: "⛅", 3: "☁️",
+              45: "🌫️", 48: "🌫️", 51: "️", 53: "🌦️", 55: "🌧️",
+              61: "🌧️", 63: "🌧️", 65: "🌧️", 71: "🌨️", 73: "🌨️", 75: "❄️",
               80: "🌦️", 81: "🌧️", 82: "🌧️", 95: "️", 96: "⛈️", 99: "⛈️",
             };
             const weatherConditions: Record<number, string> = {
@@ -348,7 +359,7 @@ export default function GuestPage() {
   checkInDateOnly.setHours(0, 0, 0, 0);
   const checkOutDateOnly = new Date(reservation.check_out);
   checkOutDateOnly.setHours(0, 0, 0, 0);
-  
+
   const daysUntilCheckIn = Math.ceil((checkInDateOnly.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
   const daysUntilCheckOut = Math.ceil((checkOutDateOnly.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 
@@ -365,7 +376,11 @@ export default function GuestPage() {
     }
   };
 
-  const whatsappMessage = `Hola ${tenant.name}! Soy ${reservation.guest?.first_name} ${reservation.guest?.last_name} (código ${reservation.reservation_code}). Necesito ayuda.`;
+  const whatsappBaseMessage = `Hola ${tenant.name}! Soy ${reservation.guest?.first_name} ${reservation.guest?.last_name} (código ${reservation.reservation_code}).`;
+
+  const getServiceWhatsAppMessage = (service: Service) => {
+    return `${whatsappBaseMessage}\n\nMe interesa el servicio: *${service.name}*${service.description ? `\n${service.description}` : ""}${service.price ? `\nPrecio: $${service.price.toLocaleString("es-AR")}` : ""}\n\n¿Está disponible durante mi estadía?`;
+  };
 
   const getMapsEmbedUrl = () => {
     const lat = settings.latitude;
@@ -377,6 +392,24 @@ export default function GuestPage() {
   };
 
   const mapsEmbedUrl = getMapsEmbedUrl();
+
+  // Helper para renderizar header de sección con toggle
+  const SectionHeader = ({ title, icon: Icon, gradient, sectionKey }: { title: string; icon: any; gradient: string; sectionKey: SectionKey }) => (
+    <button
+      onClick={() => toggleSection(sectionKey)}
+      className={`w-full ${gradient} px-4 py-3 flex items-center justify-between text-left`}
+    >
+      <div className="flex items-center gap-2">
+        <Icon className="w-5 h-5 text-white" />
+        <h2 className="text-lg font-bold text-white">{title}</h2>
+      </div>
+      {expandedSections[sectionKey] ? (
+        <ChevronUp className="w-5 h-5 text-white" />
+      ) : (
+        <ChevronDown className="w-5 h-5 text-white" />
+      )}
+    </button>
+  );
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -391,7 +424,7 @@ export default function GuestPage() {
       </header>
 
       <div className="max-w-4xl mx-auto px-4 py-6 space-y-4">
-        {/* TARJETA DE PAGO */}
+        {/* ===== PAGO (siempre visible) ===== */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
           <div className="bg-gradient-to-r from-[#0F766E] to-[#166534] px-4 py-3">
             <div className="flex items-center justify-between">
@@ -463,7 +496,7 @@ export default function GuestPage() {
           </div>
         </motion.div>
 
-        {/* TARJETA DE CLIMA */}
+        {/* ===== CLIMA (siempre visible) ===== */}
         {weather.length > 0 && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             <div className="bg-gradient-to-r from-[#00B4D8] to-[#0077B6] px-4 py-3">
@@ -489,7 +522,7 @@ export default function GuestPage() {
           </motion.div>
         )}
 
-        {/* TARJETA DE ESTADÍA */}
+        {/* ===== ESTADÍA (siempre visible) ===== */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
           <div className="bg-gradient-to-r from-[#166534] to-[#0F766E] px-4 py-3">
             <div className="flex items-center gap-2">
@@ -530,7 +563,7 @@ export default function GuestPage() {
                 <p className="text-xs text-gray-500 mt-1">Hasta las {settings.checkOutTime || "10:00"}</p>
               </div>
             </div>
-            
+
             <div className="bg-gray-50 rounded-lg p-3">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
@@ -557,7 +590,7 @@ export default function GuestPage() {
           </div>
         </motion.div>
 
-        {/* TARJETA DE WIFI */}
+        {/* ===== WIFI (siempre visible) ===== */}
         {settings.wifiNetworks && settings.wifiNetworks.length > 0 && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             <div className="bg-gradient-to-r from-[#6366F1] to-[#4F46E5] px-4 py-3">
@@ -580,7 +613,7 @@ export default function GuestPage() {
           </motion.div>
         )}
 
-        {/* TARJETA DE UBICACIÓN Y MAPA */}
+        {/* ===== MAPA (siempre visible) ===== */}
         {mapsEmbedUrl && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             <div className="bg-gradient-to-r from-[#EF4444] to-[#DC2626] px-4 py-3">
@@ -597,16 +630,7 @@ export default function GuestPage() {
                 </div>
               )}
               <div className="rounded-lg overflow-hidden border border-gray-200 mb-3">
-                <iframe
-                  src={mapsEmbedUrl}
-                  width="100%"
-                  height="250"
-                  style={{ border: 0 }}
-                  allowFullScreen
-                  loading="lazy"
-                  referrerPolicy="no-referrer-when-downgrade"
-                  title="Mapa de ubicación"
-                />
+                <iframe src={mapsEmbedUrl} width="100%" height="250" style={{ border: 0 }} allowFullScreen loading="lazy" referrerPolicy="no-referrer-when-downgrade" title="Mapa de ubicación" />
               </div>
               {settings.googleMapsUrl && (
                 <a href={settings.googleMapsUrl} target="_blank" rel="noopener noreferrer" className="w-full bg-[#EF4444] text-white py-2 rounded-lg font-medium hover:bg-[#DC2626] transition-colors flex items-center justify-center gap-2 text-sm">
@@ -618,242 +642,242 @@ export default function GuestPage() {
           </motion.div>
         )}
 
-        {/* INSTRUCCIONES DE LLEGADA */}
+        {/* ===== INSTRUCCIONES DE LLEGADA (contraída por defecto) ===== */}
         {settings.arrivalInstructions?.enabled && settings.arrivalInstructions?.steps && settings.arrivalInstructions.steps.length > 0 && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-            <div className="bg-gradient-to-r from-[#8B5CF6] to-[#7C3AED] px-4 py-3">
-              <div className="flex items-center gap-2">
-                <Info className="w-5 h-5 text-white" />
-                <h2 className="text-lg font-bold text-white">Instrucciones de Llegada</h2>
-              </div>
-            </div>
-            <div className="p-4">
-              <div className="space-y-3 text-sm text-gray-700">
-                {settings.arrivalInstructions.steps.map((step: any, index: number) => (
-                  <div key={index} className="flex items-start gap-2">
-                    <div className="w-6 h-6 bg-[#8B5CF6] text-white rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold">
-                      {step.order || index + 1}
+            <SectionHeader title="Instrucciones de Llegada" icon={Info} gradient="bg-gradient-to-r from-[#8B5CF6] to-[#7C3AED]" sectionKey="arrival" />
+            {expandedSections.arrival && (
+              <div className="p-4">
+                <div className="space-y-3 text-sm text-gray-700">
+                  {settings.arrivalInstructions.steps.map((step: any, index: number) => (
+                    <div key={index} className="flex items-start gap-2">
+                      <div className="w-6 h-6 bg-[#8B5CF6] text-white rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold">
+                        {step.order || index + 1}
+                      </div>
+                      <p>{step.text}</p>
                     </div>
-                    <p>{step.text}</p>
-                  </div>
-                ))}
-              </div>
-              {settings.arrivalInstructions.parkingInfo && (
-                <div className="mt-4 pt-4 border-t border-gray-200">
-                  <p className="text-xs text-gray-500 mb-1">Estacionamiento</p>
-                  <p className="text-sm text-gray-700">{settings.arrivalInstructions.parkingInfo}</p>
+                  ))}
                 </div>
-              )}
-            </div>
+                {settings.arrivalInstructions.parkingInfo && (
+                  <div className="mt-4 pt-4 border-t border-gray-200">
+                    <p className="text-xs text-gray-500 mb-1">Estacionamiento</p>
+                    <p className="text-sm text-gray-700">{settings.arrivalInstructions.parkingInfo}</p>
+                  </div>
+                )}
+              </div>
+            )}
           </motion.div>
         )}
 
-        {/* GUÍA DEL DESTINO - Desplegable */}
+        {/* ===== GUÍA DEL DESTINO (contraída por defecto, items desplegables) ===== */}
         {destinationPlaces.length > 0 && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-            <div className="bg-gradient-to-r from-[#F59E0B] to-[#D97706] px-4 py-3">
-              <div className="flex items-center gap-2">
-                <Compass className="w-5 h-5 text-white" />
-                <h2 className="text-lg font-bold text-white">Guía del Destino</h2>
-              </div>
-            </div>
-            <div className="p-4">
-              <div className="space-y-3">
-                {destinationPlaces.map((place) => {
-                  const isExpanded = expandedPlace === place.id;
-                  return (
-                    <div key={place.id} className={`rounded-lg border ${place.is_favorite ? "bg-yellow-50 border-yellow-200" : "bg-gray-50 border-gray-200"}`}>
-                      <div className="p-3">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <p className="text-sm font-bold text-gray-900 flex items-center gap-2">
-                              {place.name}
-                              {place.is_favorite && <Star className="w-3 h-3 text-yellow-600 fill-yellow-600" />}
-                            </p>
-                            {place.category && <p className="text-xs text-gray-500">{place.category}</p>}
-                            {place.description && <p className="text-xs text-gray-600 mt-1">{place.description}</p>}
+            <SectionHeader title="Guía del Destino" icon={Compass} gradient="bg-gradient-to-r from-[#F59E0B] to-[#D97706]" sectionKey="guide" />
+            {expandedSections.guide && (
+              <div className="p-4">
+                <div className="space-y-3">
+                  {destinationPlaces.map((place) => {
+                    const isExpanded = expandedPlace === place.id;
+                    return (
+                      <div key={place.id} className={`rounded-lg border ${place.is_favorite ? "bg-yellow-50 border-yellow-200" : "bg-gray-50 border-gray-200"}`}>
+                        <div className="p-3">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <p className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                                {place.name}
+                                {place.is_favorite && <Star className="w-3 h-3 text-yellow-600 fill-yellow-600" />}
+                              </p>
+                              {place.category && <p className="text-xs text-gray-500">{place.category}</p>}
+                              {place.description && <p className="text-xs text-gray-600 mt-1">{place.description}</p>}
+                            </div>
+                            {(place.address || place.phone || place.hours || place.website || place.tips || place.image_url || place.google_maps_url) && (
+                              <button onClick={() => setExpandedPlace(isExpanded ? null : place.id)} className="text-xs text-[#F59E0B] flex items-center gap-1 hover:underline ml-2 flex-shrink-0">
+                                {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                                {isExpanded ? "Menos" : "Más info"}
+                              </button>
+                            )}
                           </div>
-                          {(place.address || place.phone || place.hours || place.website || place.tips || place.image_url || place.google_maps_url) && (
-                            <button onClick={() => setExpandedPlace(isExpanded ? null : place.id)} className="text-xs text-[#F59E0B] flex items-center gap-1 hover:underline ml-2 flex-shrink-0">
-                              {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                              {isExpanded ? "Menos" : "Más info"}
-                            </button>
-                          )}
                         </div>
+                        {isExpanded && (
+                          <div className="px-3 pb-3 border-t border-gray-200 pt-3 space-y-2">
+                            {place.image_url && (
+                              <div className="rounded-lg overflow-hidden">
+                                <img src={place.image_url} alt={place.name} className="w-full h-40 object-cover" />
+                              </div>
+                            )}
+                            {place.address && (
+                              <div className="flex items-start gap-2">
+                                <MapPin className="w-3 h-3 text-gray-500 mt-0.5 flex-shrink-0" />
+                                <p className="text-xs text-gray-700">{place.address}</p>
+                              </div>
+                            )}
+                            {place.hours && (
+                              <div className="flex items-start gap-2">
+                                <Clock4 className="w-3 h-3 text-gray-500 mt-0.5 flex-shrink-0" />
+                                <p className="text-xs text-gray-700">{place.hours}</p>
+                              </div>
+                            )}
+                            {place.phone && (
+                              <div className="flex items-start gap-2">
+                                <Phone className="w-3 h-3 text-gray-500 mt-0.5 flex-shrink-0" />
+                                <a href={`tel:${place.phone}`} className="text-xs text-[#F59E0B] hover:underline">{place.phone}</a>
+                              </div>
+                            )}
+                            {place.website && (
+                              <div className="flex items-start gap-2">
+                                <Globe className="w-3 h-3 text-gray-500 mt-0.5 flex-shrink-0" />
+                                <a href={place.website} target="_blank" rel="noopener noreferrer" className="text-xs text-[#F59E0B] hover:underline">{place.website}</a>
+                              </div>
+                            )}
+                            {place.tips && (
+                              <div className="bg-white rounded-lg p-2 border border-gray-200">
+                                <p className="text-xs font-semibold text-gray-700 mb-1">💡 Tips</p>
+                                <p className="text-xs text-gray-600">{place.tips}</p>
+                              </div>
+                            )}
+                            {place.contact_info && typeof place.contact_info === "object" && Object.keys(place.contact_info).length > 0 && (
+                              <div className="bg-white rounded-lg p-2 border border-gray-200">
+                                <p className="text-xs font-semibold text-gray-700 mb-1">ℹ️ Información</p>
+                                {Object.entries(place.contact_info).map(([key, value]) => (
+                                  <p key={key} className="text-xs text-gray-600"><span className="font-medium capitalize">{key}:</span> {String(value)}</p>
+                                ))}
+                              </div>
+                            )}
+                            {place.google_maps_url && (
+                              <a href={place.google_maps_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-[#F59E0B] hover:underline">
+                                <Navigation className="w-3 h-3" />
+                                Ver en Google Maps
+                              </a>
+                            )}
+                          </div>
+                        )}
                       </div>
-                      {isExpanded && (
-                        <div className="px-3 pb-3 border-t border-gray-200 pt-3 space-y-2">
-                          {place.image_url && (
-                            <div className="rounded-lg overflow-hidden">
-                              <img src={place.image_url} alt={place.name} className="w-full h-40 object-cover" />
-                            </div>
-                          )}
-                          {place.address && (
-                            <div className="flex items-start gap-2">
-                              <MapPin className="w-3 h-3 text-gray-500 mt-0.5 flex-shrink-0" />
-                              <p className="text-xs text-gray-700">{place.address}</p>
-                            </div>
-                          )}
-                          {place.hours && (
-                            <div className="flex items-start gap-2">
-                              <Clock4 className="w-3 h-3 text-gray-500 mt-0.5 flex-shrink-0" />
-                              <p className="text-xs text-gray-700">{place.hours}</p>
-                            </div>
-                          )}
-                          {place.phone && (
-                            <div className="flex items-start gap-2">
-                              <Phone className="w-3 h-3 text-gray-500 mt-0.5 flex-shrink-0" />
-                              <a href={`tel:${place.phone}`} className="text-xs text-[#F59E0B] hover:underline">{place.phone}</a>
-                            </div>
-                          )}
-                          {place.website && (
-                            <div className="flex items-start gap-2">
-                              <Globe className="w-3 h-3 text-gray-500 mt-0.5 flex-shrink-0" />
-                              <a href={place.website} target="_blank" rel="noopener noreferrer" className="text-xs text-[#F59E0B] hover:underline">{place.website}</a>
-                            </div>
-                          )}
-                          {place.tips && (
-                            <div className="bg-white rounded-lg p-2 border border-gray-200">
-                              <p className="text-xs font-semibold text-gray-700 mb-1">💡 Tips</p>
-                              <p className="text-xs text-gray-600">{place.tips}</p>
-                            </div>
-                          )}
-                          {place.contact_info && typeof place.contact_info === "object" && Object.keys(place.contact_info).length > 0 && (
-                            <div className="bg-white rounded-lg p-2 border border-gray-200">
-                              <p className="text-xs font-semibold text-gray-700 mb-1">ℹ️ Información</p>
-                              {Object.entries(place.contact_info).map(([key, value]) => (
-                                <p key={key} className="text-xs text-gray-600"><span className="font-medium capitalize">{key}:</span> {String(value)}</p>
-                              ))}
-                            </div>
-                          )}
-                          {place.google_maps_url && (
-                            <a href={place.google_maps_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-[#F59E0B] hover:underline">
-                              <Navigation className="w-3 h-3" />
-                              Ver en Google Maps
-                            </a>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
-            </div>
+            )}
           </motion.div>
         )}
 
-        {/* SERVICIOS ADICIONALES */}
+        {/* ===== SERVICIOS ADICIONALES (contraída por defecto, con botón WhatsApp) ===== */}
         {services.length > 0 && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-            <div className="bg-gradient-to-r from-[#10B981] to-[#059669] px-4 py-3">
-              <div className="flex items-center gap-2">
-                <Package className="w-5 h-5 text-white" />
-                <h2 className="text-lg font-bold text-white">Servicios Adicionales</h2>
-              </div>
-            </div>
-            <div className="p-4">
-              <div className="space-y-2">
-                {services.map((service) => (
-                  <div key={service.id} className="bg-gray-50 rounded-lg p-3 flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">{service.name}</p>
-                      {service.description && <p className="text-xs text-gray-500">{service.description}</p>}
+            <SectionHeader title="Servicios Adicionales" icon={Package} gradient="bg-gradient-to-r from-[#10B981] to-[#059669]" sectionKey="services" />
+            {expandedSections.services && (
+              <div className="p-4">
+                <div className="space-y-2">
+                  {services.map((service) => (
+                    <div key={service.id} className="bg-gray-50 rounded-lg p-3">
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-gray-900">{service.name}</p>
+                          {service.description && <p className="text-xs text-gray-500 mt-1">{service.description}</p>}
+                        </div>
+                        {service.price && <p className="text-sm font-bold text-[#0F766E] ml-2">${service.price.toLocaleString("es-AR")}</p>}
+                      </div>
+                      {service.is_requestable && (
+                        <a
+                          href={`https://wa.me/${settings.whatsappNumber || "5491131923742"}?text=${encodeURIComponent(getServiceWhatsAppMessage(service))}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 px-3 py-1.5 bg-[#25D366] text-white text-xs font-medium rounded-lg hover:bg-[#128C7E] transition-colors"
+                        >
+                          <Send className="w-3 h-3" />
+                          Solicitar por WhatsApp
+                        </a>
+                      )}
                     </div>
-                    {service.price && <p className="text-sm font-bold text-[#0F766E]">${service.price.toLocaleString("es-AR")}</p>}
-                  </div>
-                ))}
+                  ))}
+                </div>
+                <p className="text-xs text-gray-500 mt-3 text-center">Consultá disponibilidad con el anfitrión</p>
               </div>
-              <p className="text-xs text-gray-500 mt-3 text-center">Consultá disponibilidad con el anfitrión</p>
-            </div>
+            )}
           </motion.div>
         )}
 
-        {/* INSTRUCCIONES DE CHECKOUT */}
+        {/* ===== CHECK-OUT (contraído por defecto) ===== */}
         {settings.checkoutInstructions?.enabled && settings.checkoutInstructions?.steps && settings.checkoutInstructions.steps.length > 0 && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-            <div className="bg-gradient-to-r from-[#64748B] to-[#475569] px-4 py-3">
-              <div className="flex items-center gap-2">
-                <LogOut className="w-5 h-5 text-white" />
-                <h2 className="text-lg font-bold text-white">Check-out</h2>
-              </div>
-            </div>
-            <div className="p-4">
-              <div className="space-y-3 text-sm text-gray-700">
-                {settings.checkoutInstructions.steps.map((step: any, index: number) => (
-                  <div key={index} className="flex items-start gap-2">
-                    <CheckCircle className="w-4 h-4 text-[#64748B] mt-0.5 flex-shrink-0" />
-                    <p>{step.text}</p>
-                  </div>
-                ))}
-              </div>
-              {settings.checkoutInstructions.keyReturnLocation && (
-                <div className="mt-4 pt-4 border-t border-gray-200">
-                  <p className="text-xs text-gray-500 mb-1">Devolución de llaves</p>
-                  <p className="text-sm text-gray-700">{settings.checkoutInstructions.keyReturnLocation}</p>
+            <SectionHeader title="Check-out" icon={LogOut} gradient="bg-gradient-to-r from-[#64748B] to-[#475569]" sectionKey="checkout" />
+            {expandedSections.checkout && (
+              <div className="p-4">
+                <div className="space-y-3 text-sm text-gray-700">
+                  {settings.checkoutInstructions.steps.map((step: any, index: number) => (
+                    <div key={index} className="flex items-start gap-2">
+                      <CheckCircle className="w-4 h-4 text-[#64748B] mt-0.5 flex-shrink-0" />
+                      <p>{step.text}</p>
+                    </div>
+                  ))}
                 </div>
-              )}
-            </div>
+                {settings.checkoutInstructions.keyReturnLocation && (
+                  <div className="mt-4 pt-4 border-t border-gray-200">
+                    <p className="text-xs text-gray-500 mb-1">Devolución de llaves</p>
+                    <p className="text-sm text-gray-700">{settings.checkoutInstructions.keyReturnLocation}</p>
+                  </div>
+                )}
+              </div>
+            )}
           </motion.div>
         )}
 
-        {/* CONTACTOS DE EMERGENCIA */}
+        {/* ===== CONTACTOS DE EMERGENCIA (contraído por defecto) ===== */}
         {settings.emergencyContacts && settings.emergencyContacts.length > 0 && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.55 }} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-            <div className="bg-gradient-to-r from-[#DC2626] to-[#B91C1C] px-4 py-3">
-              <div className="flex items-center gap-2">
-                <AlertCircle className="w-5 h-5 text-white" />
-                <h2 className="text-lg font-bold text-white">Contactos de Emergencia</h2>
+            <SectionHeader title="Contactos de Emergencia" icon={AlertCircle} gradient="bg-gradient-to-r from-[#DC2626] to-[#B91C1C]" sectionKey="emergency" />
+            {expandedSections.emergency && (
+              <div className="p-4">
+                <div className="space-y-3">
+                  {settings.emergencyContacts.map((contact: any, index: number) => (
+                    <div key={contact.id || index} className="bg-red-50 border border-red-200 rounded-lg p-3">
+                      <p className="text-sm font-bold text-gray-900">{contact.name}</p>
+                      {contact.role && <p className="text-xs text-gray-500">{contact.role}</p>}
+                      {contact.phone && (
+                        <a href={`tel:${contact.phone}`} className="text-xs text-red-600 hover:underline mt-1 block">
+                          <Phone className="w-3 h-3 inline mr-1" />
+                          {contact.phone}
+                        </a>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-            <div className="p-4">
-              <div className="space-y-3">
-                {settings.emergencyContacts.map((contact: any, index: number) => (
-                  <div key={contact.id || index} className="bg-red-50 border border-red-200 rounded-lg p-3">
-                    <p className="text-sm font-bold text-gray-900">{contact.name}</p>
-                    {contact.role && <p className="text-xs text-gray-500">{contact.role}</p>}
-                    {contact.phone && (
-                      <a href={`tel:${contact.phone}`} className="text-xs text-red-600 hover:underline mt-1 block">
-                        <Phone className="w-3 h-3 inline mr-1" />
-                        {contact.phone}
-                      </a>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
+            )}
           </motion.div>
         )}
 
-        {/* TARJETA DE CONTACTO */}
+        {/* ===== CONTACTO (contraído por defecto) ===== */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="bg-gradient-to-r from-[#25D366] to-[#128C7E] px-4 py-3">
-            <div className="flex items-center gap-2">
-              <MessageCircle className="w-5 h-5 text-white" />
-              <h2 className="text-lg font-bold text-white">Contacto</h2>
-            </div>
-          </div>
-          <div className="p-4">
-            {settings.whatsappNumber && (
-              <a href={`https://wa.me/${settings.whatsappNumber}?text=${encodeURIComponent(whatsappMessage)}`} target="_blank" rel="noopener noreferrer" className="w-full bg-[#25D366] text-white py-2 rounded-lg font-medium hover:bg-[#128C7E] transition-colors flex items-center justify-center gap-2 text-sm">
-                <MessageCircle className="w-4 h-4" />
-                Contactar anfitrión por WhatsApp
-              </a>
-            )}
-            <div className="mt-3 space-y-2 text-sm">
-              {settings.phone && (
-                <div className="flex items-center gap-2 text-gray-600">
-                  <Phone className="w-4 h-4" />
-                  <span>{settings.phone}</span>
-                </div>
-              )}
-              {settings.email && (
-                <div className="flex items-center gap-2 text-gray-600">
+          <SectionHeader title="Contacto" icon={MessageCircle} gradient="bg-gradient-to-r from-[#25D366] to-[#128C7E]" sectionKey="contact" />
+          {expandedSections.contact && (
+            <div className="p-4">
+              {settings.whatsappNumber && (
+                <a
+                  href={`https://wa.me/${settings.whatsappNumber}?text=${encodeURIComponent(whatsappBaseMessage + " Necesito ayuda.")}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full bg-[#25D366] text-white py-2 rounded-lg font-medium hover:bg-[#128C7E] transition-colors flex items-center justify-center gap-2 text-sm"
+                >
                   <MessageCircle className="w-4 h-4" />
-                  <span>{settings.email}</span>
-                </div>
+                  Contactar anfitrión por WhatsApp
+                </a>
               )}
+              <div className="mt-3 space-y-2 text-sm">
+                {settings.phone && (
+                  <div className="flex items-center gap-2 text-gray-600">
+                    <Phone className="w-4 h-4" />
+                    <span>{settings.phone}</span>
+                  </div>
+                )}
+                {settings.email && (
+                  <div className="flex items-center gap-2 text-gray-600">
+                    <MessageCircle className="w-4 h-4" />
+                    <span>{settings.email}</span>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+          )}
         </motion.div>
 
         <div className="text-center py-6 text-xs text-gray-500">
