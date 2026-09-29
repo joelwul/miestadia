@@ -2,7 +2,6 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useParams } from "next/navigation";
-import { motion } from "framer-motion";
 import {
   Calendar,
   Plus,
@@ -19,7 +18,6 @@ import {
   Send,
 } from "lucide-react";
 import Link from "next/link";
-import { getGuestPanelUrl, formatWhatsAppMessage } from "@/lib/config";
 
 interface Reservation {
   id: string;
@@ -44,7 +42,7 @@ interface Tenant {
   slug: string;
 }
 
-type FilterType = "all" | "today" | "tomorrow" | "nextweek" | "active" | "completed" | "cancelled";
+type FilterType = "all" | "today" | "tomorrow" | "nextweek";
 
 export default function ReservationsPage() {
   const params = useParams();
@@ -156,12 +154,6 @@ export default function ReservationsPage() {
         return checkIn.toDateString() === tomorrow.toDateString();
       case "nextweek":
         return checkIn >= nextWeekStart && checkIn <= nextWeekEnd;
-      case "active":
-        return res.status === "confirmed" || res.status === "checked_in";
-      case "completed":
-        return res.status === "completed";
-      case "cancelled":
-        return res.status === "cancelled";
       default:
         return true;
     }
@@ -202,11 +194,8 @@ export default function ReservationsPage() {
 
   const sendWhatsApp = (reservation: Reservation) => {
     if (!tenant) return;
-    const guestPanelUrl = getGuestPanelUrl(tenantSlug, reservation.code, reservation.guest_last_name);
-    const message = formatWhatsAppMessage(
-      tenant.name,
-      `¡Hola ${reservation.guest_name}! Tu reserva está confirmada:\n\nCheck-in: ${new Date(reservation.check_in).toLocaleDateString("es-AR")}\nCheck-out: ${new Date(reservation.check_out).toLocaleDateString("es-AR")}\nUnidad: ${reservation.unit_name}\nCódigo: ${reservation.code}\n\nAccedé a tu experiencia: ${guestPanelUrl}`
-    );
+    const guestPanelUrl = `https://miestadia.online/${tenantSlug}?code=${reservation.code}&lastName=${encodeURIComponent(reservation.guest_last_name)}`;
+    const message = `¡Hola ${reservation.guest_name}! Tu reserva está confirmada en ${tenant.name}:\n\nCheck-in: ${new Date(reservation.check_in).toLocaleDateString("es-AR")}\nCheck-out: ${new Date(reservation.check_out).toLocaleDateString("es-AR")}\nUnidad: ${reservation.unit_name}\nCódigo: ${reservation.code}\n\nAccedé a tu experiencia: ${guestPanelUrl}\n\n— ${tenant.name} (vía Mi Estadía)`;
     const phone = reservation.guest_phone?.replace(/\D/g, "") || "";
     const url = phone
       ? `https://wa.me/${phone}?text=${encodeURIComponent(message)}`
@@ -330,11 +319,8 @@ export default function ReservationsPage() {
       ) : (
         <div className="space-y-3">
           {filteredReservations.map((reservation, index) => (
-            <motion.div
+            <div
               key={reservation.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.05 }}
               className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-md transition-shadow"
             >
               <div className="flex items-start justify-between">
@@ -389,7 +375,7 @@ export default function ReservationsPage() {
                     <Send className="w-5 h-5" />
                   </button>
                   <Link
-                    href={getGuestPanelUrl(tenantSlug, reservation.code, reservation.guest_last_name)}
+                    href={`https://miestadia.online/${tenantSlug}?code=${reservation.code}&lastName=${encodeURIComponent(reservation.guest_last_name)}`}
                     target="_blank"
                     className="p-2 text-gray-400 hover:text-[#0F766E] hover:bg-gray-100 rounded-lg transition-colors"
                     title="Ver panel del huésped"
@@ -404,7 +390,7 @@ export default function ReservationsPage() {
                   </button>
                 </div>
               </div>
-            </motion.div>
+            </div>
           ))}
         </div>
       )}
