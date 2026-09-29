@@ -28,9 +28,10 @@ import {
   ChevronUp,
   History,
   DollarSign,
-  Globe,
-  Clock4,
   Send,
+  UserCheck,
+  Edit3,
+  X,
 } from "lucide-react";
 
 interface Guest {
@@ -60,6 +61,7 @@ interface Reservation {
   total_amount: number;
   paid_amount: number;
   payment_status: string;
+  notes?: string;
   guest?: Guest;
   unit?: Unit;
 }
@@ -112,7 +114,7 @@ interface WeatherData {
   icon: string;
 }
 
-type SectionKey = "arrival" | "guide" | "services" | "checkout" | "emergency" | "contact";
+type SectionKey = "precheckin" | "arrival" | "guide" | "services" | "checkout" | "emergency" | "contact";
 
 export default function GuestPage() {
   const params = useParams();
@@ -134,7 +136,9 @@ export default function GuestPage() {
   const [showPaymentHistory, setShowPaymentHistory] = useState(false);
   const [showUnitDetails, setShowUnitDetails] = useState(false);
   const [expandedPlace, setExpandedPlace] = useState<string | null>(null);
+  const [editingPreCheckin, setEditingPreCheckin] = useState(false);
   const [expandedSections, setExpandedSections] = useState<Record<SectionKey, boolean>>({
+    precheckin: true, // Pre check-in abierto por defecto
     arrival: false,
     guide: false,
     services: false,
@@ -219,6 +223,27 @@ export default function GuestPage() {
 
         setReservation(enriched);
 
+        // Cargar datos del pre-checkin si ya existe
+        if (reservationData.notes) {
+          try {
+            const preCheckinData = JSON.parse(reservationData.notes);
+            setFormData({
+              document_number: preCheckinData.document_number || "",
+              vehicle_plate: preCheckinData.vehicle_plate || "",
+              emergency_contact: preCheckinData.emergency_contact || "",
+              special_requests: preCheckinData.special_requests || "",
+            });
+          } catch (e) {
+            // Si no es JSON válido, usar como texto libre
+            setFormData({
+              document_number: "",
+              vehicle_plate: "",
+              emergency_contact: "",
+              special_requests: reservationData.notes || "",
+            });
+          }
+        }
+
         const { data: paymentsData } = await supabase
           .from("payments")
           .select("id, amount, method, date, notes")
@@ -232,7 +257,6 @@ export default function GuestPage() {
           .eq("tenant_id", tenantData.id);
         setServices(servicesData || []);
 
-        // IMPORTANTE: Traer TODOS los campos de destination_places
         const { data: placesData } = await supabase
           .from("destination_places")
           .select("id, name, description, category, is_favorite, google_maps_url, address, phone, website, hours, tips, image_url, contact_info")
@@ -273,10 +297,10 @@ export default function GuestPage() {
 
           if (weatherData.daily) {
             const weatherIcons: Record<number, string> = {
-              0: "☀️", 1: "🌤️", 2: "⛅", 3: "☁️",
-              45: "🌫️", 48: "🌫️", 51: "🌦️", 53: "🌦️", 55: "🌧️",
-              61: "🌧️", 63: "️", 65: "🌧️", 71: "🌨️", 73: "🌨️", 75: "❄️",
-              80: "️", 81: "🌧️", 82: "🌧️", 95: "⛈️", 96: "⛈️", 99: "⛈️",
+              0: "️", 1: "🌤️", 2: "⛅", 3: "☁️",
+              45: "️", 48: "🌫️", 51: "🌦️", 53: "🌦️", 55: "🌧️",
+              61: "🌧️", 63: "🌧️", 65: "️", 71: "🌨️", 73: "🌨️", 75: "❄️",
+              80: "🌦️", 81: "🌧️", 82: "️", 95: "⛈️", 96: "⛈️", 99: "⛈️",
             };
             const weatherConditions: Record<number, string> = {
               0: "Despejado", 1: "Mayormente despejado", 2: "Parcialmente nublado", 3: "Nublado",
@@ -310,12 +334,28 @@ export default function GuestPage() {
     if (!reservation) return;
     setSaving(true);
     try {
+      const preCheckinData = {
+        document_number: formData.document_number,
+        vehicle_plate: formData.vehicle_plate,
+        emergency_contact: formData.emergency_contact,
+        special_requests: formData.special_requests,
+        completed_at: new Date().toISOString(),
+      };
+
       const { error } = await supabase
         .from("reservations")
-        .update({ status: "pre_checkin", notes: formData.special_requests })
+        .update({
+          status: "pre_checkin",
+          notes: JSON.stringify(preCheckinData),
+        })
         .eq("id", reservation.id);
+
       if (error) throw error;
-      alert("Pre check-in guardado correctamente.");
+
+      // Actualizar estado local
+      setReservation({ ...reservation, status: "pre_checkin", notes: JSON.stringify(preCheckinData) });
+      setEditingPreCheckin(false);
+      alert("Pre check-in guardado correctamente. ✓");
     } catch (err: any) {
       alert("Error al guardar: " + err.message);
     } finally {
@@ -367,6 +407,9 @@ export default function GuestPage() {
   const isCheckInToday = daysUntilCheckIn === 0;
   const isCheckOutToday = daysUntilCheckOut === 0;
 
+  // Verificar si el pre-checkin ya está completado
+  const isPreCheckinDone = reservation.status === "pre_checkin" || reservation.status === "checked_in" || reservation.status === "checked_out";
+
   const getPaymentMethodLabel = (method: string) => {
     switch (method) {
       case "cash": return "Efectivo";
@@ -394,7 +437,7 @@ export default function GuestPage() {
 
   const mapsEmbedUrl = getMapsEmbedUrl();
 
-  const SectionHeader = ({ title, icon: Icon, gradient, sectionKey }: { title: string; icon: any; gradient: string; sectionKey: SectionKey }) => (
+  const SectionHeader = ({ title, icon: Icon, gradient, sectionKey, badge }: { title: string; icon: any; gradient: string; sectionKey: SectionKey; badge?: React.ReactNode }) => (
     <button
       onClick={() => toggleSection(sectionKey)}
       className={`w-full ${gradient} px-4 py-3 flex items-center justify-between text-left`}
@@ -402,6 +445,7 @@ export default function GuestPage() {
       <div className="flex items-center gap-2">
         <Icon className="w-5 h-5 text-white" />
         <h2 className="text-lg font-bold text-white">{title}</h2>
+        {badge}
       </div>
       {expandedSections[sectionKey] ? (
         <ChevronUp className="w-5 h-5 text-white" />
@@ -424,7 +468,189 @@ export default function GuestPage() {
       </header>
 
       <div className="max-w-4xl mx-auto px-4 py-6 space-y-4">
-        {/* PAGO */}
+        {/* ===== PRE CHECK-IN - SECCIÓN PRINCIPAL ===== */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <SectionHeader
+            title="Pre Check-in"
+            icon={UserCheck}
+            gradient="bg-gradient-to-r from-[#EA580C] to-[#C2410C]"
+            sectionKey="precheckin"
+            badge={isPreCheckinDone && (
+              <span className="bg-white/20 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1">
+                <CheckCircle className="w-3 h-3" />
+                Completado
+              </span>
+            )}
+          />
+          {expandedSections.precheckin && (
+            <div className="p-4">
+              {isPreCheckinDone && !editingPreCheckin ? (
+                // Vista de éxito - Pre check-in ya completado
+                <div className="space-y-4">
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-start gap-3">
+                    <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
+                      <CheckCircle className="w-6 h-6 text-green-600" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-bold text-green-900">¡Pre check-in completado con éxito!</p>
+                      <p className="text-sm text-green-700 mt-1">Tus datos fueron registrados correctamente. Te esperamos en tu check-in.</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="bg-gray-50 rounded-lg p-3">
+                      <p className="text-xs text-gray-500 mb-1">Documento</p>
+                      <p className="text-sm font-semibold text-gray-900">{formData.document_number || "—"}</p>
+                    </div>
+                    <div className="bg-gray-50 rounded-lg p-3">
+                      <p className="text-xs text-gray-500 mb-1">Patente del vehículo</p>
+                      <p className="text-sm font-semibold text-gray-900">{formData.vehicle_plate || "—"}</p>
+                    </div>
+                    <div className="bg-gray-50 rounded-lg p-3">
+                      <p className="text-xs text-gray-500 mb-1">Contacto de emergencia</p>
+                      <p className="text-sm font-semibold text-gray-900">{formData.emergency_contact || "—"}</p>
+                    </div>
+                    <div className="bg-gray-50 rounded-lg p-3">
+                      <p className="text-xs text-gray-500 mb-1">Solicitudes especiales</p>
+                      <p className="text-sm font-semibold text-gray-900">{formData.special_requests || "—"}</p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => setEditingPreCheckin(true)}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    <Edit3 className="w-4 h-4" />
+                    Editar datos
+                  </button>
+                </div>
+              ) : (
+                // Formulario de pre check-in
+                <div className="space-y-4">
+                  {!isPreCheckinDone && (
+                    <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 flex items-start gap-2">
+                      <Info className="w-4 h-4 text-orange-600 flex-shrink-0 mt-0.5" />
+                      <p className="text-xs text-orange-800">Completá tus datos antes de llegar para agilizar tu check-in.</p>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Nombre</label>
+                      <input
+                        type="text"
+                        value={reservation.guest?.first_name || ""}
+                        readOnly
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-600 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Apellido</label>
+                      <input
+                        type="text"
+                        value={reservation.guest?.last_name || ""}
+                        readOnly
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-600 text-sm"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Email</label>
+                    <input
+                      type="email"
+                      value={reservation.guest?.email || ""}
+                      readOnly
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-600 text-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Teléfono</label>
+                    <input
+                      type="tel"
+                      value={reservation.guest?.phone || ""}
+                      readOnly
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-600 text-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Documento (DNI/Pasaporte) *</label>
+                    <input
+                      type="text"
+                      value={formData.document_number}
+                      onChange={(e) => setFormData({ ...formData, document_number: e.target.value })}
+                      placeholder="Número de documento"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#EA580C] text-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Patente del vehículo (opcional)</label>
+                    <input
+                      type="text"
+                      value={formData.vehicle_plate}
+                      onChange={(e) => setFormData({ ...formData, vehicle_plate: e.target.value })}
+                      placeholder="ABC123"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#EA580C] text-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Contacto de emergencia *</label>
+                    <input
+                      type="text"
+                      value={formData.emergency_contact}
+                      onChange={(e) => setFormData({ ...formData, emergency_contact: e.target.value })}
+                      placeholder="Nombre y teléfono"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#EA580C] text-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Solicitudes especiales (opcional)</label>
+                    <textarea
+                      value={formData.special_requests}
+                      onChange={(e) => setFormData({ ...formData, special_requests: e.target.value })}
+                      rows={3}
+                      placeholder="Alergias, necesidades especiales, hora estimada de llegada, etc."
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#EA580C] text-sm"
+                    />
+                  </div>
+
+                  <div className="flex gap-3">
+                    {editingPreCheckin && (
+                      <button
+                        onClick={() => setEditingPreCheckin(false)}
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                      >
+                        <X className="w-4 h-4" />
+                        Cancelar
+                      </button>
+                    )}
+                    <button
+                      onClick={handleSavePreCheckin}
+                      disabled={saving || !formData.document_number || !formData.emergency_contact}
+                      className="flex-1 bg-[#EA580C] text-white py-2 rounded-lg font-medium hover:bg-[#C2410C] transition-colors flex items-center justify-center gap-2 disabled:opacity-50 text-sm"
+                    >
+                      {saving ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <>
+                          <Save className="w-4 h-4" />
+                          {isPreCheckinDone ? "Actualizar datos" : "Completar pre check-in"}
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </motion.div>
+
+        {/* ===== PAGO ===== */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
           <div className="bg-gradient-to-r from-[#0F766E] to-[#166534] px-4 py-3">
             <div className="flex items-center justify-between">
@@ -496,7 +722,7 @@ export default function GuestPage() {
           </div>
         </motion.div>
 
-        {/* CLIMA */}
+        {/* ===== CLIMA ===== */}
         {weather.length > 0 && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             <div className="bg-gradient-to-r from-[#00B4D8] to-[#0077B6] px-4 py-3">
@@ -522,7 +748,7 @@ export default function GuestPage() {
           </motion.div>
         )}
 
-        {/* ESTADÍA */}
+        {/* ===== ESTADÍA ===== */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
           <div className="bg-gradient-to-r from-[#166534] to-[#0F766E] px-4 py-3">
             <div className="flex items-center gap-2">
@@ -590,7 +816,7 @@ export default function GuestPage() {
           </div>
         </motion.div>
 
-        {/* WIFI */}
+        {/* ===== WIFI ===== */}
         {settings.wifiNetworks && settings.wifiNetworks.length > 0 && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             <div className="bg-gradient-to-r from-[#6366F1] to-[#4F46E5] px-4 py-3">
@@ -613,7 +839,7 @@ export default function GuestPage() {
           </motion.div>
         )}
 
-        {/* MAPA */}
+        {/* ===== MAPA ===== */}
         {mapsEmbedUrl && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             <div className="bg-gradient-to-r from-[#EF4444] to-[#DC2626] px-4 py-3">
@@ -642,7 +868,7 @@ export default function GuestPage() {
           </motion.div>
         )}
 
-        {/* INSTRUCCIONES DE LLEGADA */}
+        {/* ===== INSTRUCCIONES DE LLEGADA ===== */}
         {settings.arrivalInstructions?.enabled && settings.arrivalInstructions?.steps && settings.arrivalInstructions.steps.length > 0 && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             <SectionHeader title="Instrucciones de Llegada" icon={Info} gradient="bg-gradient-to-r from-[#8B5CF6] to-[#7C3AED]" sectionKey="arrival" />
@@ -669,7 +895,7 @@ export default function GuestPage() {
           </motion.div>
         )}
 
-        {/* GUÍA DEL DESTINO - CON DESPLEGABLE POR ITEM */}
+        {/* ===== GUÍA DEL DESTINO ===== */}
         {destinationPlaces.length > 0 && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             <SectionHeader title="Guía del Destino" icon={Compass} gradient="bg-gradient-to-r from-[#F59E0B] to-[#D97706]" sectionKey="guide" />
@@ -714,7 +940,7 @@ export default function GuestPage() {
                             )}
                             {place.hours && (
                               <div className="flex items-start gap-2">
-                                <Clock4 className="w-3 h-3 text-gray-500 mt-0.5 flex-shrink-0" />
+                                <Clock className="w-3 h-3 text-gray-500 mt-0.5 flex-shrink-0" />
                                 <p className="text-xs text-gray-700">{place.hours}</p>
                               </div>
                             )}
@@ -726,7 +952,7 @@ export default function GuestPage() {
                             )}
                             {place.website && (
                               <div className="flex items-start gap-2">
-                                <Globe className="w-3 h-3 text-gray-500 mt-0.5 flex-shrink-0" />
+                                <ExternalLink className="w-3 h-3 text-gray-500 mt-0.5 flex-shrink-0" />
                                 <a href={place.website} target="_blank" rel="noopener noreferrer" className="text-xs text-[#F59E0B] hover:underline">{place.website}</a>
                               </div>
                             )}
@@ -761,7 +987,7 @@ export default function GuestPage() {
           </motion.div>
         )}
 
-        {/* SERVICIOS ADICIONALES */}
+        {/* ===== SERVICIOS ADICIONALES ===== */}
         {services.length > 0 && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             <SectionHeader title="Servicios Adicionales" icon={Package} gradient="bg-gradient-to-r from-[#10B981] to-[#059669]" sectionKey="services" />
@@ -797,7 +1023,7 @@ export default function GuestPage() {
           </motion.div>
         )}
 
-        {/* CHECK-OUT */}
+        {/* ===== CHECK-OUT ===== */}
         {settings.checkoutInstructions?.enabled && settings.checkoutInstructions?.steps && settings.checkoutInstructions.steps.length > 0 && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             <SectionHeader title="Check-out" icon={LogOut} gradient="bg-gradient-to-r from-[#64748B] to-[#475569]" sectionKey="checkout" />
@@ -822,7 +1048,7 @@ export default function GuestPage() {
           </motion.div>
         )}
 
-        {/* CONTACTOS DE EMERGENCIA */}
+        {/* ===== CONTACTOS DE EMERGENCIA ===== */}
         {settings.emergencyContacts && settings.emergencyContacts.length > 0 && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.55 }} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             <SectionHeader title="Contactos de Emergencia" icon={AlertCircle} gradient="bg-gradient-to-r from-[#DC2626] to-[#B91C1C]" sectionKey="emergency" />
@@ -847,7 +1073,7 @@ export default function GuestPage() {
           </motion.div>
         )}
 
-        {/* CONTACTO */}
+        {/* ===== CONTACTO ===== */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
           <SectionHeader title="Contacto" icon={MessageCircle} gradient="bg-gradient-to-r from-[#25D366] to-[#128C7E]" sectionKey="contact" />
           {expandedSections.contact && (
