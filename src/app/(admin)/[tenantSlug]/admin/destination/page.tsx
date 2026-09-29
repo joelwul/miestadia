@@ -1,5 +1,4 @@
 'use client'
-
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -36,26 +35,24 @@ export default function DestinationPage({ params }: Props) {
     category: '',
     description: '',
     address: '',
-    hours: '',
     phone: '',
     website: '',
     googleMapsUrl: '',
     imageUrl: '',
     tips: '',
     order: 0,
+    isFavorite: false,
   })
 
   useEffect(() => {
     const init = async () => {
       const resolvedParams = await params
       setTenantSlug(resolvedParams.tenantSlug)
-      
       const { data: tenant } = await supabase
         .from('tenants')
         .select('id')
         .eq('slug', resolvedParams.tenantSlug)
         .single()
-
       if (tenant) {
         setTenantId(tenant.id)
         await loadPlaces(tenant.id)
@@ -70,7 +67,6 @@ export default function DestinationPage({ params }: Props) {
       .select('*')
       .eq('tenant_id', tid)
       .order('order', { ascending: true })
-
     if (data) setPlaces(data)
     setLoading(false)
   }
@@ -81,31 +77,32 @@ export default function DestinationPage({ params }: Props) {
       category: '',
       description: '',
       address: '',
-      hours: '',
       phone: '',
       website: '',
       googleMapsUrl: '',
       imageUrl: '',
       tips: '',
       order: places.length + 1,
+      isFavorite: false,
     })
     setEditingId(null)
     setShowForm(false)
   }
 
   function handleEdit(place: any) {
+    const contactInfo = place.contact_info || {}
     setFormData({
       name: place.name || '',
       category: place.category || '',
       description: place.description || '',
       address: place.address || '',
-      hours: place.hours || '',
-      phone: place.phone || '',
-      website: place.website || '',
+      phone: contactInfo.phone || '',
+      website: contactInfo.website || '',
       googleMapsUrl: place.google_maps_url || '',
       imageUrl: place.image_url || '',
       tips: place.tips || '',
       order: place.order || 0,
+      isFavorite: place.is_favorite || false,
     })
     setEditingId(place.id)
     setShowForm(true)
@@ -116,22 +113,25 @@ export default function DestinationPage({ params }: Props) {
       alert('Nombre y categoría son obligatorios')
       return
     }
-
     setSaving(true)
 
-    const placeData = {
+    // Construir contact_info como JSON
+    const contactInfo: any = {}
+    if (formData.phone) contactInfo.phone = formData.phone
+    if (formData.website) contactInfo.website = formData.website
+
+    const placeData: any = {
       tenant_id: tenantId,
       name: formData.name,
       category: formData.category,
       description: formData.description || null,
       address: formData.address || null,
-      hours: formData.hours || null,
-      phone: formData.phone || null,
-      website: formData.website || null,
       google_maps_url: formData.googleMapsUrl || null,
       image_url: formData.imageUrl || null,
       tips: formData.tips || null,
       order: formData.order,
+      is_favorite: formData.isFavorite,
+      contact_info: Object.keys(contactInfo).length > 0 ? contactInfo : null,
     }
 
     let result
@@ -157,12 +157,10 @@ export default function DestinationPage({ params }: Props) {
 
   async function handleDelete(id: string) {
     if (!confirm('¿Eliminar este lugar?')) return
-    
     await supabase
       .from('destination_places')
       .delete()
       .eq('id', id)
-    
     await loadPlaces(tenantId)
   }
 
@@ -240,14 +238,6 @@ export default function DestinationPage({ params }: Props) {
                 />
               </div>
               <div>
-                <label className="text-sm font-medium text-gray-700">Horarios</label>
-                <Input
-                  value={formData.hours}
-                  onChange={(e) => setFormData({ ...formData, hours: e.target.value })}
-                  placeholder="Ej: Lun-Dom 12:00 - 23:00"
-                />
-              </div>
-              <div>
                 <label className="text-sm font-medium text-gray-700">Teléfono</label>
                 <Input
                   value={formData.phone}
@@ -296,8 +286,19 @@ export default function DestinationPage({ params }: Props) {
                   onChange={(e) => setFormData({ ...formData, order: parseInt(e.target.value) || 0 })}
                 />
               </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="isFavorite"
+                  checked={formData.isFavorite}
+                  onChange={(e) => setFormData({ ...formData, isFavorite: e.target.checked })}
+                  className="w-4 h-4 rounded border-gray-300"
+                />
+                <label htmlFor="isFavorite" className="text-sm text-gray-700">
+                  Marcar como favorito del anfitrión ⭐
+                </label>
+              </div>
             </div>
-
             <div className="flex gap-2 pt-2">
               <Button onClick={handleSave} disabled={saving}>
                 <Save className="mr-2 h-4 w-4" />
@@ -327,6 +328,7 @@ export default function DestinationPage({ params }: Props) {
               {places.map((place) => {
                 const catConfig = getCategoryConfig(place.category)
                 const Icon = catConfig.icon
+                const contactInfo = place.contact_info || {}
                 return (
                   <div key={place.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
                     <div className="flex items-start justify-between gap-4">
@@ -338,14 +340,15 @@ export default function DestinationPage({ params }: Props) {
                           <div className="flex items-center gap-2 flex-wrap">
                             <p className="font-semibold text-gray-900">{place.name}</p>
                             <Badge className={catConfig.color}>{catConfig.label}</Badge>
+                            {place.is_favorite && <Badge className="bg-yellow-100 text-yellow-800">⭐ Favorito</Badge>}
                           </div>
                           {place.description && (
                             <p className="text-sm text-gray-600 mt-1 line-clamp-2">{place.description}</p>
                           )}
                           <div className="flex flex-wrap gap-3 mt-2 text-xs text-gray-500">
-                            {place.address && <span>📍 {place.address}</span>}
-                            {place.hours && <span>🕐 {place.hours}</span>}
-                            {place.phone && <span>📱 {place.phone}</span>}
+                            {place.address && <span> {place.address}</span>}
+                            {contactInfo.phone && <span>📱 {contactInfo.phone}</span>}
+                            {contactInfo.hours && <span>🕐 {contactInfo.hours}</span>}
                           </div>
                           {place.tips && (
                             <p className="text-xs text-blue-600 mt-2 italic">💡 {place.tips}</p>

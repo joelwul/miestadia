@@ -232,9 +232,10 @@ export default function GuestPage() {
           .eq("tenant_id", tenantData.id);
         setServices(servicesData || []);
 
+        // IMPORTANTE: Traer TODOS los campos de destination_places
         const { data: placesData } = await supabase
           .from("destination_places")
-          .select("*")
+          .select("id, name, description, category, is_favorite, google_maps_url, address, phone, website, hours, tips, image_url, contact_info")
           .eq("tenant_id", tenantData.id)
           .order("sort_order", { ascending: true });
         setDestinationPlaces(placesData || []);
@@ -272,10 +273,10 @@ export default function GuestPage() {
 
           if (weatherData.daily) {
             const weatherIcons: Record<number, string> = {
-              0: "☀️", 1: "️", 2: "⛅", 3: "☁️",
-              45: "🌫️", 48: "🌫️", 51: "️", 53: "🌦️", 55: "🌧️",
-              61: "🌧️", 63: "🌧️", 65: "🌧️", 71: "🌨️", 73: "🌨️", 75: "❄️",
-              80: "🌦️", 81: "🌧️", 82: "🌧️", 95: "️", 96: "⛈️", 99: "⛈️",
+              0: "☀️", 1: "🌤️", 2: "⛅", 3: "☁️",
+              45: "🌫️", 48: "🌫️", 51: "🌦️", 53: "🌦️", 55: "🌧️",
+              61: "🌧️", 63: "️", 65: "🌧️", 71: "🌨️", 73: "🌨️", 75: "❄️",
+              80: "️", 81: "🌧️", 82: "🌧️", 95: "⛈️", 96: "⛈️", 99: "⛈️",
             };
             const weatherConditions: Record<number, string> = {
               0: "Despejado", 1: "Mayormente despejado", 2: "Parcialmente nublado", 3: "Nublado",
@@ -393,7 +394,6 @@ export default function GuestPage() {
 
   const mapsEmbedUrl = getMapsEmbedUrl();
 
-  // Helper para renderizar header de sección con toggle
   const SectionHeader = ({ title, icon: Icon, gradient, sectionKey }: { title: string; icon: any; gradient: string; sectionKey: SectionKey }) => (
     <button
       onClick={() => toggleSection(sectionKey)}
@@ -424,7 +424,7 @@ export default function GuestPage() {
       </header>
 
       <div className="max-w-4xl mx-auto px-4 py-6 space-y-4">
-        {/* ===== PAGO (siempre visible) ===== */}
+        {/* PAGO */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
           <div className="bg-gradient-to-r from-[#0F766E] to-[#166534] px-4 py-3">
             <div className="flex items-center justify-between">
@@ -496,7 +496,7 @@ export default function GuestPage() {
           </div>
         </motion.div>
 
-        {/* ===== CLIMA (siempre visible) ===== */}
+        {/* CLIMA */}
         {weather.length > 0 && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             <div className="bg-gradient-to-r from-[#00B4D8] to-[#0077B6] px-4 py-3">
@@ -522,7 +522,7 @@ export default function GuestPage() {
           </motion.div>
         )}
 
-        {/* ===== ESTADÍA (siempre visible) ===== */}
+        {/* ESTADÍA */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
           <div className="bg-gradient-to-r from-[#166534] to-[#0F766E] px-4 py-3">
             <div className="flex items-center gap-2">
@@ -541,7 +541,7 @@ export default function GuestPage() {
                   {checkInDate.toLocaleDateString("es-AR", { weekday: "short", day: "numeric", month: "short" })}
                 </p>
                 {isCheckInToday ? (
-                  <p className="text-xs text-[#0F766E] mt-1 font-bold">📍 HOY</p>
+                  <p className="text-xs text-[#0F766E] mt-1 font-bold"> HOY</p>
                 ) : daysUntilCheckIn > 0 ? (
                   <p className="text-xs text-[#0F766E] mt-1">En {daysUntilCheckIn} {daysUntilCheckIn === 1 ? "día" : "días"}</p>
                 ) : null}
@@ -590,7 +590,7 @@ export default function GuestPage() {
           </div>
         </motion.div>
 
-        {/* ===== WIFI (siempre visible) ===== */}
+        {/* WIFI */}
         {settings.wifiNetworks && settings.wifiNetworks.length > 0 && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             <div className="bg-gradient-to-r from-[#6366F1] to-[#4F46E5] px-4 py-3">
@@ -613,7 +613,7 @@ export default function GuestPage() {
           </motion.div>
         )}
 
-        {/* ===== MAPA (siempre visible) ===== */}
+        {/* MAPA */}
         {mapsEmbedUrl && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             <div className="bg-gradient-to-r from-[#EF4444] to-[#DC2626] px-4 py-3">
@@ -642,7 +642,7 @@ export default function GuestPage() {
           </motion.div>
         )}
 
-        {/* ===== INSTRUCCIONES DE LLEGADA (contraída por defecto) ===== */}
+        {/* INSTRUCCIONES DE LLEGADA */}
         {settings.arrivalInstructions?.enabled && settings.arrivalInstructions?.steps && settings.arrivalInstructions.steps.length > 0 && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             <SectionHeader title="Instrucciones de Llegada" icon={Info} gradient="bg-gradient-to-r from-[#8B5CF6] to-[#7C3AED]" sectionKey="arrival" />
@@ -669,7 +669,7 @@ export default function GuestPage() {
           </motion.div>
         )}
 
-        {/* ===== GUÍA DEL DESTINO (contraída por defecto, items desplegables) ===== */}
+        {/* GUÍA DEL DESTINO - CON DESPLEGABLE POR ITEM */}
         {destinationPlaces.length > 0 && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             <SectionHeader title="Guía del Destino" icon={Compass} gradient="bg-gradient-to-r from-[#F59E0B] to-[#D97706]" sectionKey="guide" />
@@ -678,6 +678,7 @@ export default function GuestPage() {
                 <div className="space-y-3">
                   {destinationPlaces.map((place) => {
                     const isExpanded = expandedPlace === place.id;
+                    const hasExtraInfo = place.address || place.phone || place.hours || place.website || place.tips || place.image_url || place.google_maps_url || (place.contact_info && Object.keys(place.contact_info).length > 0);
                     return (
                       <div key={place.id} className={`rounded-lg border ${place.is_favorite ? "bg-yellow-50 border-yellow-200" : "bg-gray-50 border-gray-200"}`}>
                         <div className="p-3">
@@ -690,7 +691,7 @@ export default function GuestPage() {
                               {place.category && <p className="text-xs text-gray-500">{place.category}</p>}
                               {place.description && <p className="text-xs text-gray-600 mt-1">{place.description}</p>}
                             </div>
-                            {(place.address || place.phone || place.hours || place.website || place.tips || place.image_url || place.google_maps_url) && (
+                            {hasExtraInfo && (
                               <button onClick={() => setExpandedPlace(isExpanded ? null : place.id)} className="text-xs text-[#F59E0B] flex items-center gap-1 hover:underline ml-2 flex-shrink-0">
                                 {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                                 {isExpanded ? "Menos" : "Más info"}
@@ -698,7 +699,7 @@ export default function GuestPage() {
                             )}
                           </div>
                         </div>
-                        {isExpanded && (
+                        {isExpanded && hasExtraInfo && (
                           <div className="px-3 pb-3 border-t border-gray-200 pt-3 space-y-2">
                             {place.image_url && (
                               <div className="rounded-lg overflow-hidden">
@@ -760,7 +761,7 @@ export default function GuestPage() {
           </motion.div>
         )}
 
-        {/* ===== SERVICIOS ADICIONALES (contraída por defecto, con botón WhatsApp) ===== */}
+        {/* SERVICIOS ADICIONALES */}
         {services.length > 0 && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             <SectionHeader title="Servicios Adicionales" icon={Package} gradient="bg-gradient-to-r from-[#10B981] to-[#059669]" sectionKey="services" />
@@ -796,7 +797,7 @@ export default function GuestPage() {
           </motion.div>
         )}
 
-        {/* ===== CHECK-OUT (contraído por defecto) ===== */}
+        {/* CHECK-OUT */}
         {settings.checkoutInstructions?.enabled && settings.checkoutInstructions?.steps && settings.checkoutInstructions.steps.length > 0 && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             <SectionHeader title="Check-out" icon={LogOut} gradient="bg-gradient-to-r from-[#64748B] to-[#475569]" sectionKey="checkout" />
@@ -821,7 +822,7 @@ export default function GuestPage() {
           </motion.div>
         )}
 
-        {/* ===== CONTACTOS DE EMERGENCIA (contraído por defecto) ===== */}
+        {/* CONTACTOS DE EMERGENCIA */}
         {settings.emergencyContacts && settings.emergencyContacts.length > 0 && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.55 }} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             <SectionHeader title="Contactos de Emergencia" icon={AlertCircle} gradient="bg-gradient-to-r from-[#DC2626] to-[#B91C1C]" sectionKey="emergency" />
@@ -846,7 +847,7 @@ export default function GuestPage() {
           </motion.div>
         )}
 
-        {/* ===== CONTACTO (contraído por defecto) ===== */}
+        {/* CONTACTO */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
           <SectionHeader title="Contacto" icon={MessageCircle} gradient="bg-gradient-to-r from-[#25D366] to-[#128C7E]" sectionKey="contact" />
           {expandedSections.contact && (
