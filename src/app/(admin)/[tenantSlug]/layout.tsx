@@ -15,7 +15,6 @@ import {
   CreditCard,
   Clock,
   Crown,
-  X,
 } from 'lucide-react'
 
 interface Props {
@@ -53,7 +52,6 @@ export default async function AdminLayout({ children, params }: Props) {
     )
   }
 
-  // Calcular días de trial
   const tenant = tenantUser.tenants
   let daysLeft = 30
   let isExpired = false
