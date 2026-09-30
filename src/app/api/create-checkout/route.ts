@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { PRICES, PRICES_ARS } from "@/lib/config";
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -21,12 +22,13 @@ export async function POST(request: Request) {
     }
 
     if (provider === "mercadopago") {
-      // Configurar montos según plan
-      const config = plan === "monthly" 
-        ? { title: "Mi Estadía - Plan Mensual", amount: 40, frequency: 1, frequency_type: "months" }
-        : { title: "Mi Estadía - Plan Anual", amount: 360, frequency: 12, frequency_type: "months" };
+      // ⚠️ MercadoPago Argentina SOLO acepta ARS para suscripciones recurrentes
+      // Los precios se calculan automáticamente desde USD usando el tipo de cambio
+      const amountARS = plan === "monthly" ? PRICES_ARS.monthly : PRICES_ARS.yearly;
+      const title = plan === "monthly" 
+        ? `Mi Estadía - Plan Mensual (USD ${PRICES.monthly})`
+        : `Mi Estadía - Plan Anual (USD ${PRICES.yearly})`;
 
-      // Crear Preapproval (suscripción recurrente)
       const response = await fetch("https://api.mercadopago.com/preapproval", {
         method: "POST",
         headers: {
@@ -38,19 +40,22 @@ export async function POST(request: Request) {
           payer_email: tenant.owner_email,
           back_url: `${process.env.NEXT_PUBLIC_APP_URL}/${tenant.slug}/admin/billing?success=true&provider=mercadopago`,
           external_reference: `${tenant_id}-${plan}`,
-          reason: config.title,
+          reason: title,
           status: "pending",
           auto_recurring: {
-            frequency: config.frequency,
-            frequency_type: config.frequency_type,
-            transaction_amount: config.amount,
-            currency_id: "USD",
+            frequency: plan === "monthly" ? 1 : 12,
+            frequency_type: "months",
+            transaction_amount: amountARS,
+            currency_id: "ARS",
             start_date: new Date().toISOString(),
           },
           metadata: {
             tenant_id: tenant.id,
             plan: plan,
             provider: "mercadopago",
+            amount_usd: plan === "monthly" ? PRICES.monthly : PRICES.yearly,
+            amount_ars: amountARS,
+            exchange_rate: process.env.USD_TO_ARS || "1600",
           },
         }),
       });
@@ -62,12 +67,68 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: data.message || "Error creando suscripción" }, { status: 500 });
       }
 
-      // Redirigir al usuario a la página de pago de MP
       return NextResponse.json({ url: data.init_point });
 
     } else if (provider === "lemonsqueezy") {
-      // ... (código LS que ya tenías)
-      return NextResponse.json({ error: "LS pendiente de configurar" }, { status: 500 });
+      // LemonSqueezy SÍ acepta USD directamente
+      const variantId = plan === "monthly"
+        ? process.env.LS_MONTHLY_VARIANT_ID
+        : process.env.LS_YEARLY_VARIANT_ID;
+
+      const response = await fetch("https://api.lemonsqueezy.com/v1/checkouts", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${process.env.LS_API_KEY}`,
+          "Content-Type": "application/vnd.api+json",
+          "Accept": "application/vnd.api+json",
+        },
+        body: JSON.stringify({
+          data: {
+            type: "checkouts",
+            attributes: {
+              custom_price: null,
+              product_options: {
+                redirect_url: `${process.env.NEXT_PUBLIC_APP_URL}/${tenant.slug}/admin/billing?success=true&provider=lemonsqueezy`,
+                receipt_button_text: "Volver a Mi Estadía",
+                receipt_link_url: `${process.env.NEXT_PUBLIC_APP_URL}/${tenant.slug}/admin/billing`,
+                receipt_thank_you_note: "¡Gracias por suscribirte a Mi Estadía!",
+              },
+              checkout_data: {
+                email: tenant.owner_email,
+                custom: {
+                  tenant_id: tenant.id,
+                  plan: plan,
+                  provider: "lemonsqueezy",
+                },
+              },
+              expires_at: null,
+              preview: false,
+            },
+            relationships: {
+              store: {
+                data: {
+                  type: "stores",
+                  id: process.env.LS_STORE_ID,
+                },
+              },
+              variant: {
+                data: {
+                  type: "variants",
+                  id: variantId,
+                },
+              },
+            },
+          },
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        return NextResponse.json({ error: data.error?.message || "Error creando checkout LS" }, { status: 500 });
+      }
+
+      return NextResponse.json({ url: data.data.attributes.url });
     }
 
     return NextResponse.json({ error: "Provider no soportado" }, { status: 400 });

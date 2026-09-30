@@ -14,7 +14,10 @@ import {
   ExternalLink,
   Loader2,
   XCircle,
+  DollarSign,
+  TrendingUp,
 } from "lucide-react";
+import { PRICES, PRICES_ARS, USD_TO_ARS } from "@/lib/config";
 
 interface Invoice {
   id: string;
@@ -48,73 +51,56 @@ export default function BillingPage() {
   const [daysLeft, setDaysLeft] = useState(0);
   const supabase = createClient();
 
- useEffect(() => {
-  // Verificar si viene de un checkout exitoso
-  const urlParams = new URLSearchParams(window.location.search);
-  const success = urlParams.get("success");
-  const provider = urlParams.get("provider");
+  useEffect(() => {
+    async function load() {
+      try {
+        const { data: tenantData, error: tenantError } = await supabase
+          .from("tenants")
+          .select("*")
+          .eq("slug", tenantSlug)
+          .single();
 
-  if (success === "true" && provider) {
-    alert(`¡Pago exitoso! Tu suscripción con ${provider === "mercadopago" ? "MercadoPago" : "LemonSqueezy"} fue procesada. El sistema activará tu cuenta en unos minutos.`);
-    
-    // Limpiar URL
-    window.history.replaceState({}, document.title, window.location.pathname);
-    
-    // Recargar datos
-    load();
-  }
+        if (tenantError || !tenantData) {
+          setLoading(false);
+          return;
+        }
 
-  async function load() {
-    try {
-      const { data: tenantData, error: tenantError } = await supabase
-        .from("tenants")
-        .select("*")
-        .eq("slug", tenantSlug)
-        .single();
+        setTenant(tenantData);
 
-      if (tenantError || !tenantData) {
+        const now = new Date();
+        now.setHours(0, 0, 0, 0);
+        const trialEnd = tenantData.trial_ends_at ? new Date(tenantData.trial_ends_at) : null;
+        const subEnd = tenantData.subscription_ends_at ? new Date(tenantData.subscription_ends_at) : null;
+
+        if (tenantData.subscription_status === "active" && subEnd) {
+          setDaysLeft(Math.ceil((subEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+        } else if (trialEnd) {
+          setDaysLeft(Math.ceil((trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+        }
+
+        const { data: invoicesData } = await supabase
+          .from("invoices")
+          .select("*")
+          .eq("tenant_id", tenantData.id)
+          .order("date", { ascending: false });
+
+        if (invoicesData) {
+          setInvoices(invoicesData);
+        }
+      } catch (err) {
+        console.error("Error loading billing:", err);
+      } finally {
         setLoading(false);
-        return;
       }
-
-      setTenant(tenantData);
-
-      const now = new Date();
-      now.setHours(0, 0, 0, 0);
-      const trialEnd = tenantData.trial_ends_at ? new Date(tenantData.trial_ends_at) : null;
-      const subEnd = tenantData.subscription_ends_at ? new Date(tenantData.subscription_ends_at) : null;
-
-      if (tenantData.subscription_status === "active" && subEnd) {
-        setDaysLeft(Math.ceil((subEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
-      } else if (trialEnd) {
-        setDaysLeft(Math.ceil((trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
-      }
-
-      const { data: invoicesData } = await supabase
-        .from("invoices")
-        .select("*")
-        .eq("tenant_id", tenantData.id)
-        .order("date", { ascending: false });
-
-      if (invoicesData) {
-        setInvoices(invoicesData);
-      }
-    } catch (err) {
-      console.error("Error loading billing:", err);
-    } finally {
-      setLoading(false);
     }
-  }
-  
-  load();
-}, [tenantSlug]);
+    load();
+  }, [tenantSlug]);
 
   async function handleCheckout(plan: "monthly" | "yearly", provider: "lemonsqueezy" | "mercadopago") {
     if (!tenant) return;
     setCheckoutLoading(`${plan}-${provider}`);
 
     try {
-      // Llamar al endpoint de checkout
       const response = await fetch("/api/create-checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -195,7 +181,7 @@ export default function BillingPage() {
         <p className="text-gray-500 mt-1">Gestioná tu plan de pago y facturación</p>
       </div>
 
-      {/* Banner de estado de suscripción */}
+      {/* Banner de estado */}
       {isTrial && (
         <motion.div
           initial={{ opacity: 0, y: -10 }}
@@ -362,7 +348,13 @@ export default function BillingPage() {
       {/* Planes disponibles */}
       {!isActive && (
         <div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">Elegí tu plan</h2>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold text-gray-900">Elegí tu plan</h2>
+            <div className="flex items-center gap-2 text-sm text-gray-500">
+              <TrendingUp className="w-4 h-4" />
+              <span>Tipo de cambio: 1 USD = ${USD_TOARS.toLocaleString("es-AR")} ARS</span>
+            </div>
+          </div>
           <div className="grid md:grid-cols-2 gap-6">
             {/* Plan Mensual */}
             <div className="bg-white border-2 border-gray-200 rounded-xl p-6 hover:border-[#0F766E] transition-colors">
@@ -372,10 +364,13 @@ export default function BillingPage() {
               </div>
               <div className="mb-6">
                 <div className="flex items-baseline gap-2">
-                  <span className="text-4xl font-bold text-[#0F766E]">USD 40</span>
+                  <span className="text-4xl font-bold text-[#0F766E]">USD {PRICES.monthly}</span>
                   <span className="text-gray-500">/ mes</span>
                 </div>
-                <p className="text-sm text-gray-500 mt-2">Pago mes a mes, cancelás cuando quieras</p>
+                <p className="text-sm text-gray-500 mt-2">
+                  ≈ ${PRICES_ARS.monthly.toLocaleString("es-AR")} ARS/mes
+                </p>
+                <p className="text-xs text-gray-400 mt-1">Pago mes a mes, cancelás cuando quieras</p>
               </div>
 
               <ul className="space-y-3 mb-6">
@@ -406,7 +401,7 @@ export default function BillingPage() {
                   ) : (
                     <>
                       <CreditCard className="w-4 h-4" />
-                      Mercado Pago (ARS)
+                      Mercado Pago (${PRICES_ARS.monthly.toLocaleString("es-AR")} ARS)
                     </>
                   )}
                 </button>
@@ -420,7 +415,7 @@ export default function BillingPage() {
                   ) : (
                     <>
                       <ExternalLink className="w-4 h-4" />
-                      Pagar con LemonSqueezy
+                      Pagar con LemonSqueezy (USD {PRICES.monthly})
                     </>
                   )}
                 </button>
@@ -438,13 +433,16 @@ export default function BillingPage() {
               </div>
               <div className="mb-6">
                 <div className="flex items-baseline gap-2">
-                  <span className="text-4xl font-bold text-[#0F766E]">USD 360</span>
+                  <span className="text-4xl font-bold text-[#0F766E]">USD {PRICES.yearly}</span>
                   <span className="text-gray-500">/ año</span>
                 </div>
-                <p className="text-sm text-gray-500 mt-2">Pago único anual, 2 meses gratis</p>
+                <p className="text-sm text-gray-500 mt-2">
+                  ≈ ${PRICES_ARS.yearly.toLocaleString("es-AR")} ARS/año
+                </p>
+                <p className="text-xs text-gray-400 mt-1">Pago único anual, 2 meses gratis</p>
                 <div className="bg-[#EA580C]/10 rounded-lg p-2 mt-3">
                   <p className="text-xs font-semibold text-[#EA580C]">
-                    Equivale a USD 30/mes - Ahorrás USD 120 al año
+                    Equivale a USD {Math.round(PRICES.yearly / 12)}/mes - Ahorrás USD {PRICES.monthly * 12 - PRICES.yearly} al año
                   </p>
                 </div>
               </div>
@@ -478,7 +476,7 @@ export default function BillingPage() {
                   ) : (
                     <>
                       <CreditCard className="w-4 h-4" />
-                      Mercado Pago (ARS)
+                      Mercado Pago (${PRICES_ARS.yearly.toLocaleString("es-AR")} ARS)
                     </>
                   )}
                 </button>
@@ -492,7 +490,7 @@ export default function BillingPage() {
                   ) : (
                     <>
                       <ExternalLink className="w-4 h-4" />
-                      Pagar con LemonSqueezy
+                      Pagar con LemonSqueezy (USD {PRICES.yearly})
                     </>
                   )}
                 </button>
