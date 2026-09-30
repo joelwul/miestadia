@@ -117,39 +117,3 @@ export default function GuestPage() {
     </div>
   );
 }
-
-/* Ocultar scrollbar en navegación móvil */
-.overflow-x-auto::-webkit-scrollbar {
-  display: none;
-}
-.overflow-x-auto {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-
-/* Modales responsive */
-@media (max-width: 640px) {
-  .fixed.inset-0 {
-    padding: 0;
-  }
-  
-  .fixed.inset-0 .bg-white {
-    max-height: 100vh;
-    border-radius: 0;
-  }
-}
-
-/* Tablas scrollables en móvil */
-@media (max-width: 768px) {
-  .overflow-x-auto {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-}
-
-/* Inputs más grandes en móvil para mejor touch */
-@media (max-width: 640px) {
-  input, select, textarea, button {
-    font-size: 16px; /* Previene zoom en iOS */
-  }
-}
