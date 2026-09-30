@@ -65,6 +65,7 @@ export default function BillingPage() {
         setTenant(tenantData);
 
         const now = new Date();
+        now.setHours(0, 0, 0, 0);
         const trialEnd = tenantData.trial_ends_at ? new Date(tenantData.trial_ends_at) : null;
         const subEnd = tenantData.subscription_ends_at ? new Date(tenantData.subscription_ends_at) : null;
 
@@ -97,18 +98,24 @@ export default function BillingPage() {
     setCheckoutLoading(`${plan}-${provider}`);
 
     try {
-      const { data, error } = await supabase.functions.invoke("create-checkout", {
-        body: {
+      // Llamar al endpoint de checkout
+      const response = await fetch("/api/create-checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
           tenant_id: tenant.id,
           plan,
           provider,
-          return_url: `${window.location.origin}/${tenantSlug}/admin/billing`,
-        },
+        }),
       });
 
-      if (error) throw error;
+      const data = await response.json();
 
-      if (data?.url) {
+      if (!response.ok) {
+        throw new Error(data.error || "Error creando checkout");
+      }
+
+      if (data.url) {
         window.location.href = data.url;
       }
     } catch (err: any) {
@@ -124,15 +131,23 @@ export default function BillingPage() {
       return;
     }
 
-    const { error } = await supabase.functions.invoke("cancel-subscription", {
-      body: { tenant_id: tenant.id },
-    });
+    try {
+      const response = await fetch("/api/cancel-subscription", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tenant_id: tenant.id }),
+      });
 
-    if (error) {
-      alert("Error al cancelar: " + error.message);
-    } else {
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Error al cancelar");
+      }
+
       alert("Suscripción cancelada. Tu acceso continuará hasta el final del período pagado.");
       window.location.reload();
+    } catch (err: any) {
+      alert("Error al cancelar: " + err.message);
     }
   }
 
@@ -253,8 +268,12 @@ export default function BillingPage() {
               <p className="text-sm text-gray-500">Tu plan actual</p>
               <h2 className="text-2xl font-bold text-gray-900">
                 {isActive
-                  ? tenant.subscription_plan === "yearly" ? "Anual" : "Mensual"
-                  : isTrial ? "Prueba Gratuita" : "Sin plan"}
+                  ? tenant.subscription_plan === "yearly"
+                    ? "Anual"
+                    : "Mensual"
+                  : isTrial
+                  ? "Prueba Gratuita"
+                  : "Sin plan"}
               </h2>
             </div>
             <div className="bg-[#0F766E]/10 p-3 rounded-lg">
@@ -272,7 +291,9 @@ export default function BillingPage() {
               </div>
               <div className="flex items-center gap-2 text-sm text-gray-600">
                 <CreditCard className="w-4 h-4" />
-                <span>Método: {tenant.payment_method || "Tarjeta"}</span>
+                <span>
+                  Método: {tenant.payment_method || "Tarjeta"}
+                </span>
               </div>
             </div>
           )}
@@ -291,15 +312,21 @@ export default function BillingPage() {
           <ul className="space-y-3 text-sm text-gray-600">
             <li className="flex items-start gap-2">
               <CheckCircle className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-              <span><strong>Cancelar:</strong> corta los próximos cobros al instante; tu plan sigue activo hasta el fin del período pagado.</span>
+              <span>
+                <strong>Cancelar:</strong> corta los próximos cobros al instante; tu plan sigue activo hasta el fin del período pagado.
+              </span>
             </li>
             <li className="flex items-start gap-2">
               <CheckCircle className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-              <span><strong>Reembolsos:</strong> garantía de 7 días desde el primer pago; se procesa por el mismo medio de pago.</span>
+              <span>
+                <strong>Reembolsos:</strong> garantía de 7 días desde el primer pago; se procesa por el mismo medio de pago.
+              </span>
             </li>
             <li className="flex items-start gap-2">
               <CheckCircle className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-              <span><strong>Suscripciones por Mercado Pago:</strong> también podés verlas en tu cuenta de MP → "Suscripciones".</span>
+              <span>
+                <strong>Suscripciones por Mercado Pago:</strong> también podés verlas en tu cuenta de MP → "Suscripciones".
+              </span>
             </li>
           </ul>
 
@@ -321,6 +348,7 @@ export default function BillingPage() {
         <div>
           <h2 className="text-2xl font-bold text-gray-900 mb-6">Elegí tu plan</h2>
           <div className="grid md:grid-cols-2 gap-6">
+            {/* Plan Mensual */}
             <div className="bg-white border-2 border-gray-200 rounded-xl p-6 hover:border-[#0F766E] transition-colors">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-xl font-bold text-gray-900">Plan Mensual</h3>
@@ -335,7 +363,15 @@ export default function BillingPage() {
               </div>
 
               <ul className="space-y-3 mb-6">
-                {["Todas las funcionalidades", "Unidades ilimitadas", "Reservas ilimitadas", "Panel de huésped premium", "Mensajería WhatsApp", "Emails automáticos", "Soporte prioritario"].map((feature, i) => (
+                {[
+                  "Todas las funcionalidades",
+                  "Unidades ilimitadas",
+                  "Reservas ilimitadas",
+                  "Panel de huésped premium",
+                  "Mensajería WhatsApp",
+                  "Emails automáticos",
+                  "Soporte prioritario",
+                ].map((feature, i) => (
                   <li key={i} className="flex items-center gap-2 text-sm text-gray-700">
                     <CheckCircle className="w-4 h-4 text-[#0F766E] flex-shrink-0" />
                     {feature}
@@ -349,20 +385,37 @@ export default function BillingPage() {
                   disabled={checkoutLoading !== null}
                   className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-[#00B1EA] text-white rounded-lg font-semibold hover:bg-[#009EE3] transition-colors disabled:opacity-50"
                 >
-                  {checkoutLoading === "monthly-mercadopago" ? <Loader2 className="w-4 h-4 animate-spin" /> : <><CreditCard className="w-4 h-4" />Mercado Pago (ARS)</>}
+                  {checkoutLoading === "monthly-mercadopago" ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <>
+                      <CreditCard className="w-4 h-4" />
+                      Mercado Pago (ARS)
+                    </>
+                  )}
                 </button>
                 <button
                   onClick={() => handleCheckout("monthly", "lemonsqueezy")}
                   disabled={checkoutLoading !== null}
                   className="w-full flex items-center justify-center gap-2 px-4 py-3 border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition-colors disabled:opacity-50"
                 >
-                  {checkoutLoading === "monthly-lemonsqueezy" ? <Loader2 className="w-4 h-4 animate-spin" /> : <><ExternalLink className="w-4 h-4" />Pagar con LemonSqueezy</>}
+                  {checkoutLoading === "monthly-lemonsqueezy" ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <>
+                      <ExternalLink className="w-4 h-4" />
+                      Pagar con LemonSqueezy
+                    </>
+                  )}
                 </button>
               </div>
             </div>
 
+            {/* Plan Anual */}
             <div className="bg-white border-2 border-[#EA580C] rounded-xl p-6 relative">
-              <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#EA580C] text-white text-xs font-bold px-3 py-1 rounded-full">Ahorrás 25%</span>
+              <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#EA580C] text-white text-xs font-bold px-3 py-1 rounded-full">
+                Ahorrás 25%
+              </span>
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-xl font-bold text-gray-900">Plan Anual</h3>
                 <span className="text-xs bg-[#EA580C]/10 text-[#EA580C] px-2 py-1 rounded">Mejor valor</span>
@@ -374,12 +427,23 @@ export default function BillingPage() {
                 </div>
                 <p className="text-sm text-gray-500 mt-2">Pago único anual, 2 meses gratis</p>
                 <div className="bg-[#EA580C]/10 rounded-lg p-2 mt-3">
-                  <p className="text-xs font-semibold text-[#EA580C]">Equivale a USD 30/mes - Ahorrás USD 120 al año</p>
+                  <p className="text-xs font-semibold text-[#EA580C]">
+                    Equivale a USD 30/mes - Ahorrás USD 120 al año
+                  </p>
                 </div>
               </div>
 
               <ul className="space-y-3 mb-6">
-                {["Todas las funcionalidades", "Unidades ilimitadas", "Reservas ilimitadas", "Panel de huésped premium", "Mensajería WhatsApp", "Emails automáticos", "Soporte prioritario", "2 meses gratis"].map((feature, i) => (
+                {[
+                  "Todas las funcionalidades",
+                  "Unidades ilimitadas",
+                  "Reservas ilimitadas",
+                  "Panel de huésped premium",
+                  "Mensajería WhatsApp",
+                  "Emails automáticos",
+                  "Soporte prioritario",
+                  "2 meses gratis",
+                ].map((feature, i) => (
                   <li key={i} className="flex items-center gap-2 text-sm text-gray-700">
                     <CheckCircle className="w-4 h-4 text-[#0F766E] flex-shrink-0" />
                     {feature}
@@ -393,14 +457,28 @@ export default function BillingPage() {
                   disabled={checkoutLoading !== null}
                   className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-[#00B1EA] text-white rounded-lg font-semibold hover:bg-[#009EE3] transition-colors disabled:opacity-50"
                 >
-                  {checkoutLoading === "yearly-mercadopago" ? <Loader2 className="w-4 h-4 animate-spin" /> : <><CreditCard className="w-4 h-4" />Mercado Pago (ARS)</>}
+                  {checkoutLoading === "yearly-mercadopago" ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <>
+                      <CreditCard className="w-4 h-4" />
+                      Mercado Pago (ARS)
+                    </>
+                  )}
                 </button>
                 <button
                   onClick={() => handleCheckout("yearly", "lemonsqueezy")}
                   disabled={checkoutLoading !== null}
                   className="w-full flex items-center justify-center gap-2 px-4 py-3 border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition-colors disabled:opacity-50"
                 >
-                  {checkoutLoading === "yearly-lemonsqueezy" ? <Loader2 className="w-4 h-4 animate-spin" /> : <><ExternalLink className="w-4 h-4" />Pagar con LemonSqueezy</>}
+                  {checkoutLoading === "yearly-lemonsqueezy" ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <>
+                      <ExternalLink className="w-4 h-4" />
+                      Pagar con LemonSqueezy
+                    </>
+                  )}
                 </button>
               </div>
             </div>
@@ -426,25 +504,56 @@ export default function BillingPage() {
         ) : (
           <div className="space-y-3">
             {invoices.map((invoice) => (
-              <div key={invoice.id} className="flex items-center justify-between p-4 border border-gray-100 rounded-lg hover:bg-gray-50 transition-colors">
+              <div
+                key={invoice.id}
+                className="flex items-center justify-between p-4 border border-gray-100 rounded-lg hover:bg-gray-50 transition-colors"
+              >
                 <div className="flex items-center gap-4">
-                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                    invoice.status === "paid" ? "bg-green-100" : invoice.status === "pending" ? "bg-yellow-100" : "bg-red-100"
-                  }`}>
-                    {invoice.status === "paid" ? <CheckCircle className="w-5 h-5 text-green-600" /> : invoice.status === "pending" ? <Clock className="w-5 h-5 text-yellow-600" /> : <AlertCircle className="w-5 h-5 text-red-600" />}
+                  <div
+                    className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                      invoice.status === "paid"
+                        ? "bg-green-100"
+                        : invoice.status === "pending"
+                        ? "bg-yellow-100"
+                        : "bg-red-100"
+                    }`}
+                  >
+                    {invoice.status === "paid" ? (
+                      <CheckCircle className="w-5 h-5 text-green-600" />
+                    ) : invoice.status === "pending" ? (
+                      <Clock className="w-5 h-5 text-yellow-600" />
+                    ) : (
+                      <AlertCircle className="w-5 h-5 text-red-600" />
+                    )}
                   </div>
                   <div>
-                    <p className="font-medium text-gray-900">{invoice.plan === "yearly" ? "Plan Anual" : "Plan Mensual"}</p>
-                    <p className="text-sm text-gray-500">{new Date(invoice.date).toLocaleDateString("es-AR")} • {invoice.period}</p>
+                    <p className="font-medium text-gray-900">
+                      {invoice.plan === "yearly" ? "Plan Anual" : "Plan Mensual"}
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      {new Date(invoice.date).toLocaleDateString("es-AR")} • {invoice.period}
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
                   <div className="text-right">
-                    <p className="font-semibold text-gray-900">${invoice.amount.toLocaleString("es-AR")}</p>
-                    <p className={`text-xs font-medium ${
-                      invoice.status === "paid" ? "text-green-600" : invoice.status === "pending" ? "text-yellow-600" : "text-red-600"
-                    }`}>
-                      {invoice.status === "paid" ? "Pagado" : invoice.status === "pending" ? "Pendiente" : "Fallido"}
+                    <p className="font-semibold text-gray-900">
+                      ${invoice.amount.toLocaleString("es-AR")}
+                    </p>
+                    <p
+                      className={`text-xs font-medium ${
+                        invoice.status === "paid"
+                          ? "text-green-600"
+                          : invoice.status === "pending"
+                          ? "text-yellow-600"
+                          : "text-red-600"
+                      }`}
+                    >
+                      {invoice.status === "paid"
+                        ? "Pagado"
+                        : invoice.status === "pending"
+                        ? "Pendiente"
+                        : "Fallido"}
                     </p>
                   </div>
                   <button className="p-2 text-gray-400 hover:text-gray-600">

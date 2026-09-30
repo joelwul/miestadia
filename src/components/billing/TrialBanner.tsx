@@ -29,8 +29,13 @@ export default function TrialBanner() {
           setStatus(t.subscription_status || "trial");
 
           if (t.trial_ends_at) {
+            // Usar solo fechas (sin hora) para cálculo preciso
             const end = new Date(t.trial_ends_at);
+            end.setHours(0, 0, 0, 0);
+            
             const now = new Date();
+            now.setHours(0, 0, 0, 0);
+            
             const diff = Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
             setDaysLeft(diff);
             setExpired(diff <= 0 && t.subscription_status !== "active");

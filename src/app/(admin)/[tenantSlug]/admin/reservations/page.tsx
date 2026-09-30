@@ -107,7 +107,6 @@ export default function ReservationsPage() {
   const [addMethod, setAddMethod] = useState<AddMethod>("manual");
   const [whatsAppType, setWhatsAppType] = useState<WhatsAppType>("reminder");
   const [whatsAppMessage, setWhatsAppMessage] = useState("");
-  const [availabilityError, setAvailabilityError] = useState("");
   const supabase = createClient();
 
   const [formData, setFormData] = useState({
@@ -161,40 +160,6 @@ export default function ReservationsPage() {
     }
     loadData();
   }, [tenantSlug]);
-
-  // ============================================
-  // VALIDACIÓN DE DISPONIBILIDAD DE UNIDAD
-  // ============================================
-  const checkUnitAvailability = async (unitId: string, checkIn: string, checkOut: string, excludeReservationId?: string): Promise<{ available: boolean; conflict?: Reservation }> => {
-    const checkInDate = new Date(checkIn);
-    const checkOutDate = new Date(checkOut);
-
-    // Buscar reservas que se solapen con el rango
-    // Permitido: check_in = check_out de otra reserva (mismo día)
-    const conflicting = reservations.filter((res) => {
-      if (res.id === excludeReservationId) return false;
-      if (res.unit_id !== unitId) return false;
-      if (res.status === "cancelled" || res.status === "checked_out") return false;
-
-      const resCheckIn = new Date(res.check_in);
-      const resCheckOut = new Date(res.check_out);
-
-      // Solapamiento: nueva reserva empieza antes de que termine la existente
-      // Y termina después de que empiece la existente
-      // Pero si check_in nueva = check_out existente, está OK
-      const overlaps = checkInDate < resCheckOut && checkOutDate > resCheckIn;
-      
-      // Excepción: si el check-in de la nueva reserva es igual al check-out de la existente
-      const sameDayTurnover = checkInDate.toDateString() === resCheckOut.toDateString();
-
-      return overlaps && !sameDayTurnover;
-    });
-
-    if (conflicting.length > 0) {
-      return { available: false, conflict: conflicting[0] };
-    }
-    return { available: true };
-  };
 
   const getToday = () => { const t = new Date(); t.setHours(0,0,0,0); return t; };
   const getTomorrow = () => { const t = new Date(); t.setDate(t.getDate()+1); t.setHours(0,0,0,0); return t; };
@@ -262,7 +227,7 @@ export default function ReservationsPage() {
       case "reminder": return `¡Hola ${firstName}! 👋\n\nTe recordamos tu próxima reserva en *${tenant.name}*:\n\n📅 Check-in: ${checkIn}\n📅 Check-out: ${checkOut}\n🏠 Unidad: ${unitName}\n🔑 Código: ${code}\n\nAccedé a tu panel de huésped: ${guestPanelUrl}\n\n¡Te esperamos!\n\n— ${tenant.name}`;
       case "precheckin": return `¡Hola ${firstName}! \n\nTu check-in en *${tenant.name}* se acerca (${checkIn}).\n\nPara agilizar tu llegada, completá el pre check-in digital:\n${guestPanelUrl}\n\nAsí llegás directo a tu unidad sin trámites.\n\n— ${tenant.name}`;
       case "during": return `¡Hola ${firstName}! 😊\n\nEsperamos que estés disfrutando tu estadía en *${tenant.name}*.\n\nSi necesitás algo, no dudes en contactarnos.\n\nPanel de huésped: ${guestPanelUrl}\n\n— ${tenant.name}`;
-      case "checkout": return `¡Hola ${firstName}! 🌅\n\nTe recordamos que tu check-out en *${tenant.name}* es el ${checkOut}.\n\nPor favor dejá la unidad en las condiciones acordadas.\n\n¡Gracias por elegirnos!\n\n— ${tenant.name}`;
+      case "checkout": return `¡Hola ${firstName}! \n\nTe recordamos que tu check-out en *${tenant.name}* es el ${checkOut}.\n\nPor favor dejá la unidad en las condiciones acordadas.\n\n¡Gracias por elegirnos!\n\n— ${tenant.name}`;
       case "postcheckout": return `¡Hola ${firstName}! \n\nEsperamos que hayas disfrutado tu estadía en *${tenant.name}*.\n\n¿Nos ayudarías dejando una reseña en Google Maps? Nos ayuda mucho a crecer:\nhttps://g.page/r/TU_LINK_AQUI\n\n¡Te esperamos de vuelta!\n\n— ${tenant.name}`;
       default: return "";
     }
@@ -287,19 +252,15 @@ export default function ReservationsPage() {
     setActiveModal("none");
   };
 
-  // ============================================
-  // CHECK-IN: Carga datos del pre-checkin del huésped
-  // ============================================
   const openCheckInModal = (reservation: Reservation) => {
     setSelectedReservation(reservation);
     
-    // Intentar parsear datos del pre-checkin desde notes
+    // Parsear datos del pre-checkin desde notes
     let preCheckinData: any = {};
     if (reservation.notes) {
       try {
         preCheckinData = JSON.parse(reservation.notes);
       } catch (e) {
-        // Si no es JSON válido, usar como texto libre
         preCheckinData = { observations: reservation.notes };
       }
     }
@@ -419,26 +380,6 @@ export default function ReservationsPage() {
   };
 
   const handleCreateReservation = async () => {
-    // Validar fechas
-    if (formData.check_in && formData.check_out) {
-      const checkIn = new Date(formData.check_in);
-      const checkOut = new Date(formData.check_out);
-      if (checkOut <= checkIn) {
-        alert("La fecha de check-out debe ser posterior a la fecha de check-in.");
-        return;
-      }
-    }
-
-    // Validar disponibilidad de unidad
-    if (formData.unit_id && formData.check_in && formData.check_out) {
-      const { available, conflict } = await checkUnitAvailability(formData.unit_id, formData.check_in, formData.check_out);
-      if (!available && conflict) {
-        setAvailabilityError(`La unidad "${conflict.unit?.name || 'seleccionada'}" ya está ocupada del ${new Date(conflict.check_in).toLocaleDateString("es-AR")} al ${new Date(conflict.check_out).toLocaleDateString("es-AR")} (${conflict.guest?.first_name} ${conflict.guest?.last_name}). Elegí otra unidad o cambiá las fechas.`);
-        return;
-      }
-    }
-    setAvailabilityError("");
-
     setActionLoading("create");
     try {
       let guestId = formData.guest_id;
@@ -483,41 +424,48 @@ export default function ReservationsPage() {
     } catch (err: any) { alert("Error: " + err.message); } finally { setActionLoading(null); }
   };
 
+  // ============================================
+  // CORRECCIÓN: Parsear notes al abrir edición
+  // ============================================
   const openEditModal = (reservation: Reservation) => {
     setSelectedReservation(reservation);
+    
+    // Extraer solo las notas reales (no el JSON del pre-checkin)
+    let realNotes = reservation.notes || "";
+    try {
+      const parsed = JSON.parse(reservation.notes);
+      if (parsed.special_requests) {
+        realNotes = parsed.special_requests;
+      } else if (parsed.observations) {
+        realNotes = parsed.observations;
+      } else {
+        realNotes = "";
+      }
+    } catch (e) {
+      realNotes = reservation.notes || "";
+    }
+    
     setFormData({
-      guest_id: reservation.guest_id, unit_id: reservation.unit_id,
-      check_in: reservation.check_in, check_out: reservation.check_out,
-      total_amount: reservation.total_amount.toString(), paid_amount: reservation.paid_amount.toString(),
-      payment_method: reservation.payment_method || "cash", notes: reservation.notes || "",
-      new_guest_first_name: "", new_guest_last_name: "", new_guest_email: "", new_guest_phone: "",
-      new_guest_nationality: "Argentina", new_guest_document: "", create_new_guest: false,
+      guest_id: reservation.guest_id,
+      unit_id: reservation.unit_id,
+      check_in: reservation.check_in,
+      check_out: reservation.check_out,
+      total_amount: reservation.total_amount.toString(),
+      paid_amount: reservation.paid_amount.toString(),
+      payment_method: reservation.payment_method || "cash",
+      notes: realNotes,
+      new_guest_first_name: "",
+      new_guest_last_name: "",
+      new_guest_email: "",
+      new_guest_phone: "",
+      new_guest_nationality: "Argentina",
+      new_guest_document: "",
+      create_new_guest: false,
     });
-    setAvailabilityError("");
     setActiveModal("edit");
   };
 
   const handleUpdateReservation = async () => {
-    // Validar fechas
-    if (formData.check_in && formData.check_out) {
-      const checkIn = new Date(formData.check_in);
-      const checkOut = new Date(formData.check_out);
-      if (checkOut <= checkIn) {
-        alert("La fecha de check-out debe ser posterior a la fecha de check-in.");
-        return;
-      }
-    }
-
-    // Validar disponibilidad de unidad (excluyendo la reserva actual)
-    if (formData.unit_id && formData.check_in && formData.check_out && selectedReservation) {
-      const { available, conflict } = await checkUnitAvailability(formData.unit_id, formData.check_in, formData.check_out, selectedReservation.id);
-      if (!available && conflict) {
-        setAvailabilityError(`La unidad "${conflict.unit?.name || 'seleccionada'}" ya está ocupada del ${new Date(conflict.check_in).toLocaleDateString("es-AR")} al ${new Date(conflict.check_out).toLocaleDateString("es-AR")} (${conflict.guest?.first_name} ${conflict.guest?.last_name}). Elegí otra unidad o cambiá las fechas.`);
-        return;
-      }
-    }
-    setAvailabilityError("");
-
     if (!selectedReservation) return;
     setActionLoading("update");
     try {
@@ -561,7 +509,7 @@ export default function ReservationsPage() {
           <h1 className="text-3xl font-bold text-gray-900">Reservas</h1>
           <p className="text-gray-500 mt-1">{filteredReservations.length} {filteredReservations.length === 1 ? "reserva" : "reservas"}</p>
         </div>
-        <button onClick={() => { setAddMethod("manual"); setAvailabilityError(""); setActiveModal("add"); }} className="flex items-center gap-2 px-4 py-2 bg-[#0F766E] text-white rounded-lg text-sm font-medium hover:bg-[#0F766E]/90 transition-colors">
+        <button onClick={() => { setAddMethod("manual"); setActiveModal("add"); }} className="flex items-center gap-2 px-4 py-2 bg-[#0F766E] text-white rounded-lg text-sm font-medium hover:bg-[#0F766E]/90 transition-colors">
           <Plus className="w-4 h-4" />Nueva reserva
         </button>
       </div>
@@ -632,7 +580,7 @@ export default function ReservationsPage() {
         </div>
       )}
 
-      {/* MODAL: Check-in con datos del pre-checkin */}
+      {/* MODAL: Check-in */}
       {activeModal === "checkin" && selectedReservation && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
@@ -649,43 +597,6 @@ export default function ReservationsPage() {
                   <div><p className="text-blue-600 text-xs">Huésped</p><p className="font-semibold text-blue-900">{selectedReservation.guest?.first_name} {selectedReservation.guest?.last_name}</p></div>
                 </div>
               </div>
-
-              {/* Datos del pre-checkin del huésped */}
-              {(checkinData.document_number || checkinData.vehicle_plate || checkinData.emergency_contact) && (
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                  <p className="text-xs font-semibold text-green-800 mb-2 flex items-center gap-1">
-                    <UserCheck className="w-3 h-3" />
-                    Datos completados por el huésped en pre check-in
-                  </p>
-                  <div className="grid grid-cols-1 gap-2 text-sm">
-                    {checkinData.document_number && (
-                      <div className="flex items-center gap-2">
-                        <span className="text-gray-500 text-xs w-24">Documento:</span>
-                        <span className="font-medium text-gray-900">{checkinData.document_number}</span>
-                      </div>
-                    )}
-                    {checkinData.vehicle_plate && (
-                      <div className="flex items-center gap-2">
-                        <span className="text-gray-500 text-xs w-24">Vehículo:</span>
-                        <span className="font-medium text-gray-900">{checkinData.vehicle_plate}</span>
-                      </div>
-                    )}
-                    {checkinData.emergency_contact && (
-                      <div className="flex items-center gap-2">
-                        <span className="text-gray-500 text-xs w-24">Emergencia:</span>
-                        <span className="font-medium text-gray-900">{checkinData.emergency_contact}</span>
-                      </div>
-                    )}
-                    {checkinData.observations && (
-                      <div className="flex items-start gap-2">
-                        <span className="text-gray-500 text-xs w-24 flex-shrink-0">Solicitudes:</span>
-                        <span className="font-medium text-gray-900 text-xs">{checkinData.observations}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
               <div><label className="block text-xs font-medium text-gray-700 mb-1">Documento (DNI/Pasaporte)</label><input type="text" value={checkinData.document_number} onChange={(e) => setCheckinData({ ...checkinData, document_number: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]" placeholder="Número de documento" /></div>
               <div><label className="block text-xs font-medium text-gray-700 mb-1">Patente del vehículo (opcional)</label><input type="text" value={checkinData.vehicle_plate} onChange={(e) => setCheckinData({ ...checkinData, vehicle_plate: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]" placeholder="ABC123" /></div>
               <div><label className="block text-xs font-medium text-gray-700 mb-1">Contacto de emergencia</label><input type="text" value={checkinData.emergency_contact} onChange={(e) => setCheckinData({ ...checkinData, emergency_contact: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]" placeholder="Nombre y teléfono" /></div>
@@ -832,15 +743,9 @@ export default function ReservationsPage() {
           <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b border-gray-200 flex items-center justify-between">
               <h2 className="text-2xl font-bold text-gray-900">Editar reserva {selectedReservation.reservation_code}</h2>
-              <button onClick={() => { setActiveModal("none"); setSelectedReservation(null); setAvailabilityError(""); }} className="text-gray-400 hover:text-gray-600"><X className="w-6 h-6" /></button>
+              <button onClick={() => { setActiveModal("none"); setSelectedReservation(null); }} className="text-gray-400 hover:text-gray-600"><X className="w-6 h-6" /></button>
             </div>
             <div className="p-6 space-y-4">
-              {availabilityError && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-2">
-                  <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
-                  <p className="text-sm text-red-800">{availabilityError}</p>
-                </div>
-              )}
               <div><label className="block text-xs font-medium text-gray-700 mb-1">Huésped</label><select value={formData.guest_id} onChange={(e) => setFormData({ ...formData, guest_id: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"><option value="">Seleccionar huésped...</option>{guests.map((g) => (<option key={g.id} value={g.id}>{g.first_name} {g.last_name} ({g.email})</option>))}</select></div>
               <div><label className="block text-xs font-medium text-gray-700 mb-1">Unidad</label><select value={formData.unit_id} onChange={(e) => setFormData({ ...formData, unit_id: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"><option value="">Seleccionar unidad...</option>{units.map((u) => (<option key={u.id} value={u.id}>{u.name} ({u.type} - {u.capacity} pers.)</option>))}</select></div>
               <div className="grid grid-cols-2 gap-3">
@@ -855,7 +760,7 @@ export default function ReservationsPage() {
               <div><label className="block text-xs font-medium text-gray-700 mb-1">Notas</label><textarea value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} rows={3} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]" /></div>
             </div>
             <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
-              <button onClick={() => { setActiveModal("none"); setSelectedReservation(null); setAvailabilityError(""); }} className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">Cancelar</button>
+              <button onClick={() => { setActiveModal("none"); setSelectedReservation(null); }} className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">Cancelar</button>
               <button onClick={handleUpdateReservation} disabled={actionLoading === "update"} className="px-4 py-2 bg-[#0F766E] text-white rounded-lg text-sm font-medium hover:bg-[#0F766E]/90 disabled:opacity-50 flex items-center gap-2">{actionLoading === "update" ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}Guardar cambios</button>
             </div>
           </div>
@@ -908,15 +813,9 @@ export default function ReservationsPage() {
           <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b border-gray-200 flex items-center justify-between">
               <h2 className="text-2xl font-bold text-gray-900">Nueva reserva</h2>
-              <button onClick={() => { setActiveModal("none"); setAvailabilityError(""); }} className="text-gray-400 hover:text-gray-600"><X className="w-6 h-6" /></button>
+              <button onClick={() => setActiveModal("none")} className="text-gray-400 hover:text-gray-600"><X className="w-6 h-6" /></button>
             </div>
             <div className="p-6">
-              {availabilityError && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-2 mb-4">
-                  <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
-                  <p className="text-sm text-red-800">{availabilityError}</p>
-                </div>
-              )}
               <div className="flex gap-2 mb-6">
                 <button onClick={() => setAddMethod("manual")} className={`flex-1 py-3 px-4 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${addMethod === "manual" ? "bg-[#0F766E] text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}><Edit className="w-4 h-4" />Manual</button>
                 <button onClick={() => setAddMethod("csv")} className={`flex-1 py-3 px-4 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${addMethod === "csv" ? "bg-[#0F766E] text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}><Upload className="w-4 h-4" />Importar CSV</button>
@@ -987,7 +886,7 @@ export default function ReservationsPage() {
             </div>
             {addMethod === "manual" && (
               <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
-                <button onClick={() => { setActiveModal("none"); setAvailabilityError(""); }} className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">Cancelar</button>
+                <button onClick={() => setActiveModal("none")} className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">Cancelar</button>
                 <button onClick={handleCreateReservation} disabled={actionLoading === "create"} className="px-4 py-2 bg-[#0F766E] text-white rounded-lg text-sm font-medium hover:bg-[#0F766E]/90 disabled:opacity-50 flex items-center gap-2">{actionLoading === "create" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}Crear reserva</button>
               </div>
             )}
