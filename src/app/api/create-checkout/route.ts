@@ -22,12 +22,16 @@ export async function POST(request: Request) {
     }
 
     if (provider === "mercadopago") {
-      // ⚠️ MercadoPago Argentina SOLO acepta ARS para suscripciones recurrentes
-      // Los precios se calculan automáticamente desde USD usando el tipo de cambio
       const amountARS = plan === "monthly" ? PRICES_ARS.monthly : PRICES_ARS.yearly;
       const title = plan === "monthly" 
         ? `Mi Estadía - Plan Mensual (USD ${PRICES.monthly})`
         : `Mi Estadía - Plan Anual (USD ${PRICES.yearly})`;
+
+      // ⚠️ IMPORTANTE: start_date debe ser en el FUTURO (mañana)
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(12, 0, 0, 0); // Mediodía para evitar problemas de timezone
+      const startDate = tomorrow.toISOString();
 
       const response = await fetch("https://api.mercadopago.com/preapproval", {
         method: "POST",
@@ -47,7 +51,7 @@ export async function POST(request: Request) {
             frequency_type: "months",
             transaction_amount: amountARS,
             currency_id: "ARS",
-            start_date: new Date().toISOString(),
+            start_date: startDate, // ✅ Fecha de mañana al mediodía
           },
           metadata: {
             tenant_id: tenant.id,
@@ -55,7 +59,7 @@ export async function POST(request: Request) {
             provider: "mercadopago",
             amount_usd: plan === "monthly" ? PRICES.monthly : PRICES.yearly,
             amount_ars: amountARS,
-            exchange_rate: process.env.USD_TO_ARS || "1600",
+            exchange_rate: String(process.env.USD_TO_ARS || "1600"),
           },
         }),
       });
@@ -70,7 +74,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ url: data.init_point });
 
     } else if (provider === "lemonsqueezy") {
-      // LemonSqueezy SÍ acepta USD directamente
       const variantId = plan === "monthly"
         ? process.env.LS_MONTHLY_VARIANT_ID
         : process.env.LS_YEARLY_VARIANT_ID;
