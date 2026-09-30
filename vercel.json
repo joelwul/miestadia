@@ -1,0 +1,20 @@
+{
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-store" }
+      ]
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/api/webhooks/mercadopago",
+      "destination": "/api/webhooks/mercadopago"
+    },
+    {
+      "source": "/api/webhooks/lemonsqueezy",
+      "destination": "/api/webhooks/lemonsqueezy"
+    }
+  ]
+}

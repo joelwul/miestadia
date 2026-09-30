@@ -48,50 +48,66 @@ export default function BillingPage() {
   const [daysLeft, setDaysLeft] = useState(0);
   const supabase = createClient();
 
-  useEffect(() => {
-    async function load() {
-      try {
-        const { data: tenantData, error: tenantError } = await supabase
-          .from("tenants")
-          .select("*")
-          .eq("slug", tenantSlug)
-          .single();
+ useEffect(() => {
+  // Verificar si viene de un checkout exitoso
+  const urlParams = new URLSearchParams(window.location.search);
+  const success = urlParams.get("success");
+  const provider = urlParams.get("provider");
 
-        if (tenantError || !tenantData) {
-          setLoading(false);
-          return;
-        }
-
-        setTenant(tenantData);
-
-        const now = new Date();
-        now.setHours(0, 0, 0, 0);
-        const trialEnd = tenantData.trial_ends_at ? new Date(tenantData.trial_ends_at) : null;
-        const subEnd = tenantData.subscription_ends_at ? new Date(tenantData.subscription_ends_at) : null;
-
-        if (tenantData.subscription_status === "active" && subEnd) {
-          setDaysLeft(Math.ceil((subEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
-        } else if (trialEnd) {
-          setDaysLeft(Math.ceil((trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
-        }
-
-        const { data: invoicesData } = await supabase
-          .from("invoices")
-          .select("*")
-          .eq("tenant_id", tenantData.id)
-          .order("date", { ascending: false });
-
-        if (invoicesData) {
-          setInvoices(invoicesData);
-        }
-      } catch (err) {
-        console.error("Error loading billing:", err);
-      } finally {
-        setLoading(false);
-      }
-    }
+  if (success === "true" && provider) {
+    alert(`¡Pago exitoso! Tu suscripción con ${provider === "mercadopago" ? "MercadoPago" : "LemonSqueezy"} fue procesada. El sistema activará tu cuenta en unos minutos.`);
+    
+    // Limpiar URL
+    window.history.replaceState({}, document.title, window.location.pathname);
+    
+    // Recargar datos
     load();
-  }, [tenantSlug]);
+  }
+
+  async function load() {
+    try {
+      const { data: tenantData, error: tenantError } = await supabase
+        .from("tenants")
+        .select("*")
+        .eq("slug", tenantSlug)
+        .single();
+
+      if (tenantError || !tenantData) {
+        setLoading(false);
+        return;
+      }
+
+      setTenant(tenantData);
+
+      const now = new Date();
+      now.setHours(0, 0, 0, 0);
+      const trialEnd = tenantData.trial_ends_at ? new Date(tenantData.trial_ends_at) : null;
+      const subEnd = tenantData.subscription_ends_at ? new Date(tenantData.subscription_ends_at) : null;
+
+      if (tenantData.subscription_status === "active" && subEnd) {
+        setDaysLeft(Math.ceil((subEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+      } else if (trialEnd) {
+        setDaysLeft(Math.ceil((trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+      }
+
+      const { data: invoicesData } = await supabase
+        .from("invoices")
+        .select("*")
+        .eq("tenant_id", tenantData.id)
+        .order("date", { ascending: false });
+
+      if (invoicesData) {
+        setInvoices(invoicesData);
+      }
+    } catch (err) {
+      console.error("Error loading billing:", err);
+    } finally {
+      setLoading(false);
+    }
+  }
+  
+  load();
+}, [tenantSlug]);
 
   async function handleCheckout(plan: "monthly" | "yearly", provider: "lemonsqueezy" | "mercadopago") {
     if (!tenant) return;

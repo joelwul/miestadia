@@ -9,92 +9,89 @@ const supabase = createClient(
 
 export async function POST(request: Request) {
   try {
-    const body = await request.text();
+    const payload = await request.json();
     const signature = request.headers.get("x-signature");
 
-    if (signature) {
-      const hmac = crypto.createHmac("sha256", process.env.LEMONSQUEEZY_WEBHOOK_SECRET!);
-      hmac.update(body);
-      const digest = hmac.digest("hex");
+    // Verificar firma del webhook
+    const hmac = crypto.createHmac("sha256", process.env.LS_WEBHOOK_SECRET!);
+    hmac.update(JSON.stringify(payload));
+    const digest = hmac.digest("hex");
 
-      if (signature !== digest) {
-        return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
-      }
+    if (signature !== digest) {
+      return NextResponse.json({ error: "Firma inválida" }, { status: 401 });
     }
 
-    const event = JSON.parse(body);
-    const eventName = event.meta?.event_name;
+    const eventName = payload.meta?.event_name;
 
-    if (eventName === "subscription_created" || eventName === "subscription_updated") {
-      const subscription = event.data.attributes;
-      const tenantId = subscription.custom_data?.tenant_id;
-      const plan = subscription.custom_data?.plan;
+    switch (eventName) {
+      case "subscription_created":
+      case "subscription_updated": {
+        const subscription = payload.data?.attributes;
+        const customData = subscription?.custom_data || {};
+        const tenantId = customData.tenant_id;
+        const plan = customData.plan;
 
-      if (!tenantId || !plan) {
-        return NextResponse.json({ error: "Missing metadata" }, { status: 400 });
+        if (tenantId && plan && subscription?.status === "active") {
+          // Calcular fecha de fin
+          const subscriptionEndsAt = new Date(subscription.renews_at);
+
+          // Actualizar tenant
+          await supabase
+            .from("tenants")
+            .update({
+              subscription_status: "active",
+              subscription_plan: plan,
+              subscription_ends_at: subscriptionEndsAt.toISOString(),
+              payment_provider: "lemonsqueezy",
+              payment_method: "card",
+            })
+            .eq("id", tenantId);
+
+          console.log(`Suscripción LS activada para tenant ${tenantId}`);
+        }
+        break;
       }
 
-      const endsAt = new Date();
-      if (plan === "yearly") {
-        endsAt.setFullYear(endsAt.getFullYear() + 1);
-      } else {
-        endsAt.setMonth(endsAt.getMonth() + 1);
+      case "subscription_cancelled": {
+        const subscription = payload.data?.attributes;
+        const customData = subscription?.custom_data || {};
+        const tenantId = customData.tenant_id;
+
+        if (tenantId) {
+          await supabase
+            .from("tenants")
+            .update({
+              subscription_status: "cancelled",
+            })
+            .eq("id", tenantId);
+
+          console.log(`Suscripción LS cancelada para tenant ${tenantId}`);
+        }
+        break;
       }
 
-      await supabase
-        .from("tenants")
-        .update({
-          subscription_status: "active",
-          subscription_plan: plan,
-          subscription_ends_at: endsAt.toISOString(),
-          payment_method: "lemonsqueezy",
-          payment_provider: "lemonsqueezy",
-        })
-        .eq("id", tenantId);
+      case "subscription_expired": {
+        const subscription = payload.data?.attributes;
+        const customData = subscription?.custom_data || {};
+        const tenantId = customData.tenant_id;
 
-      await supabase.from("invoices").insert({
-        tenant_id: tenantId,
-        amount: subscription.price / 100,
-        currency: subscription.currency,
-        status: "paid",
-        plan,
-        period: `${new Date().toLocaleDateString("es-AR")} - ${endsAt.toLocaleDateString("es-AR")}`,
-        provider: "lemonsqueezy",
-        provider_subscription_id: subscription.id,
-      });
-    }
+        if (tenantId) {
+          await supabase
+            .from("tenants")
+            .update({
+              subscription_status: "expired",
+            })
+            .eq("id", tenantId);
 
-    if (eventName === "subscription_cancelled") {
-      const subscription = event.data.attributes;
-      const tenantId = subscription.custom_data?.tenant_id;
-
-      if (tenantId) {
-        await supabase
-          .from("tenants")
-          .update({
-            subscription_status: "cancelled",
-          })
-          .eq("id", tenantId);
-      }
-    }
-
-    if (eventName === "subscription_expired") {
-      const subscription = event.data.attributes;
-      const tenantId = subscription.custom_data?.tenant_id;
-
-      if (tenantId) {
-        await supabase
-          .from("tenants")
-          .update({
-            subscription_status: "expired",
-          })
-          .eq("id", tenantId);
+          console.log(`Suscripción LS expirada para tenant ${tenantId}`);
+        }
+        break;
       }
     }
 
     return NextResponse.json({ received: true });
-  } catch (err: any) {
-    console.error("Error processing LemonSqueezy webhook:", err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (error: any) {
+    console.error("Error en webhook LS:", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
