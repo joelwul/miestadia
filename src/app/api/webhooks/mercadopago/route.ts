@@ -8,61 +8,81 @@ const supabase = createClient(
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
+    const payload = await request.json();
+    
+    console.log("Webhook MP recibido:", payload);
 
-    if (body.type === "payment") {
-      const paymentId = body.data.id;
+    // MP envía notificaciones con query params: type y data.id
+    const url = new URL(request.url);
+    const type = url.searchParams.get("type") || payload.type;
+    const dataId = url.searchParams.get("data.id") || payload.data?.id;
 
-      const response = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
+    if (type === "preapproval") {
+      // Obtener detalles del preapproval
+      const response = await fetch(`https://api.mercadopago.com/preapproval/${dataId}`, {
         headers: {
-          Authorization: `Bearer ${process.env.MERCADOPAGO_ACCESS_TOKEN}`,
+          "Authorization": `Bearer ${process.env.MP_ACCESS_TOKEN}`,
         },
       });
 
-      const payment = await response.json();
+      const preapproval = await response.json();
 
-      if (payment.status === "approved") {
-        const tenantId = payment.metadata?.tenant_id;
-        const plan = payment.metadata?.plan;
+      if (preapproval.status === "authorized") {
+        const externalRef = preapproval.external_reference; // "tenant_id-plan"
+        const [tenantId, plan] = externalRef.split("-");
 
-        if (!tenantId || !plan) {
-          return NextResponse.json({ error: "Missing metadata" }, { status: 400 });
+        if (tenantId && plan) {
+          // Calcular fecha de fin
+          const subscriptionEndsAt = new Date();
+          if (plan === "monthly") {
+            subscriptionEndsAt.setMonth(subscriptionEndsAt.getMonth() + 1);
+          } else if (plan === "yearly") {
+            subscriptionEndsAt.setFullYear(subscriptionEndsAt.getFullYear() + 1);
+          }
+
+          // Actualizar tenant
+          await supabase
+            .from("tenants")
+            .update({
+              subscription_status: "active",
+              subscription_plan: plan,
+              subscription_ends_at: subscriptionEndsAt.toISOString(),
+              payment_provider: "mercadopago",
+              payment_method: "mercadopago",
+            })
+            .eq("id", tenantId);
+
+          // Registrar pago inicial
+          await supabase
+            .from("payments")
+            .insert({
+              tenant_id: tenantId,
+              amount: preapproval.auto_recurring.transaction_amount,
+              method: "mercadopago",
+              date: new Date().toISOString(),
+              notes: `Suscripción ${plan} activada - Preapproval ID: ${dataId}`,
+            });
+
+          console.log(`✅ Suscripción activada para tenant ${tenantId}`);
         }
-
-        const endsAt = new Date();
-        if (plan === "yearly") {
-          endsAt.setFullYear(endsAt.getFullYear() + 1);
-        } else {
-          endsAt.setMonth(endsAt.getMonth() + 1);
+      } else if (preapproval.status === "cancelled" || preapproval.status === "paused") {
+        const externalRef = preapproval.external_reference;
+        const [tenantId] = externalRef.split("-");
+        
+        if (tenantId) {
+          await supabase
+            .from("tenants")
+            .update({ subscription_status: "cancelled" })
+            .eq("id", tenantId);
+          
+          console.log(`⚠️ Suscripción cancelada/pausada para tenant ${tenantId}`);
         }
-
-        await supabase
-          .from("tenants")
-          .update({
-            subscription_status: "active",
-            subscription_plan: plan,
-            subscription_ends_at: endsAt.toISOString(),
-            payment_method: "mercadopago",
-            payment_provider: "mercadopago",
-          })
-          .eq("id", tenantId);
-
-        await supabase.from("invoices").insert({
-          tenant_id: tenantId,
-          amount: payment.transaction_amount,
-          currency: payment.currency_id,
-          status: "paid",
-          plan,
-          period: `${new Date().toLocaleDateString("es-AR")} - ${endsAt.toLocaleDateString("es-AR")}`,
-          provider: "mercadopago",
-          provider_payment_id: paymentId,
-        });
       }
     }
 
     return NextResponse.json({ received: true });
-  } catch (err: any) {
-    console.error("Error processing MercadoPago webhook:", err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (error: any) {
+    console.error("Error en webhook MP:", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
