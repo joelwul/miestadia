@@ -457,15 +457,35 @@ export default function GuestPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-gradient-to-r from-[#0F766E] to-[#166534] text-white py-6 px-4">
-        <div className="max-w-4xl mx-auto">
-          <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="text-center">
-            <h1 className="text-2xl font-bold mb-1">¡Hola, {reservation.guest?.first_name || "huésped"}!</h1>
-            <p className="text-white/90 text-sm">{tenant.name} • {reservation.unit?.name || "—"}</p>
-            <p className="text-white/70 text-xs mt-1">Código: {reservation.reservation_code}</p>
-          </motion.div>
-        </div>
-      </header>
+<header className="bg-gradient-to-r from-[#0F766E] to-[#166534] text-white py-6 px-4">
+  <div className="max-w-4xl mx-auto">
+    <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="text-center">
+      {/* Logo del alojamiento */}
+      {(() => {
+        try {
+          const branding = typeof tenant.branding === 'string' ? JSON.parse(tenant.branding) : tenant.branding;
+          const logoUrl = branding?.logoUrl;
+          if (logoUrl) {
+            return (
+              <div className="mb-3 flex justify-center">
+                <img
+                  src={logoUrl}
+                  alt={tenant.name}
+                  className="h-16 w-auto rounded-lg bg-white/10 p-2"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                />
+              </div>
+            );
+          }
+        } catch (e) {}
+        return null;
+      })()}
+      <h1 className="text-2xl font-bold mb-1">¡Hola, {reservation.guest?.first_name || "huésped"}!</h1>
+      <p className="text-white/90 text-sm">{tenant.name} • {reservation.unit?.name || "—"}</p>
+      <p className="text-white/70 text-xs mt-1">Código: {reservation.reservation_code}</p>
+    </motion.div>
+  </div>
+</header>
 
       <div className="max-w-4xl mx-auto px-4 py-6 space-y-4">
         {/* ===== PRE CHECK-IN - SECCIÓN PRINCIPAL ===== */}
