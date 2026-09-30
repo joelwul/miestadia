@@ -352,7 +352,7 @@ export default function BillingPage() {
             <h2 className="text-2xl font-bold text-gray-900">Elegí tu plan</h2>
             <div className="flex items-center gap-2 text-sm text-gray-500">
               <TrendingUp className="w-4 h-4" />
-              <span>Tipo de cambio: 1 USD = ${USD_TOARS.toLocaleString("es-AR")} ARS</span>
+               <span>Tipo de cambio: 1 USD = ${USD_TO_ARS.toLocaleString("es-AR")} ARS</span>
             </div>
           </div>
           <div className="grid md:grid-cols-2 gap-6">
