@@ -8,6 +8,7 @@ export default function TrialBanner() {
   const [daysLeft, setDaysLeft] = useState<number | null>(null);
   const [status, setStatus] = useState<string>("");
   const [plan, setPlan] = useState<string>("");
+  const [tenantSlug, setTenantSlug] = useState<string>("");
   const [dismissed, setDismissed] = useState(false);
   const [expired, setExpired] = useState(false);
   const router = useRouter();
@@ -27,6 +28,7 @@ export default function TrialBanner() {
 
         if (tenantUser?.tenants) {
           const t = tenantUser.tenants;
+          setTenantSlug(t.slug);
           setStatus(t.subscription_status || "trial");
           setPlan(t.subscription_plan || "");
 
@@ -89,6 +91,14 @@ export default function TrialBanner() {
     return "Disfrutá Mi Estadía";
   };
 
+  const handleVerClick = () => {
+    if (tenantSlug) {
+      router.push(`/${tenantSlug}/admin/billing`);
+    } else {
+      router.push("/login");
+    }
+  };
+
   return (
     <div className={`fixed bottom-4 left-4 z-50 rounded-lg shadow-2xl border border-white/20 p-3 max-w-xs ${getColorClasses()}`}>
       <div className="flex items-center gap-3">
@@ -98,7 +108,7 @@ export default function TrialBanner() {
           <p className="text-xs opacity-90 truncate">{getSubMessage()}</p>
         </div>
         <button
-          onClick={() => router.push("/admin/billing")}
+          onClick={handleVerClick}
           className="flex items-center gap-1 px-3 py-1.5 bg-white text-gray-900 rounded text-xs font-bold hover:bg-gray-100 transition-colors flex-shrink-0"
         >
           <Crown className="w-3 h-3" />
