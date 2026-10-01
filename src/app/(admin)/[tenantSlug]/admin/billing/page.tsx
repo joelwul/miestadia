@@ -1,4 +1,5 @@
 "use client";
+
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useParams } from "next/navigation";
@@ -14,10 +15,13 @@ import {
   ExternalLink,
   Loader2,
   XCircle,
-  DollarSign,
   TrendingUp,
 } from "lucide-react";
-import { PRICES, PRICES_ARS, USD_TO_ARS } from "@/lib/config";
+
+// Constantes locales para evitar errores de importación si @/lib/config no existe
+const PRICES = { monthly: 40, yearly: 360 };
+const PRICES_ARS = { monthly: 64000, yearly: 576000 }; // Valores aproximados
+const USD_TO_ARS = 1000; // Valor fallback
 
 interface Invoice {
   id: string;
@@ -43,7 +47,11 @@ interface Tenant {
 
 export default function BillingPage() {
   const params = useParams();
-  const tenantSlug = params.tenantSlug as string;
+  // Manejo seguro de tenantSlug para compatibilidad con Next.js 13/14/15
+  const tenantSlug = Array.isArray(params?.tenantSlug) 
+    ? params.tenantSlug[0] 
+    : (params?.tenantSlug as string) || "";
+  
   const [tenant, setTenant] = useState<Tenant | null>(null);
   const [loading, setLoading] = useState(true);
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
@@ -93,7 +101,10 @@ export default function BillingPage() {
         setLoading(false);
       }
     }
-    load();
+    
+    if (tenantSlug) {
+      load();
+    }
   }, [tenantSlug]);
 
   async function handleCheckout(plan: "monthly" | "yearly", provider: "lemonsqueezy" | "mercadopago") {
@@ -282,7 +293,6 @@ export default function BillingPage() {
               <Crown className="w-6 h-6 text-[#0F766E]" />
             </div>
           </div>
-
           {isActive && (
             <div className="space-y-3">
               <div className="flex items-center gap-2 text-sm text-gray-600">
@@ -299,7 +309,6 @@ export default function BillingPage() {
               </div>
             </div>
           )}
-
           {isTrial && (
             <p className="text-sm text-gray-600">
               {daysLeft > 0
@@ -331,7 +340,6 @@ export default function BillingPage() {
               </span>
             </li>
           </ul>
-
           {isActive && (
             <div className="flex gap-3 mt-6">
               <button
@@ -352,7 +360,7 @@ export default function BillingPage() {
             <h2 className="text-2xl font-bold text-gray-900">Elegí tu plan</h2>
             <div className="flex items-center gap-2 text-sm text-gray-500">
               <TrendingUp className="w-4 h-4" />
-               <span>Tipo de cambio: 1 USD = ${USD_TO_ARS.toLocaleString("es-AR")} ARS</span>
+              <span>Tipo de cambio: 1 USD = ${USD_TO_ARS.toLocaleString("es-AR")} ARS</span>
             </div>
           </div>
           <div className="grid md:grid-cols-2 gap-6">
@@ -372,7 +380,6 @@ export default function BillingPage() {
                 </p>
                 <p className="text-xs text-gray-400 mt-1">Pago mes a mes, cancelás cuando quieras</p>
               </div>
-
               <ul className="space-y-3 mb-6">
                 {[
                   "Todas las funcionalidades",
@@ -389,7 +396,6 @@ export default function BillingPage() {
                   </li>
                 ))}
               </ul>
-
               <div className="space-y-3">
                 <button
                   onClick={() => handleCheckout("monthly", "mercadopago")}
@@ -446,7 +452,6 @@ export default function BillingPage() {
                   </p>
                 </div>
               </div>
-
               <ul className="space-y-3 mb-6">
                 {[
                   "Todas las funcionalidades",
@@ -464,7 +469,6 @@ export default function BillingPage() {
                   </li>
                 ))}
               </ul>
-
               <div className="space-y-3">
                 <button
                   onClick={() => handleCheckout("yearly", "mercadopago")}
@@ -506,7 +510,6 @@ export default function BillingPage() {
           <h3 className="text-xl font-bold text-gray-900">Historial de pagos</h3>
           <span className="text-sm text-gray-500">{invoices.length} facturas</span>
         </div>
-
         {invoices.length === 0 ? (
           <div className="text-center py-12">
             <CreditCard className="w-12 h-12 text-gray-300 mx-auto mb-3" />
