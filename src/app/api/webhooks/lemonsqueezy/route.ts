@@ -26,20 +26,23 @@ export async function POST(request: Request) {
     
     console.log("=== WEBHOOK RECIBIDO ===");
     console.log("Evento:", eventName);
-    console.log("Payload completo:", JSON.stringify(payload, null, 2));
+    console.log("Payload meta:", JSON.stringify(payload.meta, null, 2));
+    console.log("Payload data:", JSON.stringify(payload.data, null, 2));
+
+    // Intentar obtener tenant_id y plan de MÚLTIPLES ubicaciones
+    let tenantId: string | undefined;
+    let plan: string | undefined;
 
     switch (eventName) {
       case "order_created": {
         const order = payload.data?.attributes;
-        console.log(" Order attributes:", JSON.stringify(order, null, 2));
         
-        // Intentar múltiples ubicaciones para los datos custom
-        const customData = order?.custom || order?.custom_data || {};
-        console.log("📦 Custom data encontrado:", customData);
+        // Buscar en múltiples ubicaciones
+        const customData = order?.custom || order?.custom_data || payload.meta?.custom_data || {};
+        tenantId = customData.tenant_id || order?.custom?.tenant_id;
+        plan = customData.plan || order?.custom?.plan;
         
-        const tenantId = customData.tenant_id;
-        const plan = customData.plan;
-        
+        console.log(" Order custom data:", customData);
         console.log("📦 tenantId:", tenantId, "plan:", plan);
 
         if (tenantId && plan) {
@@ -50,7 +53,7 @@ export async function POST(request: Request) {
             subscriptionEndsAt.setMonth(subscriptionEndsAt.getMonth() + 1);
           }
 
-          const { error: updateError } = await supabase
+          await supabase
             .from("tenants")
             .update({
               subscription_status: "active",
@@ -61,13 +64,7 @@ export async function POST(request: Request) {
             })
             .eq("id", tenantId);
 
-          if (updateError) {
-            console.error("❌ Error actualizando tenant:", updateError);
-          } else {
-            console.log("✅ Tenant actualizado:", tenantId);
-          }
-
-          const { error: invoiceError } = await supabase.from("invoices").insert({
+          await supabase.from("invoices").insert({
             tenant_id: tenantId,
             date: new Date().toISOString(),
             amount: plan === "yearly" ? 360 : 40,
@@ -77,14 +74,9 @@ export async function POST(request: Request) {
             payment_provider: "lemonsqueezy",
           });
 
-          if (invoiceError) {
-            console.error("❌ Error creando factura:", invoiceError);
-          } else {
-            console.log("✅ Factura creada para tenant:", tenantId);
-          }
+          console.log("✅ Pedido completado y factura creada para tenant:", tenantId);
         } else {
           console.error("❌ tenantId o plan no encontrados");
-          console.error("customData completo:", customData);
           console.error("order completo:", JSON.stringify(order, null, 2));
         }
         break;
@@ -93,21 +85,19 @@ export async function POST(request: Request) {
       case "subscription_created":
       case "subscription_updated": {
         const subscription = payload.data?.attributes;
-        console.log("🔄 Subscription attributes:", JSON.stringify(subscription, null, 2));
         
-        // Intentar múltiples ubicaciones
-        const customData = subscription?.custom_data || subscription?.custom || {};
-        console.log("🔄 Custom data encontrado:", customData);
+        // Buscar en múltiples ubicaciones
+        const customData = subscription?.custom_data || subscription?.custom || payload.meta?.custom_data || {};
+        tenantId = customData.tenant_id;
+        plan = customData.plan;
         
-        const tenantId = customData.tenant_id;
-        const plan = customData.plan;
-        
-        console.log("🔄 tenantId:", tenantId, "plan:", plan, "status:", subscription?.status);
+        console.log("🔄 Subscription custom_data:", customData);
+        console.log(" tenantId:", tenantId, "plan:", plan, "status:", subscription?.status);
 
         if (tenantId && plan && subscription?.status === "active") {
           const subscriptionEndsAt = new Date(subscription.renews_at);
 
-          const { error } = await supabase
+          await supabase
             .from("tenants")
             .update({
               subscription_status: "active",
@@ -118,11 +108,7 @@ export async function POST(request: Request) {
             })
             .eq("id", tenantId);
 
-          if (error) {
-            console.error("❌ Error actualizando suscripción:", error);
-          } else {
-            console.log("✅ Suscripción activada para tenant:", tenantId);
-          }
+          console.log("✅ Suscripción activada para tenant:", tenantId);
         } else {
           console.error("❌ Datos incompletos. tenantId:", tenantId, "plan:", plan, "status:", subscription?.status);
         }
@@ -132,7 +118,7 @@ export async function POST(request: Request) {
       case "subscription_cancelled": {
         const subscription = payload.data?.attributes;
         const customData = subscription?.custom_data || {};
-        const tenantId = customData.tenant_id;
+        tenantId = customData.tenant_id;
 
         if (tenantId) {
           await supabase
@@ -147,7 +133,7 @@ export async function POST(request: Request) {
       case "subscription_expired": {
         const subscription = payload.data?.attributes;
         const customData = subscription?.custom_data || {};
-        const tenantId = customData.tenant_id;
+        tenantId = customData.tenant_id;
 
         if (tenantId) {
           await supabase
