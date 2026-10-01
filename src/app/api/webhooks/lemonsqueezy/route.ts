@@ -26,17 +26,21 @@ export async function POST(request: Request) {
     
     console.log("=== WEBHOOK RECIBIDO ===");
     console.log("Evento:", eventName);
-    console.log("Payload data.attributes:", JSON.stringify(payload.data?.attributes, null, 2));
+    console.log("Payload completo:", JSON.stringify(payload, null, 2));
 
     switch (eventName) {
       case "order_created": {
         const order = payload.data?.attributes;
-        // Los datos custom están en order.custom (no en custom_data)
-        const customData = order?.custom || {};
+        console.log(" Order attributes:", JSON.stringify(order, null, 2));
+        
+        // Intentar múltiples ubicaciones para los datos custom
+        const customData = order?.custom || order?.custom_data || {};
+        console.log("📦 Custom data encontrado:", customData);
+        
         const tenantId = customData.tenant_id;
         const plan = customData.plan;
         
-        console.log("📦 Order custom data:", customData);
+        console.log("📦 tenantId:", tenantId, "plan:", plan);
 
         if (tenantId && plan) {
           const subscriptionEndsAt = new Date();
@@ -79,8 +83,9 @@ export async function POST(request: Request) {
             console.log("✅ Factura creada para tenant:", tenantId);
           }
         } else {
-          console.error("❌ tenantId o plan no encontrados. customData:", customData);
-          console.error("Order completo:", JSON.stringify(order, null, 2));
+          console.error("❌ tenantId o plan no encontrados");
+          console.error("customData completo:", customData);
+          console.error("order completo:", JSON.stringify(order, null, 2));
         }
         break;
       }
@@ -88,13 +93,16 @@ export async function POST(request: Request) {
       case "subscription_created":
       case "subscription_updated": {
         const subscription = payload.data?.attributes;
-        // Los datos custom están en subscription.custom_data (no en custom)
-        const customData = subscription?.custom_data || {};
+        console.log("🔄 Subscription attributes:", JSON.stringify(subscription, null, 2));
+        
+        // Intentar múltiples ubicaciones
+        const customData = subscription?.custom_data || subscription?.custom || {};
+        console.log("🔄 Custom data encontrado:", customData);
+        
         const tenantId = customData.tenant_id;
         const plan = customData.plan;
         
-        console.log("🔄 Subscription custom_data:", customData);
-        console.log("Status:", subscription?.status);
+        console.log("🔄 tenantId:", tenantId, "plan:", plan, "status:", subscription?.status);
 
         if (tenantId && plan && subscription?.status === "active") {
           const subscriptionEndsAt = new Date(subscription.renews_at);
