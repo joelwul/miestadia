@@ -13,7 +13,6 @@ import {
   CheckCircle,
   Plus,
   ArrowUpRight,
-  ArrowDownRight,
   Bed,
   UserCheck,
   UserPlus,
@@ -69,9 +68,7 @@ export default function DashboardPage({ params }: Props) {
     setTenantId(tenant.id)
 
     const today = new Date().toISOString().split('T')[0]
-    const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0]
 
-    // Llegadas hoy
     const { data: arrivalsToday } = await supabase
       .from('reservations')
       .select(`*, guests (first_name, last_name), units (name)`)
@@ -79,7 +76,6 @@ export default function DashboardPage({ params }: Props) {
       .eq('check_in', today)
       .neq('status', 'cancelled')
 
-    // Salidas hoy
     const { data: departuresToday } = await supabase
       .from('reservations')
       .select(`*, guests (first_name, last_name), units (name)`)
@@ -87,7 +83,6 @@ export default function DashboardPage({ params }: Props) {
       .eq('check_out', today)
       .neq('status', 'cancelled')
 
-    // Huéspedes alojados (check_in <= hoy AND check_out > hoy)
     const { data: currentGuestsData } = await supabase
       .from('reservations')
       .select(`*, guests (first_name, last_name), units (name)`)
@@ -96,7 +91,6 @@ export default function DashboardPage({ params }: Props) {
       .gt('check_out', today)
       .neq('status', 'cancelled')
 
-    // Próximas reservas (check_in > hoy)
     const { data: upcomingData } = await supabase
       .from('reservations')
       .select(`*, guests (first_name, last_name), units (name)`)
@@ -106,14 +100,12 @@ export default function DashboardPage({ params }: Props) {
       .order('check_in', { ascending: true })
       .limit(10)
 
-    // Total de reservas
     const { count: totalReservations } = await supabase
       .from('reservations')
       .select('*', { count: 'exact', head: true })
       .eq('tenant_id', tenant.id)
       .neq('status', 'cancelled')
 
-    // Ocupación (unidades activas vs ocupadas)
     const { data: activeUnits } = await supabase
       .from('units')
       .select('id')
@@ -169,7 +161,6 @@ export default function DashboardPage({ params }: Props) {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
@@ -181,7 +172,6 @@ export default function DashboardPage({ params }: Props) {
         </Button>
       </div>
 
-      {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <Card className="hover:shadow-lg transition-shadow">
           <CardContent className="p-6">
@@ -250,9 +240,7 @@ export default function DashboardPage({ params }: Props) {
         </Card>
       </div>
 
-      {/* Main Content */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Próximas llegadas */}
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -303,7 +291,6 @@ export default function DashboardPage({ params }: Props) {
           </CardContent>
         </Card>
 
-        {/* Huéspedes alojados */}
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -355,7 +342,6 @@ export default function DashboardPage({ params }: Props) {
         </Card>
       </div>
 
-      {/* Acciones rápidas */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
