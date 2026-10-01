@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { useParams, useSearchParams } from "next/navigation";
 import {
   Crown,
   CreditCard,
@@ -16,6 +17,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 
+// Constantes locales (fallback si no existe @/lib/config)
 const PRICES = { monthly: 40, yearly: 360 };
 const PRICES_ARS = { monthly: 64000, yearly: 576000 };
 const USD_TO_ARS = 1600;
@@ -42,14 +44,7 @@ interface Tenant {
   owner_name: string;
 }
 
-function getTenantSlugFromURL(): string {
-  if (typeof window === "undefined") return "";
-  const path = window.location.pathname;
-  const match = path.match(/\/([^/]+)\/admin\/billing/);
-  return match ? match[1] : "";
-}
-
-export default function BillingPage() {
+function BillingContent() {
   const [tenantSlug, setTenantSlug] = useState("");
   const [tenant, setTenant] = useState<Tenant | null>(null);
   const [loading, setLoading] = useState(true);
@@ -58,9 +53,13 @@ export default function BillingPage() {
   const [daysLeft, setDaysLeft] = useState(0);
   const supabase = createClient();
 
+  // Obtener tenantSlug de forma segura
   useEffect(() => {
-    const slug = getTenantSlugFromURL();
-    setTenantSlug(slug);
+    const path = window.location.pathname;
+    const match = path.match(/\/([^/]+)\/admin\/billing/);
+    if (match) {
+      setTenantSlug(match[1]);
+    }
   }, []);
 
   useEffect(() => {
@@ -78,6 +77,7 @@ export default function BillingPage() {
           .single();
 
         if (tenantError || !tenantData) {
+          console.error("Error loading tenant:", tenantError);
           setLoading(false);
           return;
         }
@@ -422,5 +422,13 @@ export default function BillingPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function BillingPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-gray-400" /></div>}>
+      <BillingContent />
+    </Suspense>
   );
 }
