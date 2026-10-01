@@ -15,13 +15,10 @@ import {
   ExternalLink,
   Loader2,
   XCircle,
+  DollarSign,
   TrendingUp,
 } from "lucide-react";
-
-// Constantes locales para evitar errores de importación si @/lib/config no existe
-const PRICES = { monthly: 40, yearly: 360 };
-const PRICES_ARS = { monthly: 64000, yearly: 576000 }; // Valores aproximados
-const USD_TO_ARS = 1000; // Valor fallback
+import { PRICES, PRICES_ARS, USD_TO_ARS } from "@/lib/config";
 
 interface Invoice {
   id: string;
@@ -47,10 +44,9 @@ interface Tenant {
 
 export default function BillingPage() {
   const params = useParams();
-  // Manejo seguro de tenantSlug para compatibilidad con Next.js 13/14/15
-  const tenantSlug = Array.isArray(params?.tenantSlug) 
+  const tenantSlug = Array.isArray(params.tenantSlug) 
     ? params.tenantSlug[0] 
-    : (params?.tenantSlug as string) || "";
+    : params.tenantSlug;
   
   const [tenant, setTenant] = useState<Tenant | null>(null);
   const [loading, setLoading] = useState(true);
@@ -192,7 +188,6 @@ export default function BillingPage() {
         <p className="text-gray-500 mt-1">Gestioná tu plan de pago y facturación</p>
       </div>
 
-      {/* Banner de estado */}
       {isTrial && (
         <motion.div
           initial={{ opacity: 0, y: -10 }}
@@ -273,7 +268,6 @@ export default function BillingPage() {
         </motion.div>
       )}
 
-      {/* Plan actual */}
       <div className="grid md:grid-cols-2 gap-6">
         <div className="bg-white border border-gray-200 rounded-xl p-6">
           <div className="flex items-center justify-between mb-4">
@@ -353,7 +347,6 @@ export default function BillingPage() {
         </div>
       </div>
 
-      {/* Planes disponibles */}
       {!isActive && (
         <div>
           <div className="flex items-center justify-between mb-6">
@@ -364,7 +357,6 @@ export default function BillingPage() {
             </div>
           </div>
           <div className="grid md:grid-cols-2 gap-6">
-            {/* Plan Mensual */}
             <div className="bg-white border-2 border-gray-200 rounded-xl p-6 hover:border-[#0F766E] transition-colors">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-xl font-bold text-gray-900">Plan Mensual</h3>
@@ -428,7 +420,6 @@ export default function BillingPage() {
               </div>
             </div>
 
-            {/* Plan Anual */}
             <div className="bg-white border-2 border-[#EA580C] rounded-xl p-6 relative">
               <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#EA580C] text-white text-xs font-bold px-3 py-1 rounded-full">
                 Ahorrás 25%
@@ -504,7 +495,6 @@ export default function BillingPage() {
         </div>
       )}
 
-      {/* Historial de pagos */}
       <div className="bg-white border border-gray-200 rounded-xl p-6">
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-xl font-bold text-gray-900">Historial de pagos</h3>
