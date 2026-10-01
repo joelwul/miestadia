@@ -38,7 +38,6 @@ export default function DashboardPage({ params }: Props) {
   })
   const [upcomingArrivals, setUpcomingArrivals] = useState<any[]>([])
   const [currentGuests, setCurrentGuests] = useState<any[]>([])
-  const [recentReservations, setRecentReservations] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const router = useRouter()
   const supabase = createClient()
@@ -128,7 +127,6 @@ export default function DashboardPage({ params }: Props) {
 
     setUpcomingArrivals(upcomingData?.slice(0, 5) || [])
     setCurrentGuests(currentGuestsData || [])
-    setRecentReservations(upcomingData?.slice(0, 5) || [])
     setLoading(false)
   }
 
