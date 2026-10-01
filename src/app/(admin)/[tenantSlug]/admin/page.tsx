@@ -69,6 +69,7 @@ export default function DashboardPage({ params }: Props) {
     setTenantId(tenant.id)
 
     const today = new Date().toISOString().split('T')[0]
+    const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0]
 
     // Llegadas hoy
     const { data: arrivalsToday } = await supabase
@@ -86,7 +87,7 @@ export default function DashboardPage({ params }: Props) {
       .eq('check_out', today)
       .neq('status', 'cancelled')
 
-    // Huéspedes alojados
+    // Huéspedes alojados (check_in <= hoy AND check_out > hoy)
     const { data: currentGuestsData } = await supabase
       .from('reservations')
       .select(`*, guests (first_name, last_name), units (name)`)
@@ -95,7 +96,7 @@ export default function DashboardPage({ params }: Props) {
       .gt('check_out', today)
       .neq('status', 'cancelled')
 
-    // Próximas reservas
+    // Próximas reservas (check_in > hoy)
     const { data: upcomingData } = await supabase
       .from('reservations')
       .select(`*, guests (first_name, last_name), units (name)`)
@@ -112,14 +113,14 @@ export default function DashboardPage({ params }: Props) {
       .eq('tenant_id', tenant.id)
       .neq('status', 'cancelled')
 
-    // Ocupación
+    // Ocupación (unidades activas vs ocupadas)
     const { data: activeUnits } = await supabase
       .from('units')
       .select('id')
       .eq('tenant_id', tenant.id)
       .eq('status', 'active')
 
-    const occupancyRate = activeUnits && activeUnits.length > 0
+    const occupancyRate = activeUnits && activeUnits.length > 0 
       ? Math.round((currentGuestsData?.length || 0) / activeUnits.length * 100)
       : 0
 
