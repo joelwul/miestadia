@@ -9,32 +9,34 @@ const supabase = createClient(
 
 export async function POST(request: Request) {
   try {
-    // 1. LEER EL CUERPO CRUDO (RAW) PARA VERIFICAR LA FIRMA
-    // Esto es crucial: JSON.stringify altera el formato y rompe el hash.
     const rawBody = await request.text();
     const signature = request.headers.get("x-signature");
 
-    // 2. VERIFICAR LA FIRMA CON EL CUERPO CRUDO
     const hmac = crypto.createHmac("sha256", process.env.LS_WEBHOOK_SECRET!);
     hmac.update(rawBody);
     const digest = hmac.digest("hex");
 
     if (signature !== digest) {
-      console.error("❌ Firma de webhook inválida. Posible ataque o secreto incorrecto.");
+      console.error("❌ Firma inválida");
       return NextResponse.json({ error: "Firma inválida" }, { status: 401 });
     }
 
-    // 3. PARSEAR EL JSON SOLO DESPUÉS DE VERIFICAR LA SEGURIDAD
     const payload = JSON.parse(rawBody);
     const eventName = payload.meta?.event_name;
-    console.log(`✅ Webhook recibido y verificado: ${eventName}`);
-
+    
+    // LOG COMPLETO PARA DEBUG
+    console.log("=== WEBHOOK RECIBIDO ===");
+    console.log("Evento:", eventName);
+    console.log("Payload completo:", JSON.stringify(payload, null, 2));
+    
     switch (eventName) {
       case "order_created": {
         const order = payload.data?.attributes;
         const customData = order?.custom || {};
         const tenantId = customData.tenant_id;
         const plan = customData.plan;
+        
+        console.log("📦 Order data:", { tenantId, plan, customData });
 
         if (tenantId && plan) {
           const subscriptionEndsAt = new Date();
@@ -44,7 +46,7 @@ export async function POST(request: Request) {
             subscriptionEndsAt.setMonth(subscriptionEndsAt.getMonth() + 1);
           }
 
-          await supabase
+          const { error: updateError } = await supabase
             .from("tenants")
             .update({
               subscription_status: "active",
@@ -55,7 +57,13 @@ export async function POST(request: Request) {
             })
             .eq("id", tenantId);
 
-          await supabase.from("invoices").insert({
+          if (updateError) {
+            console.error("❌ Error actualizando tenant:", updateError);
+          } else {
+            console.log("✅ Tenant actualizado:", tenantId);
+          }
+
+          const { error: invoiceError } = await supabase.from("invoices").insert({
             tenant_id: tenantId,
             date: new Date().toISOString(),
             amount: plan === "yearly" ? 360 : 40,
@@ -65,7 +73,13 @@ export async function POST(request: Request) {
             payment_provider: "lemonsqueezy",
           });
 
-          console.log(`✅ Pedido LS completado y factura creada para tenant ${tenantId}`);
+          if (invoiceError) {
+            console.error("❌ Error creando factura:", invoiceError);
+          } else {
+            console.log("✅ Factura creada para tenant:", tenantId);
+          }
+        } else {
+          console.error("❌ tenantId o plan no encontrados en customData:", customData);
         }
         break;
       }
@@ -76,11 +90,13 @@ export async function POST(request: Request) {
         const customData = subscription?.custom_data || {};
         const tenantId = customData.tenant_id;
         const plan = customData.plan;
+        
+        console.log("🔄 Subscription data:", { tenantId, plan, customData, status: subscription?.status });
 
         if (tenantId && plan && subscription?.status === "active") {
           const subscriptionEndsAt = new Date(subscription.renews_at);
 
-          await supabase
+          const { error } = await supabase
             .from("tenants")
             .update({
               subscription_status: "active",
@@ -91,7 +107,13 @@ export async function POST(request: Request) {
             })
             .eq("id", tenantId);
 
-          console.log(`✅ Suscripción LS activada para tenant ${tenantId}`);
+          if (error) {
+            console.error("❌ Error actualizando suscripción:", error);
+          } else {
+            console.log("✅ Suscripción activada para tenant:", tenantId);
+          }
+        } else {
+          console.error("❌ Datos incompletos para suscripción:", { tenantId, plan, status: subscription?.status });
         }
         break;
       }
@@ -106,7 +128,7 @@ export async function POST(request: Request) {
             .from("tenants")
             .update({ subscription_status: "cancelled" })
             .eq("id", tenantId);
-          console.log(`⚠️ Suscripción LS cancelada para tenant ${tenantId}`);
+          console.log("️ Suscripción cancelada para tenant:", tenantId);
         }
         break;
       }
@@ -121,7 +143,7 @@ export async function POST(request: Request) {
             .from("tenants")
             .update({ subscription_status: "expired" })
             .eq("id", tenantId);
-          console.log(`❌ Suscripción LS expirada para tenant ${tenantId}`);
+          console.log("❌ Suscripción expirada para tenant:", tenantId);
         }
         break;
       }
@@ -129,7 +151,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ received: true });
   } catch (error: any) {
-    console.error("❌ Error crítico en webhook LS:", error);
+    console.error("❌ Error crítico en webhook:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
