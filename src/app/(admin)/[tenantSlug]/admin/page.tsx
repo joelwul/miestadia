@@ -1,17 +1,16 @@
 'use client'
-
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { 
-  Calendar, 
-  Users, 
-  TrendingUp, 
-  Clock, 
-  AlertCircle, 
-  CheckCircle, 
+import {
+  Calendar,
+  Users,
+  TrendingUp,
+  Clock,
+  AlertCircle,
+  CheckCircle,
   Plus,
   ArrowUpRight,
   ArrowDownRight,
@@ -20,7 +19,7 @@ import {
   UserPlus,
   BarChart3
 } from 'lucide-react'
-import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 
 interface Props {
   params: Promise<{ tenantSlug: string }>
@@ -42,6 +41,7 @@ export default function DashboardPage({ params }: Props) {
   const [currentGuests, setCurrentGuests] = useState<any[]>([])
   const [recentReservations, setRecentReservations] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const router = useRouter()
   const supabase = createClient()
 
   useEffect(() => {
@@ -55,7 +55,6 @@ export default function DashboardPage({ params }: Props) {
 
   async function loadData(slug: string) {
     setLoading(true)
-
     const { data: tenant } = await supabase
       .from('tenants')
       .select('id')
@@ -70,7 +69,6 @@ export default function DashboardPage({ params }: Props) {
     setTenantId(tenant.id)
 
     const today = new Date().toISOString().split('T')[0]
-    const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0]
 
     // Llegadas hoy
     const { data: arrivalsToday } = await supabase
@@ -88,7 +86,7 @@ export default function DashboardPage({ params }: Props) {
       .eq('check_out', today)
       .neq('status', 'cancelled')
 
-    // Huéspedes alojados (check_in <= hoy AND check_out > hoy)
+    // Huéspedes alojados
     const { data: currentGuestsData } = await supabase
       .from('reservations')
       .select(`*, guests (first_name, last_name), units (name)`)
@@ -97,7 +95,7 @@ export default function DashboardPage({ params }: Props) {
       .gt('check_out', today)
       .neq('status', 'cancelled')
 
-    // Próximas reservas (check_in > hoy)
+    // Próximas reservas
     const { data: upcomingData } = await supabase
       .from('reservations')
       .select(`*, guests (first_name, last_name), units (name)`)
@@ -114,14 +112,14 @@ export default function DashboardPage({ params }: Props) {
       .eq('tenant_id', tenant.id)
       .neq('status', 'cancelled')
 
-    // Ocupación (unidades activas vs ocupadas)
+    // Ocupación
     const { data: activeUnits } = await supabase
       .from('units')
       .select('id')
       .eq('tenant_id', tenant.id)
       .eq('status', 'active')
 
-    const occupancyRate = activeUnits && activeUnits.length > 0 
+    const occupancyRate = activeUnits && activeUnits.length > 0
       ? Math.round((currentGuestsData?.length || 0) / activeUnits.length * 100)
       : 0
 
@@ -138,7 +136,6 @@ export default function DashboardPage({ params }: Props) {
     setUpcomingArrivals(upcomingData?.slice(0, 5) || [])
     setCurrentGuests(currentGuestsData || [])
     setRecentReservations(upcomingData?.slice(0, 5) || [])
-
     setLoading(false)
   }
 
@@ -152,6 +149,10 @@ export default function DashboardPage({ params }: Props) {
     }
     const c = config[status] || config.booked
     return <span className={`px-2 py-1 rounded-full text-xs font-medium ${c.color}`}>{c.label}</span>
+  }
+
+  function navigateTo(path: string) {
+    router.push(path)
   }
 
   if (loading) {
@@ -173,12 +174,10 @@ export default function DashboardPage({ params }: Props) {
           <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
           <p className="text-gray-500 mt-1">Resumen de tu alojamiento</p>
         </div>
-        <Link href={`/${tenantSlug}/admin/reservations`}>
-          <Button size="lg">
-            <Plus className="mr-2 h-4 w-4" />
-            Nueva Reserva
-          </Button>
-        </Link>
+        <Button size="lg" onClick={() => navigateTo(`/${tenantSlug}/admin/reservations`)}>
+          <Plus className="mr-2 h-4 w-4" />
+          Nueva Reserva
+        </Button>
       </div>
 
       {/* Stats Cards */}
@@ -196,7 +195,6 @@ export default function DashboardPage({ params }: Props) {
             </div>
           </CardContent>
         </Card>
-
         <Card className="hover:shadow-lg transition-shadow">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -210,7 +208,6 @@ export default function DashboardPage({ params }: Props) {
             </div>
           </CardContent>
         </Card>
-
         <Card className="hover:shadow-lg transition-shadow">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -224,7 +221,6 @@ export default function DashboardPage({ params }: Props) {
             </div>
           </CardContent>
         </Card>
-
         <Card className="hover:shadow-lg transition-shadow">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -238,7 +234,6 @@ export default function DashboardPage({ params }: Props) {
             </div>
           </CardContent>
         </Card>
-
         <Card className="hover:shadow-lg transition-shadow">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -267,12 +262,10 @@ export default function DashboardPage({ params }: Props) {
                 </CardTitle>
                 <CardDescription>Reservas confirmadas para los próximos días</CardDescription>
               </div>
-              <Link href={`/${tenantSlug}/admin/reservations`}>
-                <Button variant="ghost" size="sm">
-                  Ver todas
-                  <ArrowUpRight className="ml-1 h-4 w-4" />
-                </Button>
-              </Link>
+              <Button variant="ghost" size="sm" onClick={() => navigateTo(`/${tenantSlug}/admin/reservations`)}>
+                Ver todas
+                <ArrowUpRight className="ml-1 h-4 w-4" />
+              </Button>
             </div>
           </CardHeader>
           <CardContent>
@@ -320,12 +313,10 @@ export default function DashboardPage({ params }: Props) {
                 </CardTitle>
                 <CardDescription>Huéspedes actualmente en el alojamiento</CardDescription>
               </div>
-              <Link href={`/${tenantSlug}/admin/reservations?status=checked_in`}>
-                <Button variant="ghost" size="sm">
-                  Ver todos
-                  <ArrowUpRight className="ml-1 h-4 w-4" />
-                </Button>
-              </Link>
+              <Button variant="ghost" size="sm" onClick={() => navigateTo(`/${tenantSlug}/admin/reservations?status=checked_in`)}>
+                Ver todos
+                <ArrowUpRight className="ml-1 h-4 w-4" />
+              </Button>
             </div>
           </CardHeader>
           <CardContent>
@@ -374,30 +365,22 @@ export default function DashboardPage({ params }: Props) {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Link href={`/${tenantSlug}/admin/reservations`}>
-              <Button variant="outline" className="w-full h-20 flex flex-col items-center justify-center gap-2">
-                <Calendar className="h-6 w-6" />
-                <span>Gestionar Reservas</span>
-              </Button>
-            </Link>
-            <Link href={`/${tenantSlug}/admin/units`}>
-              <Button variant="outline" className="w-full h-20 flex flex-col items-center justify-center gap-2">
-                <Bed className="h-6 w-6" />
-                <span>Ver Unidades</span>
-              </Button>
-            </Link>
-            <Link href={`/${tenantSlug}/admin/guests`}>
-              <Button variant="outline" className="w-full h-20 flex flex-col items-center justify-center gap-2">
-                <Users className="h-6 w-6" />
-                <span>Ver Huéspedes</span>
-              </Button>
-            </Link>
-            <Link href={`/${tenantSlug}/admin/settings`}>
-              <Button variant="outline" className="w-full h-20 flex flex-col items-center justify-center gap-2">
-                <AlertCircle className="h-6 w-6" />
-                <span>Configuración</span>
-              </Button>
-            </Link>
+            <Button variant="outline" className="w-full h-20 flex flex-col items-center justify-center gap-2" onClick={() => navigateTo(`/${tenantSlug}/admin/reservations`)}>
+              <Calendar className="h-6 w-6" />
+              <span>Gestionar Reservas</span>
+            </Button>
+            <Button variant="outline" className="w-full h-20 flex flex-col items-center justify-center gap-2" onClick={() => navigateTo(`/${tenantSlug}/admin/units`)}>
+              <Bed className="h-6 w-6" />
+              <span>Ver Unidades</span>
+            </Button>
+            <Button variant="outline" className="w-full h-20 flex flex-col items-center justify-center gap-2" onClick={() => navigateTo(`/${tenantSlug}/admin/guests`)}>
+              <Users className="h-6 w-6" />
+              <span>Ver Huéspedes</span>
+            </Button>
+            <Button variant="outline" className="w-full h-20 flex flex-col items-center justify-center gap-2" onClick={() => navigateTo(`/${tenantSlug}/admin/settings`)}>
+              <AlertCircle className="h-6 w-6" />
+              <span>Configuración</span>
+            </Button>
           </div>
         </CardContent>
       </Card>
