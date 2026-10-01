@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { useParams } from "next/navigation";
 import {
   Crown,
   CreditCard,
@@ -17,7 +16,6 @@ import {
   TrendingUp,
 } from "lucide-react";
 
-// Constantes locales (no dependemos de @/lib/config)
 const PRICES = { monthly: 40, yearly: 360 };
 const PRICES_ARS = { monthly: 64000, yearly: 576000 };
 const USD_TO_ARS = 1600;
@@ -44,18 +42,26 @@ interface Tenant {
   owner_name: string;
 }
 
+function getTenantSlugFromURL(): string {
+  if (typeof window === "undefined") return "";
+  const path = window.location.pathname;
+  const match = path.match(/\/([^/]+)\/admin\/billing/);
+  return match ? match[1] : "";
+}
+
 export default function BillingPage() {
-  const params = useParams();
-  const tenantSlug = Array.isArray(params.tenantSlug) 
-    ? params.tenantSlug[0] 
-    : (params.tenantSlug as string) || "";
-  
+  const [tenantSlug, setTenantSlug] = useState("");
   const [tenant, setTenant] = useState<Tenant | null>(null);
   const [loading, setLoading] = useState(true);
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [daysLeft, setDaysLeft] = useState(0);
   const supabase = createClient();
+
+  useEffect(() => {
+    const slug = getTenantSlugFromURL();
+    setTenantSlug(slug);
+  }, []);
 
   useEffect(() => {
     async function load() {
@@ -140,7 +146,7 @@ export default function BillingPage() {
 
   async function handleCancelSubscription() {
     if (!tenant) return;
-    if (!confirm("¿Estás seguro que querés cancelar tu suscripción? Tu acceso continuará hasta el final del período pagado.")) {
+    if (!confirm("¿Estás seguro que querés cancelar tu suscripción?")) {
       return;
     }
 
@@ -157,7 +163,7 @@ export default function BillingPage() {
         throw new Error(data.error || "Error al cancelar");
       }
 
-      alert("Suscripción cancelada. Tu acceso continuará hasta el final del período pagado.");
+      alert("Suscripción cancelada.");
       window.location.reload();
     } catch (err: any) {
       alert("Error al cancelar: " + err.message);
@@ -207,7 +213,7 @@ export default function BillingPage() {
                 {daysLeft <= 0 ? "Tu período de prueba ha finalizado" : `${daysLeft} ${daysLeft === 1 ? "día" : "días"} de prueba restantes`}
               </p>
               <p className={`text-sm ${daysLeft <= 0 ? "text-red-700" : daysLeft <= 3 ? "text-orange-700" : daysLeft <= 7 ? "text-yellow-700" : "text-blue-700"}`}>
-                {daysLeft <= 0 ? "Suscribite para reactivar tu cuenta y continuar usando Mi Estadía." : daysLeft <= 3 ? "¡Últimos días! Suscribite ahora para no perder acceso." : "Disfrutá de todas las funcionalidades durante tu prueba gratuita de 30 días."}
+                {daysLeft <= 0 ? "Suscribite para reactivar tu cuenta." : daysLeft <= 3 ? "¡Últimos días! Suscribite ahora." : "Disfrutá de todas las funcionalidades durante tu prueba gratuita de 30 días."}
               </p>
             </div>
           </div>
@@ -279,11 +285,11 @@ export default function BillingPage() {
             </li>
             <li className="flex items-start gap-2">
               <CheckCircle className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-              <span><strong>Reembolsos:</strong> garantía de 7 días desde el primer pago; se procesa por el mismo medio de pago.</span>
+              <span><strong>Reembolsos:</strong> garantía de 7 días desde el primer pago.</span>
             </li>
             <li className="flex items-start gap-2">
               <CheckCircle className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-              <span><strong>Suscripciones por Mercado Pago:</strong> también podés verlas en tu cuenta de MP → "Suscripciones".</span>
+              <span><strong>Mercado Pago:</strong> también podés verlas en tu cuenta de MP → "Suscripciones".</span>
             </li>
           </ul>
           {isActive && (
