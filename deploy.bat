@@ -33,7 +33,7 @@ echo [3/4] Creando commit (%commit_msg%)...
 git commit -m %commit_msg%
 
 echo [4/4] Subiendo a GitHub (Vercel se actualiza solo)...
-git push origin main
+git push origin version-estable
 
 echo.
 echo ==========================================
