@@ -2,48 +2,205 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Users, CreditCard, Clock, AlertTriangle, ExternalLink, Search, LogOut } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { Users, CreditCard, Clock, AlertTriangle, ExternalLink, Search, LogOut, Lock, Mail, KeyRound } from 'lucide-react'
 
 export default function SuperadminPage() {
   const [user, setUser] = useState<any>(null)
+  const [checkingAuth, setCheckingAuth] = useState(true)
+  
+  // Estados para el login
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [loginLoading, setLoginLoading] = useState(false)
+  const [loginError, setLoginError] = useState('')
+
+  // Estados del dashboard
   const [tenants, setTenants] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  const [dashboardLoading, setDashboardLoading] = useState(true)
   const [search, setSearch] = useState('')
+  
   const router = useRouter()
   const supabase = createClient()
 
   useEffect(() => {
     async function checkAuth() {
       const { data: { user } } = await supabase.auth.getUser()
-      
-      // 🔒 SEGURIDAD: Solo joelwul@gmail.com puede entrar
-      if (!user || user.email !== 'joelwul@gmail.com') {
-        router.push('/')
-        return
-      }
-      
       setUser(user)
-      loadTenants()
+      setCheckingAuth(false)
+      
+      if (user && user.email === 'joelwul@gmail.com') {
+        loadTenants()
+      }
     }
     checkAuth()
   }, [])
 
+  async function handleLogin(e: React.FormEvent) {
+    e.preventDefault()
+    setLoginLoading(true)
+    setLoginError('')
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    })
+
+    if (error) {
+      setLoginError('Credenciales incorrectas. Intentá de nuevo.')
+      setLoginLoading(false)
+      return
+    }
+
+    if (data.user?.email !== 'joelwul@gmail.com') {
+      setLoginError('Acceso denegado. Esta área es exclusiva para el administrador principal.')
+      await supabase.auth.signOut()
+      setUser(null)
+      setLoginLoading(false)
+      return
+    }
+
+    setUser(data.user)
+    setLoginLoading(false)
+    loadTenants()
+  }
+
+  async function handleLogout() {
+    await supabase.auth.signOut()
+    setUser(null)
+    setEmail('')
+    setPassword('')
+    router.push('/')
+  }
+
   async function loadTenants() {
+    setDashboardLoading(true)
     const { data, error } = await supabase
       .from('tenants')
       .select('id, name, slug, owner_email, owner_name, subscription_status, subscription_plan, trial_ends_at, subscription_ends_at, created_at')
       .order('created_at', { ascending: false })
     
     if (data) setTenants(data)
-    setLoading(false)
+    setDashboardLoading(false)
   }
 
-  async function handleLogout() {
-    await supabase.auth.signOut()
-    router.push('/')
+  // --- VISTA 1: Cargando sesión inicial ---
+  if (checkingAuth) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#0F766E] mx-auto"></div>
+          <p className="mt-4 text-gray-600">Verificando acceso...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // --- VISTA 2: Formulario de Login ---
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md shadow-xl">
+          <CardHeader className="text-center">
+            <div className="mx-auto w-12 h-12 bg-[#0F766E]/10 rounded-full flex items-center justify-center mb-4">
+              <Lock className="w-6 h-6 text-[#0F766E]" />
+            </div>
+            <CardTitle className="text-2xl">Acceso Superadmin</CardTitle>
+            <CardDescription>
+              Ingresá tus credenciales de administrador principal
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                  <Mail className="w-4 h-4" /> Email
+                </label>
+                <Input 
+                  type="email" 
+                  value={email} 
+                  onChange={(e) => setEmail(e.target.value)} 
+                  placeholder="joelwul@gmail.com" 
+                  required 
+                  className="h-11"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                  <KeyRound className="w-4 h-4" /> Contraseña
+                </label>
+                <Input 
+                  type="password" 
+                  value={password} 
+                  onChange={(e) => setPassword(e.target.value)} 
+                  placeholder="••••••••" 
+                  required 
+                  className="h-11"
+                />
+              </div>
+              
+              {loginError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+                  {loginError}
+                </div>
+              )}
+
+              <Button type="submit" className="w-full h-11 bg-[#0F766E] hover:bg-[#0D665E]" disabled={loginLoading}>
+                {loginLoading ? 'Ingresando...' : 'Ingresar al Panel'}
+              </Button>
+            </form>
+            <div className="mt-6 text-center">
+              <Button variant="link" className="text-sm text-gray-500" onClick={() => router.push('/')}>
+                ← Volver al sitio principal
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  // --- VISTA 3: Acceso Denegado (por si las dudas) ---
+  if (user.email !== 'joelwul@gmail.com') {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md shadow-xl border-red-200">
+          <CardHeader className="text-center">
+            <div className="mx-auto w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4">
+              <AlertTriangle className="w-6 h-6 text-red-600" />
+            </div>
+            <CardTitle className="text-2xl text-red-900">Acceso Denegado</CardTitle>
+            <CardDescription className="text-red-700">
+              El usuario <strong>{user.email}</strong> no tiene permisos de superadministrador.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Button variant="outline" className="w-full" onClick={handleLogout}>
+              Cerrar sesión y volver
+            </Button>
+            <Button variant="link" className="w-full text-gray-500" onClick={() => router.push('/')}>
+              Ir al inicio
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  // --- VISTA 4: Dashboard de Superadmin (Solo si todo está OK) ---
+  if (dashboardLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#0F766E] mx-auto"></div>
+          <p className="mt-4 text-gray-600">Cargando datos del sistema...</p>
+        </div>
+      </div>
+    )
   }
 
   // Cálculos de KPIs
@@ -52,7 +209,6 @@ export default function SuperadminPage() {
   const trialTenants = tenants.filter(t => t.subscription_status === 'trial').length
   const expiredTenants = tenants.filter(t => t.subscription_status === 'expired' || t.subscription_status === 'cancelled').length
   
-  // MRR Estimado (Mensual): Anual = 360/12 = 30, Mensual = 40
   const mrr = tenants.reduce((acc, t) => {
     if (t.subscription_status === 'active') {
       return acc + (t.subscription_plan === 'yearly' ? 30 : 40)
@@ -65,19 +221,6 @@ export default function SuperadminPage() {
     t.owner_email?.toLowerCase().includes(search.toLowerCase())
   )
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#0F766E] mx-auto"></div>
-          <p className="mt-4 text-gray-600">Cargando panel de superadmin...</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (!user) return null
-
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-8">
       <div className="max-w-7xl mx-auto space-y-8">
@@ -85,8 +228,14 @@ export default function SuperadminPage() {
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Panel de Superadmin</h1>
-            <p className="text-gray-500">Bienvenido, {user.email}</p>
+            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
+              <Lock className="w-8 h-8 text-[#0F766E]" />
+              Panel de Superadmin
+            </h1>
+            <p className="text-gray-500 mt-1">
+              Bienvenido, {user.email} 
+              <Badge className="ml-2 bg-green-100 text-green-800 border-green-200">Administrador Principal</Badge>
+            </p>
           </div>
           <div className="flex gap-3">
             <Button variant="outline" onClick={() => router.push('/')}>
