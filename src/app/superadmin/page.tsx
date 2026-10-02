@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Users,
   CreditCard,
@@ -23,15 +22,15 @@ import {
   Activity,
   Settings,
   Eye,
-  Calendar,
-  PlusCircle,
-  Trash2,
-  CheckCircle,
-  XCircle,
   BarChart3,
   FileText,
-  Globe
+  Globe,
+  PlusCircle,
+  Trash2,
+  CheckCircle
 } from 'lucide-react'
+
+type TabId = 'dashboard' | 'tenants' | 'finance' | 'settings'
 
 export default function SuperadminPage() {
   const [user, setUser] = useState<any>(null)
@@ -46,7 +45,7 @@ export default function SuperadminPage() {
   const [invoices, setInvoices] = useState<any[]>([])
   const [dashboardLoading, setDashboardLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [activeTab, setActiveTab] = useState('dashboard')
+  const [activeTab, setActiveTab] = useState<TabId>('dashboard')
   
   const router = useRouter()
   const supabase = createClient()
@@ -171,6 +170,7 @@ export default function SuperadminPage() {
     }
   }
 
+  // --- VISTA 1: Cargando sesión inicial ---
   if (checkingAuth) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -182,6 +182,7 @@ export default function SuperadminPage() {
     )
   }
 
+  // --- VISTA 2: Formulario de Login ---
   if (!user) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -244,6 +245,7 @@ export default function SuperadminPage() {
     )
   }
 
+  // --- VISTA 3: Acceso Denegado ---
   if (user.email !== 'joelwul@gmail.com') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -270,6 +272,7 @@ export default function SuperadminPage() {
     )
   }
 
+  // --- VISTA 4: Dashboard cargando ---
   if (dashboardLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -281,6 +284,7 @@ export default function SuperadminPage() {
     )
   }
 
+  // Cálculos de KPIs
   const totalTenants = tenants.length
   const activeTenants = tenants.filter(t => t.subscription_status === 'active').length
   const trialTenants = tenants.filter(t => t.subscription_status === 'trial').length
@@ -302,8 +306,16 @@ export default function SuperadminPage() {
     t.owner_email?.toLowerCase().includes(search.toLowerCase())
   )
 
+  const tabs: { id: TabId; label: string; icon: any }[] = [
+    { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
+    { id: 'tenants', label: 'Alojamientos', icon: Users },
+    { id: 'finance', label: 'Finanzas', icon: DollarSign },
+    { id: 'settings', label: 'Configuración', icon: Settings },
+  ]
+
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Header */}
       <div className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 md:px-8 py-4">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -335,15 +347,30 @@ export default function SuperadminPage() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 md:px-8 py-8">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-            <TabsTrigger value="tenants">Alojamientos</TabsTrigger>
-            <TabsTrigger value="finance">Finanzas</TabsTrigger>
-            <TabsTrigger value="settings">Configuración</TabsTrigger>
-          </TabsList>
+        {/* Navegación de pestañas */}
+        <div className="flex flex-wrap gap-2 mb-6 border-b border-gray-200 pb-3">
+          {tabs.map((tab) => {
+            const Icon = tab.icon
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  activeTab === tab.id
+                    ? 'bg-[#0F766E] text-white shadow-sm'
+                    : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+                }`}
+              >
+                <Icon className="w-4 h-4" />
+                {tab.label}
+              </button>
+            )
+          })}
+        </div>
 
-          <TabsContent value="dashboard" className="space-y-6">
+        {/* === PESTAÑA: DASHBOARD === */}
+        {activeTab === 'dashboard' && (
+          <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -426,133 +453,137 @@ export default function SuperadminPage() {
                 </CardContent>
               </Card>
             </div>
-          </TabsContent>
+          </div>
+        )}
 
-          <TabsContent value="tenants" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <CardTitle>Gestión de Alojamientos</CardTitle>
-                  <div className="relative w-full md:w-72">
-                    <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-                    <Input 
-                      type="text" 
-                      placeholder="Buscar por nombre o email..." 
-                      className="pl-9"
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                    />
-                  </div>
+        {/* === PESTAÑA: ALOJAMIENTOS === */}
+        {activeTab === 'tenants' && (
+          <Card>
+            <CardHeader>
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <CardTitle>Gestión de Alojamientos</CardTitle>
+                <div className="relative w-full md:w-72">
+                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                  <Input 
+                    type="text" 
+                    placeholder="Buscar por nombre o email..." 
+                    className="pl-9"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                  />
                 </div>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm text-left">
-                    <thead className="text-xs text-gray-500 uppercase bg-gray-50 border-b">
-                      <tr>
-                        <th className="px-4 py-3 font-medium">Alojamiento</th>
-                        <th className="px-4 py-3 font-medium">Dueño</th>
-                        <th className="px-4 py-3 font-medium">Estado</th>
-                        <th className="px-4 py-3 font-medium">Plan</th>
-                        <th className="px-4 py-3 font-medium">Fechas Clave</th>
-                        <th className="px-4 py-3 font-medium text-right">Acciones</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {filteredTenants.map((tenant) => (
-                        <tr key={tenant.id} className="bg-white hover:bg-gray-50 transition-colors">
-                          <td className="px-4 py-4">
-                            <div className="font-semibold text-gray-900">{tenant.name}</div>
-                            <div className="text-xs text-gray-500 font-mono">{tenant.slug}</div>
-                          </td>
-                          <td className="px-4 py-4">
-                            <div className="text-gray-900">{tenant.owner_name || 'N/A'}</div>
-                            <div className="text-xs text-gray-500">{tenant.owner_email}</div>
-                          </td>
-                          <td className="px-4 py-4">
-                            <StatusBadge status={tenant.subscription_status} />
-                          </td>
-                          <td className="px-4 py-4">
-                            <span className="text-gray-700">
-                              {tenant.subscription_plan === 'yearly' ? 'Anual' : 
-                               tenant.subscription_plan === 'monthly' ? 'Mensual' : 'Ninguno'}
-                            </span>
-                          </td>
-                          <td className="px-4 py-4 text-xs">
-                            {tenant.subscription_status === 'active' && tenant.subscription_ends_at ? (
-                              <div>
-                                <div className="text-gray-400 mb-1">Suscripción:</div>
-                                <div className="font-medium text-gray-900">
-                                  {new Date(tenant.subscription_ends_at).toLocaleDateString('es-AR')}
-                                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left">
+                  <thead className="text-xs text-gray-500 uppercase bg-gray-50 border-b">
+                    <tr>
+                      <th className="px-4 py-3 font-medium">Alojamiento</th>
+                      <th className="px-4 py-3 font-medium">Dueño</th>
+                      <th className="px-4 py-3 font-medium">Estado</th>
+                      <th className="px-4 py-3 font-medium">Plan</th>
+                      <th className="px-4 py-3 font-medium">Fechas Clave</th>
+                      <th className="px-4 py-3 font-medium text-right">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {filteredTenants.map((tenant) => (
+                      <tr key={tenant.id} className="bg-white hover:bg-gray-50 transition-colors">
+                        <td className="px-4 py-4">
+                          <div className="font-semibold text-gray-900">{tenant.name}</div>
+                          <div className="text-xs text-gray-500 font-mono">{tenant.slug}</div>
+                        </td>
+                        <td className="px-4 py-4">
+                          <div className="text-gray-900">{tenant.owner_name || 'N/A'}</div>
+                          <div className="text-xs text-gray-500">{tenant.owner_email}</div>
+                        </td>
+                        <td className="px-4 py-4">
+                          <StatusBadge status={tenant.subscription_status} />
+                        </td>
+                        <td className="px-4 py-4">
+                          <span className="text-gray-700">
+                            {tenant.subscription_plan === 'yearly' ? 'Anual' : 
+                             tenant.subscription_plan === 'monthly' ? 'Mensual' : 'Ninguno'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-4 text-xs">
+                          {tenant.subscription_status === 'active' && tenant.subscription_ends_at ? (
+                            <div>
+                              <div className="text-gray-400 mb-1">Suscripción:</div>
+                              <div className="font-medium text-gray-900">
+                                {new Date(tenant.subscription_ends_at).toLocaleDateString('es-AR')}
                               </div>
-                            ) : tenant.trial_ends_at ? (
-                              <div>
-                                <div className="text-gray-400 mb-1">Fin de Trial:</div>
-                                <div className="font-medium text-gray-900">
-                                  {new Date(tenant.trial_ends_at).toLocaleDateString('es-AR')}
-                                </div>
-                              </div>
-                            ) : (
-                              <span className="text-gray-400">N/A</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-4 text-right">
-                            <div className="flex items-center justify-end gap-2">
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                onClick={() => window.open(`/${tenant.slug}/admin`, '_blank')}
-                                className="text-xs"
-                              >
-                                <Eye className="h-3 w-3 mr-1.5" />
-                                Ver
-                              </Button>
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                onClick={() => extendTrial(tenant.id, 7)}
-                                className="text-xs"
-                              >
-                                <PlusCircle className="h-3 w-3 mr-1.5" />
-                                +7 días
-                              </Button>
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                onClick={() => changeStatus(tenant.id, 'active')}
-                                className="text-xs"
-                              >
-                                <CheckCircle className="h-3 w-3 mr-1.5" />
-                                Activar
-                              </Button>
-                              <Button 
-                                variant="destructive" 
-                                size="sm"
-                                onClick={() => deleteTenant(tenant.id)}
-                                className="text-xs"
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
                             </div>
-                          </td>
-                        </tr>
-                      ))}
-                      {filteredTenants.length === 0 && (
-                        <tr>
-                          <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
-                            No se encontraron alojamientos con ese criterio de búsqueda.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
+                          ) : tenant.trial_ends_at ? (
+                            <div>
+                              <div className="text-gray-400 mb-1">Fin de Trial:</div>
+                              <div className="font-medium text-gray-900">
+                                {new Date(tenant.trial_ends_at).toLocaleDateString('es-AR')}
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="text-gray-400">N/A</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-4 text-right">
+                          <div className="flex items-center justify-end gap-2 flex-wrap">
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => window.open(`/${tenant.slug}/admin`, '_blank')}
+                              className="text-xs"
+                            >
+                              <Eye className="h-3 w-3 mr-1.5" />
+                              Ver
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => extendTrial(tenant.id, 7)}
+                              className="text-xs"
+                            >
+                              <PlusCircle className="h-3 w-3 mr-1.5" />
+                              +7 días
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => changeStatus(tenant.id, 'active')}
+                              className="text-xs"
+                            >
+                              <CheckCircle className="h-3 w-3 mr-1.5" />
+                              Activar
+                            </Button>
+                            <Button 
+                              variant="destructive" 
+                              size="sm"
+                              onClick={() => deleteTenant(tenant.id)}
+                              className="text-xs"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                    {filteredTenants.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
+                          No se encontraron alojamientos con ese criterio de búsqueda.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
-          <TabsContent value="finance" className="space-y-6">
+        {/* === PESTAÑA: FINANZAS === */}
+        {activeTab === 'finance' && (
+          <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -644,9 +675,12 @@ export default function SuperadminPage() {
                 </div>
               </CardContent>
             </Card>
-          </TabsContent>
+          </div>
+        )}
 
-          <TabsContent value="settings" className="space-y-6">
+        {/* === PESTAÑA: CONFIGURACIÓN === */}
+        {activeTab === 'settings' && (
+          <div className="space-y-6">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -661,45 +695,25 @@ export default function SuperadminPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-gray-700">Tipo de Cambio USD/ARS</label>
-                    <Input 
-                      type="number" 
-                      defaultValue="1600"
-                      className="h-11"
-                    />
+                    <Input type="number" defaultValue="1600" className="h-11" />
                     <p className="text-xs text-gray-500">Valor actual: 1 USD = 1600 ARS</p>
                   </div>
-
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-gray-700">Plan Mensual (USD)</label>
-                    <Input 
-                      type="number" 
-                      defaultValue="40"
-                      className="h-11"
-                    />
+                    <Input type="number" defaultValue="40" className="h-11" />
                     <p className="text-xs text-gray-500">Precio mensual en dólares</p>
                   </div>
-
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-gray-700">Plan Anual (USD)</label>
-                    <Input 
-                      type="number" 
-                      defaultValue="360"
-                      className="h-11"
-                    />
+                    <Input type="number" defaultValue="360" className="h-11" />
                     <p className="text-xs text-gray-500">Precio anual en dólares (2 meses gratis)</p>
                   </div>
-
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-gray-700">Días de Trial</label>
-                    <Input 
-                      type="number" 
-                      defaultValue="30"
-                      className="h-11"
-                    />
+                    <Input type="number" defaultValue="30" className="h-11" />
                     <p className="text-xs text-gray-500">Período de prueba gratuito</p>
                   </div>
                 </div>
-
                 <div className="pt-4 border-t border-gray-200">
                   <Button className="bg-[#0F766E] hover:bg-[#0D665E]">
                     Guardar Cambios
@@ -723,7 +737,7 @@ export default function SuperadminPage() {
                   <label className="text-sm font-medium text-gray-700">Mensaje</label>
                   <Input 
                     type="text" 
-                    placeholder="Ej: ️ Mantenimiento programado el domingo a las 3 AM"
+                    placeholder="Ej: ⚠️ Mantenimiento programado el domingo a las 3 AM"
                     className="h-11"
                   />
                 </div>
@@ -741,8 +755,8 @@ export default function SuperadminPage() {
                 </Button>
               </CardContent>
             </Card>
-          </TabsContent>
-        </Tabs>
+          </div>
+        )}
       </div>
     </div>
   )
