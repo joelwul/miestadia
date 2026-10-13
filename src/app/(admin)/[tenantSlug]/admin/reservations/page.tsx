@@ -317,7 +317,7 @@ export default function ReservationsPage() {
 
     switch (type) {
       case "reminder":
-        return `¡Hola ${firstName}! 👋\n\nTe recordamos tu próxima reserva en *${tenant.name}*:\n\n📅 Check-in: ${checkIn}\n📅 Check-out: ${checkOut}\n🏠 Unidad: ${unitName}\n🔑 Código: ${code}\n\nAccedé a tu panel de huésped: ${guestPanelUrl}\n\n¡Te esperamos!\n\n— ${tenant.name}`;
+        return `¡Hola ${firstName}! \n\nTe recordamos tu próxima reserva en *${tenant.name}*:\n\n📅 Check-in: ${checkIn}\n📅 Check-out: ${checkOut}\n🏠 Unidad: ${unitName}\n🔑 Código: ${code}\n\nAccedé a tu panel de huésped: ${guestPanelUrl}\n\n¡Te esperamos!\n\n— ${tenant.name}`;
       case "precheckin":
         return `¡Hola ${firstName}! \n\nTu check-in en *${tenant.name}* se acerca (${checkIn}).\n\nPara agilizar tu llegada, completá el pre check-in digital:\n${guestPanelUrl}\n\nAsí llegás directo a tu unidad sin trámites.\n\n— ${tenant.name}`;
       case "during":
@@ -1230,33 +1230,50 @@ export default function ReservationsPage() {
                 />
               </div>
               {getReservationPayments(selectedReservation.id).length > 0 && (
-                <div>
-                  <p className="text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1">
-                    <History className="w-3 h-3" />
-                    Historial de pagos
+                <div className="border-t border-gray-200 pt-4">
+                  <p className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                    <History className="w-4 h-4" />
+                    Historial de pagos ({getReservationPayments(selectedReservation.id).length})
                   </p>
-                  <div className="space-y-2 max-h-40 overflow-y-auto">
-                    {getReservationPayments(selectedReservation.id).map((p) => (
-                      <div key={p.id} className="bg-gray-50 rounded-lg p-3">
-                        <div className="flex items-center justify-between mb-1">
-                          <p className="font-semibold text-gray-900">${p.amount.toLocaleString("es-AR")}</p>
-                          <span className="text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded-full">
-                            {getPaymentMethodLabel(p.method)}
-                          </span>
+                  <div className="space-y-3 max-h-48 overflow-y-auto">
+                    {getReservationPayments(selectedReservation.id).map((p) => {
+                      const paymentDate = new Date(p.date);
+                      const formattedDate = paymentDate.toLocaleDateString("es-AR", {
+                        day: "2-digit",
+                        month: "2-digit",
+                        year: "numeric",
+                      });
+                      const formattedTime = paymentDate.toLocaleTimeString("es-AR", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      });
+                      
+                      return (
+                        <div key={p.id} className="bg-gradient-to-r from-gray-50 to-white border border-gray-200 rounded-lg p-4">
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <DollarSign className="w-4 h-4 text-green-600" />
+                              <p className="font-bold text-lg text-gray-900">${p.amount.toLocaleString("es-AR")}</p>
+                            </div>
+                            <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full font-medium">
+                              {getPaymentMethodLabel(p.method)}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">
+                            <Calendar className="w-3 h-3" />
+                            <span className="font-medium">{formattedDate}</span>
+                            <span className="text-gray-400">•</span>
+                            <Clock className="w-3 h-3" />
+                            <span>{formattedTime} hs</span>
+                          </div>
+                          {p.notes && (
+                            <div className="mt-2 pt-2 border-t border-gray-100">
+                              <p className="text-xs text-gray-600 italic">"{p.notes}"</p>
+                            </div>
+                          )}
                         </div>
-                        <p className="text-xs text-gray-500">
-                          {new Date(p.date).toLocaleDateString("es-AR", {
-                            weekday: "short",
-                            year: "numeric",
-                            month: "short",
-                            day: "numeric",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </p>
-                        {p.notes && <p className="text-xs text-gray-600 mt-1 italic">"{p.notes}"</p>}
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}
