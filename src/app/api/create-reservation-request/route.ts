@@ -1,5 +1,5 @@
 ﻿import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/client";
+import { createClient } from "@supabase/supabase-js";
 
 export async function POST(request: Request) {
   try {
@@ -22,7 +22,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Faltan datos requeridos" }, { status: 400 });
     }
 
-    const supabase = createClient();
+    // Usar service role para evitar problemas de RLS
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
 
     // 1. Obtener tenant y su configuración de timeout
     const { data: tenant } = await supabase
@@ -35,11 +39,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Alojamiento no encontrado" }, { status: 404 });
     }
 
-    // 2. Doble verificación de disponibilidad (prevención de race conditions)
-    const timeoutHours = tenant.reservation_timeout_hours || 24;
-    const expiresAt = new Date();
-    expiresAt.setHours(expiresAt.getHours() + timeoutHours);
-
+    // 2. Doble verificación de disponibilidad
     const { data: conflicts } = await supabase
       .from("reservations")
       .select("id")
@@ -50,12 +50,17 @@ export async function POST(request: Request) {
       .gte("check_out", checkIn);
 
     if (conflicts && conflicts.length > 0) {
-      return NextResponse.json({ 
-        error: "La unidad acaba de ser reservada. Por favor, elegí otras fechas." 
+      return NextResponse.json({
+        error: "La unidad acaba de ser reservada. Por favor, elegí otras fechas."
       }, { status: 409 });
     }
 
-    // 3. Crear la solicitud
+    // 3. Calcular timeout
+    const timeoutHours = tenant.reservation_timeout_hours || 24;
+    const expiresAt = new Date();
+    expiresAt.setHours(expiresAt.getHours() + timeoutHours);
+
+    // 4. Crear la solicitud
     const { data, error } = await supabase
       .from("reservation_requests")
       .insert({
@@ -78,15 +83,13 @@ export async function POST(request: Request) {
 
     if (error) {
       console.error("Error creando solicitud:", error);
-      return NextResponse.json({ error: "No se pudo crear la solicitud" }, { status: 500 });
+      return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    // TODO: Paso 5 - Aquí iremos el envío de emails (al admin y al huésped)
-
-    return NextResponse.json({ 
-      success: true, 
+    return NextResponse.json({
+      success: true,
       message: "Solicitud enviada correctamente",
-      requestId: data.id 
+      requestId: data.id
     });
   } catch (error: any) {
     console.error("Error en create-reservation-request:", error);

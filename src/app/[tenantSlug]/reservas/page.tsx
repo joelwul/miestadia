@@ -12,6 +12,12 @@ import {
   ChevronLeft,
   Shield,
   Clock,
+  X,
+  Package,
+  MapPin,
+  Star,
+  Car,
+  Key,
 } from "lucide-react";
 
 interface Unit {
@@ -22,6 +28,7 @@ interface Unit {
   price_per_night: number;
   description: string;
   photos: { image_url: string; is_primary: boolean }[];
+  inventory?: { category: string; name: string; quantity: number }[];
 }
 
 interface Tenant {
@@ -49,6 +56,8 @@ export default function PublicReservationsPage() {
   const [selectedUnit, setSelectedUnit] = useState<Unit | null>(null);
   const [checkingAvailability, setCheckingAvailability] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [detailModal, setDetailModal] = useState<Unit | null>(null);
+  const [detailPhotoIndex, setDetailPhotoIndex] = useState(0);
   const supabase = createClient();
 
   const [formData, setFormData] = useState({
@@ -59,12 +68,7 @@ export default function PublicReservationsPage() {
     specialRequests: "",
   });
 
-  // Calcular minDate una sola vez
-  const minDate = useMemo(() => {
-    return new Date().toISOString().split("T")[0];
-  }, []);
-
-  // Estilo base para forzar inputs visibles
+  const minDate = useMemo(() => new Date().toISOString().split("T")[0], []);
   const inputStyle = { colorScheme: "light" as const };
   const inputClass =
     "w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-900 bg-white";
@@ -92,17 +96,34 @@ export default function PublicReservationsPage() {
           .eq("status", "active");
 
         if (unitsData) {
-          const unitsWithPhotos = await Promise.all(
+          const unitsWithDetails = await Promise.all(
             unitsData.map(async (unit) => {
               const { data: photos } = await supabase
                 .from("unit_photos")
                 .select("image_url, is_primary")
                 .eq("unit_id", unit.id)
                 .order("order_index");
-              return { ...unit, photos: photos || [] };
+
+              const { data: inventory } = await supabase
+                .from("unit_inventory_items")
+                .select("category, custom_category, name, quantity")
+                .eq("unit_id", unit.id)
+                .order("category");
+
+              const inventoryFormatted = (inventory || []).map((item: any) => ({
+                category: item.custom_category || item.category,
+                name: item.name,
+                quantity: item.quantity,
+              }));
+
+              return {
+                ...unit,
+                photos: photos || [],
+                inventory: inventoryFormatted,
+              };
             })
           );
-          setUnits(unitsWithPhotos);
+          setUnits(unitsWithDetails);
         }
       } catch (err: any) {
         setError("Error al cargar los datos");
@@ -161,6 +182,16 @@ export default function PublicReservationsPage() {
     } finally {
       setCheckingAvailability(false);
     }
+  }
+
+  function openDetailModal(unit: Unit) {
+    setDetailModal(unit);
+    setDetailPhotoIndex(0);
+  }
+
+  function closeDetailModal() {
+    setDetailModal(null);
+    setDetailPhotoIndex(0);
   }
 
   function selectUnit(unit: Unit) {
@@ -226,6 +257,14 @@ export default function PublicReservationsPage() {
     );
   }
 
+  function formatPrice(price: number) {
+    return new Intl.NumberFormat("es-AR", {
+      style: "currency",
+      currency: "ARS",
+      minimumFractionDigits: 0,
+    }).format(price || 0);
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-emerald-100">
@@ -243,9 +282,7 @@ export default function PublicReservationsPage() {
         <div className="text-center max-w-md">
           <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Error</h2>
-          <p className="text-gray-600 mb-6">
-            {error || "Alojamiento no encontrado"}
-          </p>
+          <p className="text-gray-600 mb-6">{error || "Alojamiento no encontrado"}</p>
           <button
             onClick={() => (window.location.href = `/${tenantSlug}`)}
             className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors"
@@ -262,21 +299,15 @@ export default function PublicReservationsPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               {branding.logoUrl && (
-                <img
-                  src={branding.logoUrl}
-                  alt={tenant.name}
-                  className="h-10 w-auto"
-                />
+                <img src={branding.logoUrl} alt={tenant.name} className="h-10 w-auto" />
               )}
               <div>
-                <h1 className="text-xl font-bold text-gray-900">
-                  {tenant.name}
-                </h1>
+                <h1 className="text-xl font-bold text-gray-900">{tenant.name}</h1>
                 <p className="text-sm text-gray-500">Reservas online</p>
               </div>
             </div>
@@ -338,11 +369,8 @@ export default function PublicReservationsPage() {
                     value={guestsCount}
                     onChange={(e) => {
                       const val = parseInt(e.target.value);
-                      if (!isNaN(val) && val >= 1) {
-                        setGuestsCount(val);
-                      } else if (e.target.value === "") {
-                        setGuestsCount(1);
-                      }
+                      if (!isNaN(val) && val >= 1) setGuestsCount(val);
+                      else if (e.target.value === "") setGuestsCount(1);
                     }}
                     min="1"
                     max="20"
@@ -384,18 +412,14 @@ export default function PublicReservationsPage() {
               <ChevronLeft className="w-4 h-4" />
               Cambiar fechas
             </button>
-            <h2 className="text-3xl font-bold text-gray-900">
-              Unidades disponibles
-            </h2>
+            <h2 className="text-3xl font-bold text-gray-900">Unidades disponibles</h2>
             <p className="text-gray-600 mt-2">
               {checkIn && checkOut && (
                 <>
                   {new Date(checkIn).toLocaleDateString("es-AR")} →{" "}
                   {new Date(checkOut).toLocaleDateString("es-AR")} •{" "}
-                  {calculateNights()}{" "}
-                  {calculateNights() === 1 ? "noche" : "noches"} •{" "}
-                  {guestsCount}{" "}
-                  {guestsCount === 1 ? "huésped" : "huéspedes"}
+                  {calculateNights()} {calculateNights() === 1 ? "noche" : "noches"} •{" "}
+                  {guestsCount} {guestsCount === 1 ? "huésped" : "huéspedes"}
                 </>
               )}
             </p>
@@ -422,21 +446,34 @@ export default function PublicReservationsPage() {
               {availableUnits.map((unit) => {
                 const nights = calculateNights();
                 const total = nights * unit.price_per_night;
-                const primaryPhoto =
-                  unit.photos.find((p) => p.is_primary) || unit.photos[0];
+                const primaryPhoto = unit.photos.find((p) => p.is_primary) || unit.photos[0];
 
                 return (
                   <div
                     key={unit.id}
-                    className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow"
+                    className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow cursor-pointer"
+                    onClick={() => openDetailModal(unit)}
                   >
-                    {primaryPhoto && (
+                    {primaryPhoto ? (
                       <div className="relative h-48 bg-gray-200">
                         <img
                           src={primaryPhoto.image_url}
                           alt={unit.name}
                           className="w-full h-full object-cover"
                         />
+                        {unit.type && (
+                          <div className="absolute top-4 right-4 bg-white/90 backdrop-blur px-3 py-1 rounded-full text-sm font-medium text-gray-700">
+                            {unit.type}
+                          </div>
+                        )}
+                        <div className="absolute bottom-4 right-4 bg-green-600 text-white px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1">
+                          <Search className="w-3 h-3" />
+                          Ver detalles
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="relative h-48 bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center">
+                        <Package className="w-12 h-12 text-gray-400" />
                         {unit.type && (
                           <div className="absolute top-4 right-4 bg-white/90 backdrop-blur px-3 py-1 rounded-full text-sm font-medium text-gray-700">
                             {unit.type}
@@ -462,7 +499,7 @@ export default function PublicReservationsPage() {
                       <div className="border-t border-gray-200 pt-4">
                         <div className="flex items-baseline gap-2 mb-4">
                           <span className="text-2xl font-bold text-gray-900">
-                            ${unit.price_per_night.toLocaleString("es-AR")}
+                            {formatPrice(unit.price_per_night)}
                           </span>
                           <span className="text-sm text-gray-500">/ noche</span>
                         </div>
@@ -470,17 +507,19 @@ export default function PublicReservationsPage() {
                           <div className="bg-green-50 rounded-lg p-3 mb-4">
                             <div className="flex items-center justify-between text-sm">
                               <span className="text-gray-600">
-                                {nights} {nights === 1 ? "noche" : "noches"} × $
-                                {unit.price_per_night.toLocaleString("es-AR")}
+                                {nights} {nights === 1 ? "noche" : "noches"} × {formatPrice(unit.price_per_night)}
                               </span>
                               <span className="font-bold text-green-700">
-                                Total: ${total.toLocaleString("es-AR")}
+                                Total: {formatPrice(total)}
                               </span>
                             </div>
                           </div>
                         )}
                         <button
-                          onClick={() => selectUnit(unit)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            selectUnit(unit);
+                          }}
                           className="w-full bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 transition-colors"
                         >
                           Reservar esta unidad
@@ -492,6 +531,177 @@ export default function PublicReservationsPage() {
               })}
             </div>
           )}
+        </div>
+      )}
+
+      {/* MODAL: Detalle de Unidad */}
+      {detailModal && (
+        <div
+          className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 overflow-y-auto"
+          onClick={closeDetailModal}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full my-8 relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Botón cerrar */}
+            <button
+              onClick={closeDetailModal}
+              className="absolute top-4 right-4 z-10 p-2 bg-white/90 hover:bg-white rounded-full shadow-lg transition-colors"
+              aria-label="Cerrar"
+            >
+              <X className="w-6 h-6 text-gray-700" />
+            </button>
+
+            {/* Carrousel de fotos */}
+            {detailModal.photos && detailModal.photos.length > 0 ? (
+              <div className="relative aspect-video bg-gray-200 rounded-t-2xl overflow-hidden">
+                <img
+                  src={detailModal.photos[detailPhotoIndex].image_url}
+                  alt={`${detailModal.name} - Foto ${detailPhotoIndex + 1}`}
+                  className="w-full h-full object-cover"
+                />
+                {detailModal.photos.length > 1 && (
+                  <>
+                    <button
+                      onClick={() =>
+                        setDetailPhotoIndex(
+                          (prev) => (prev - 1 + detailModal.photos.length) % detailModal.photos.length
+                        )
+                      }
+                      className="absolute left-4 top-1/2 -translate-y-1/2 p-2 bg-white/90 hover:bg-white rounded-full shadow-lg"
+                    >
+                      <ChevronLeft className="w-5 h-5 text-gray-700" />
+                    </button>
+                    <button
+                      onClick={() =>
+                        setDetailPhotoIndex((prev) => (prev + 1) % detailModal.photos.length)
+                      }
+                      className="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-white/90 hover:bg-white rounded-full shadow-lg"
+                    >
+                      <ChevronLeft className="w-5 h-5 text-gray-700 rotate-180" />
+                    </button>
+                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
+                      {detailModal.photos.map((_, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => setDetailPhotoIndex(idx)}
+                          className={`w-2 h-2 rounded-full transition-colors ${
+                            idx === detailPhotoIndex ? "bg-white" : "bg-white/50"
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            ) : (
+              <div className="aspect-video bg-gradient-to-br from-gray-200 to-gray-300 rounded-t-2xl flex items-center justify-center">
+                <Package className="w-16 h-16 text-gray-400" />
+              </div>
+            )}
+
+            {/* Contenido */}
+            <div className="p-8">
+              <div className="flex items-start justify-between gap-4 mb-6">
+                <div>
+                  <h2 className="text-3xl font-bold text-gray-900 mb-2">{detailModal.name}</h2>
+                  {detailModal.type && (
+                    <span className="inline-block bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
+                      {detailModal.type}
+                    </span>
+                  )}
+                </div>
+                <div className="text-right">
+                  <div className="text-3xl font-bold text-green-700">
+                    {formatPrice(detailModal.price_per_night)}
+                  </div>
+                  <div className="text-sm text-gray-500">por noche</div>
+                </div>
+              </div>
+
+              {/* Info básica */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg">
+                  <Users className="w-5 h-5 text-green-600" />
+                  <div>
+                    <p className="text-xs text-gray-500">Capacidad</p>
+                    <p className="font-semibold text-gray-900">{detailModal.capacity} personas</p>
+                  </div>
+                </div>
+                {checkIn && checkOut && (
+                  <>
+                    <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg">
+                      <Calendar className="w-5 h-5 text-green-600" />
+                      <div>
+                        <p className="text-xs text-gray-500">Noches</p>
+                        <p className="font-semibold text-gray-900">{calculateNights()}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 p-4 bg-green-50 rounded-lg border border-green-200">
+                      <Star className="w-5 h-5 text-green-600" />
+                      <div>
+                        <p className="text-xs text-green-600">Total estimado</p>
+                        <p className="font-bold text-green-700">
+                          {formatPrice(calculateNights() * detailModal.price_per_night)}
+                        </p>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Descripción */}
+              {detailModal.description && (
+                <div className="mb-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Descripción</h3>
+                  <p className="text-gray-700 leading-relaxed">{detailModal.description}</p>
+                </div>
+              )}
+
+              {/* Inventario */}
+              {detailModal.inventory && detailModal.inventory.length > 0 && (
+                <div className="mb-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                    <Package className="w-5 h-5 text-green-600" />
+                    Qué incluye la unidad
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {detailModal.inventory.map((item, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                      >
+                        <span className="text-sm text-gray-700">{item.name}</span>
+                        <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full font-medium">
+                          x{item.quantity}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Botones */}
+              <div className="flex gap-3 pt-4 border-t border-gray-200">
+                <button
+                  onClick={closeDetailModal}
+                  className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+                >
+                  Cerrar
+                </button>
+                <button
+                  onClick={() => {
+                    closeDetailModal();
+                    selectUnit(detailModal);
+                  }}
+                  className="flex-1 px-6 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors"
+                >
+                  Reservar esta unidad
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
@@ -507,24 +717,16 @@ export default function PublicReservationsPage() {
           </button>
 
           <div className="bg-white rounded-2xl shadow-lg p-8">
-            <h2 className="text-3xl font-bold text-gray-900 mb-2">
-              Completá tus datos
-            </h2>
-            <p className="text-gray-600 mb-8">
-              Enviaremos una confirmación a tu email
-            </p>
+            <h2 className="text-3xl font-bold text-gray-900 mb-2">Completá tus datos</h2>
+            <p className="text-gray-600 mb-8">Enviaremos una confirmación a tu email</p>
 
             {/* Resumen de reserva */}
             <div className="bg-green-50 rounded-lg p-6 mb-8">
-              <h3 className="font-semibold text-gray-900 mb-4">
-                Resumen de tu reserva
-              </h3>
+              <h3 className="font-semibold text-gray-900 mb-4">Resumen de tu reserva</h3>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-gray-600">Unidad:</span>
-                  <span className="font-medium text-gray-900">
-                    {selectedUnit.name}
-                  </span>
+                  <span className="font-medium text-gray-900">{selectedUnit.name}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Check-in:</span>
@@ -540,23 +742,16 @@ export default function PublicReservationsPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Noches:</span>
-                  <span className="font-medium text-gray-900">
-                    {calculateNights()}
-                  </span>
+                  <span className="font-medium text-gray-900">{calculateNights()}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Huéspedes:</span>
-                  <span className="font-medium text-gray-900">
-                    {guestsCount}
-                  </span>
+                  <span className="font-medium text-gray-900">{guestsCount}</span>
                 </div>
                 <div className="border-t border-green-200 pt-2 mt-2 flex justify-between">
                   <span className="font-semibold text-gray-900">Total:</span>
                   <span className="font-bold text-green-700 text-lg">
-                    $
-                    {(
-                      calculateNights() * selectedUnit.price_per_night
-                    ).toLocaleString("es-AR")}
+                    {formatPrice(calculateNights() * selectedUnit.price_per_night)}
                   </span>
                 </div>
               </div>
@@ -570,9 +765,7 @@ export default function PublicReservationsPage() {
                 <input
                   type="text"
                   value={formData.guestName}
-                  onChange={(e) =>
-                    setFormData({ ...formData, guestName: e.target.value })
-                  }
+                  onChange={(e) => setFormData({ ...formData, guestName: e.target.value })}
                   required
                   className={inputClass}
                   style={inputStyle}
@@ -581,15 +774,11 @@ export default function PublicReservationsPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Email *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Email *</label>
                 <input
                   type="email"
                   value={formData.guestEmail}
-                  onChange={(e) =>
-                    setFormData({ ...formData, guestEmail: e.target.value })
-                  }
+                  onChange={(e) => setFormData({ ...formData, guestEmail: e.target.value })}
                   required
                   className={inputClass}
                   style={inputStyle}
@@ -598,15 +787,11 @@ export default function PublicReservationsPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Teléfono
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Teléfono</label>
                 <input
                   type="tel"
                   value={formData.guestPhone}
-                  onChange={(e) =>
-                    setFormData({ ...formData, guestPhone: e.target.value })
-                  }
+                  onChange={(e) => setFormData({ ...formData, guestPhone: e.target.value })}
                   className={inputClass}
                   style={inputStyle}
                   placeholder="011 1234-5678"
@@ -620,9 +805,7 @@ export default function PublicReservationsPage() {
                 <input
                   type="text"
                   value={formData.guestDocument}
-                  onChange={(e) =>
-                    setFormData({ ...formData, guestDocument: e.target.value })
-                  }
+                  onChange={(e) => setFormData({ ...formData, guestDocument: e.target.value })}
                   className={inputClass}
                   style={inputStyle}
                   placeholder="12345678"
@@ -635,12 +818,7 @@ export default function PublicReservationsPage() {
                 </label>
                 <textarea
                   value={formData.specialRequests}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      specialRequests: e.target.value,
-                    })
-                  }
+                  onChange={(e) => setFormData({ ...formData, specialRequests: e.target.value })}
                   rows={3}
                   className={inputClass}
                   style={inputStyle}
@@ -652,13 +830,10 @@ export default function PublicReservationsPage() {
                 <div className="flex items-start gap-3">
                   <Shield className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
                   <div className="text-sm text-blue-800">
-                    <p className="font-medium mb-1">
-                      ¿Cómo funciona la reserva?
-                    </p>
+                    <p className="font-medium mb-1">¿Cómo funciona la reserva?</p>
                     <p>
-                      Tu solicitud será enviada al anfitrión, quien la confirmará
-                      en las próximas 24 horas. Recibirás un email con la
-                      confirmación.
+                      Tu solicitud será enviada al anfitrión, quien la confirmará en las próximas 24
+                      horas. Recibirás un email con la confirmación.
                     </p>
                   </div>
                 </div>
@@ -693,23 +868,17 @@ export default function PublicReservationsPage() {
             <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
               <CheckCircle className="w-12 h-12 text-green-600" />
             </div>
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">
-              ¡Solicitud enviada!
-            </h2>
+            <h2 className="text-3xl font-bold text-gray-900 mb-4">¡Solicitud enviada!</h2>
             <p className="text-lg text-gray-600 mb-8">
-              Tu solicitud de reserva fue recibida. El anfitrión la revisará y te
-              enviará una confirmación por email en las próximas 24 horas.
+              Tu solicitud de reserva fue recibida. El anfitrión la revisará y te enviará una
+              confirmación por email en las próximas 24 horas.
             </p>
             <div className="bg-gray-50 rounded-lg p-6 mb-8 text-left">
-              <h3 className="font-semibold text-gray-900 mb-4">
-                Detalles de tu solicitud
-              </h3>
+              <h3 className="font-semibold text-gray-900 mb-4">Detalles de tu solicitud</h3>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-gray-600">Unidad:</span>
-                  <span className="font-medium text-gray-900">
-                    {selectedUnit?.name}
-                  </span>
+                  <span className="font-medium text-gray-900">{selectedUnit?.name}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Fechas:</span>
@@ -720,9 +889,7 @@ export default function PublicReservationsPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Email:</span>
-                  <span className="font-medium text-gray-900">
-                    {formData.guestEmail}
-                  </span>
+                  <span className="font-medium text-gray-900">{formData.guestEmail}</span>
                 </div>
               </div>
             </div>
@@ -761,11 +928,7 @@ export default function PublicReservationsPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <img
-                src="/mi-estadia-logo.png"
-                alt="Mi Estadía"
-                className="h-8 w-auto"
-              />
+              <img src="/mi-estadia-logo.png" alt="Mi Estadía" className="h-8 w-auto" />
               <span className="text-sm text-gray-600">© 2026 Mi Estadía</span>
             </div>
             <div className="flex items-center gap-4 text-sm text-gray-500">
