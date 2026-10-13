@@ -318,7 +318,7 @@ export default function ReservationsPage() {
 
     switch (type) {
       case "reminder":
-        return `¡Hola ${firstName}! \n\nTe recordamos tu próxima reserva en *${tenant.name}*:\n\n📅 Check-in: ${checkIn}\n📅 Check-out: ${checkOut}\n Unidad: ${unitName}\n🔑 Código: ${code}\n\nAccedé a tu panel de huésped: ${guestPanelUrl}\n\n¡Te esperamos!\n\n— ${tenant.name}`;
+        return `¡Hola ${firstName}! 👋\n\nTe recordamos tu próxima reserva en *${tenant.name}*:\n\n📅 Check-in: ${checkIn}\n📅 Check-out: ${checkOut}\n🏠 Unidad: ${unitName}\n🔑 Código: ${code}\n\nAccedé a tu panel de huésped: ${guestPanelUrl}\n\n¡Te esperamos!\n\n— ${tenant.name}`;
       case "precheckin":
         return `¡Hola ${firstName}! \n\nTu check-in en *${tenant.name}* se acerca (${checkIn}).\n\nPara agilizar tu llegada, completá el pre check-in digital:\n${guestPanelUrl}\n\nAsí llegás directo a tu unidad sin trámites.\n\n— ${tenant.name}`;
       case "during":
@@ -1176,7 +1176,6 @@ export default function ReservationsPage() {
               </button>
             </div>
             <div className="p-6 space-y-4">
-              {/* Resumen de totales */}
               <div className="bg-gray-50 rounded-lg p-4">
                 <div className="grid grid-cols-3 gap-3 text-sm">
                   <div>
@@ -1196,7 +1195,7 @@ export default function ReservationsPage() {
                 </div>
               </div>
 
-              {/* HISTORIAL DE PAGOS - AHORA ARRIBA Y PROMINENTE */}
+              {/* HISTORIAL DE PAGOS */}
               {getReservationPayments(selectedReservation.id).length > 0 && (
                 <div className="border-2 border-green-200 bg-green-50 rounded-lg p-4">
                   <p className="text-sm font-bold text-green-900 mb-3 flex items-center gap-2">
@@ -1215,7 +1214,7 @@ export default function ReservationsPage() {
                         hour: "2-digit",
                         minute: "2-digit",
                       });
-                      
+
                       return (
                         <div key={p.id} className="bg-white border border-green-200 rounded-lg p-3">
                           <div className="flex items-center justify-between mb-1">
