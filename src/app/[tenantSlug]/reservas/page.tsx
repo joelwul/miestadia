@@ -12,7 +12,6 @@ import {
   ChevronLeft,
   Shield,
   Clock,
-  Star,
 } from "lucide-react";
 
 interface Unit {
@@ -64,6 +63,11 @@ export default function PublicReservationsPage() {
   const minDate = useMemo(() => {
     return new Date().toISOString().split("T")[0];
   }, []);
+
+  // Estilo base para forzar inputs visibles
+  const inputStyle = { colorScheme: "light" as const };
+  const inputClass =
+    "w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-900 bg-white";
 
   useEffect(() => {
     async function loadData() {
@@ -217,7 +221,9 @@ export default function PublicReservationsPage() {
     if (!checkIn || !checkOut) return 0;
     const checkInDate = new Date(checkIn);
     const checkOutDate = new Date(checkOut);
-    return Math.ceil((checkOutDate.getTime() - checkInDate.getTime()) / (1000 * 60 * 60 * 24));
+    return Math.ceil(
+      (checkOutDate.getTime() - checkInDate.getTime()) / (1000 * 60 * 60 * 24)
+    );
   }
 
   if (loading) {
@@ -237,7 +243,9 @@ export default function PublicReservationsPage() {
         <div className="text-center max-w-md">
           <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Error</h2>
-          <p className="text-gray-600 mb-6">{error || "Alojamiento no encontrado"}</p>
+          <p className="text-gray-600 mb-6">
+            {error || "Alojamiento no encontrado"}
+          </p>
           <button
             onClick={() => (window.location.href = `/${tenantSlug}`)}
             className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors"
@@ -250,7 +258,6 @@ export default function PublicReservationsPage() {
   }
 
   const branding = tenant.branding || {};
-  const settings = tenant.settings || {};
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -260,10 +267,16 @@ export default function PublicReservationsPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               {branding.logoUrl && (
-                <img src={branding.logoUrl} alt={tenant.name} className="h-10 w-auto" />
+                <img
+                  src={branding.logoUrl}
+                  alt={tenant.name}
+                  className="h-10 w-auto"
+                />
               )}
               <div>
-                <h1 className="text-xl font-bold text-gray-900">{tenant.name}</h1>
+                <h1 className="text-xl font-bold text-gray-900">
+                  {tenant.name}
+                </h1>
                 <p className="text-sm text-gray-500">Reservas online</p>
               </div>
             </div>
@@ -297,7 +310,8 @@ export default function PublicReservationsPage() {
                     value={checkIn}
                     onChange={(e) => setCheckIn(e.target.value)}
                     min={minDate}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-900"
+                    className={inputClass}
+                    style={inputStyle}
                   />
                 </div>
                 <div>
@@ -310,7 +324,8 @@ export default function PublicReservationsPage() {
                     value={checkOut}
                     onChange={(e) => setCheckOut(e.target.value)}
                     min={checkIn || minDate}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-900"
+                    className={inputClass}
+                    style={inputStyle}
                   />
                 </div>
                 <div>
@@ -325,11 +340,14 @@ export default function PublicReservationsPage() {
                       const val = parseInt(e.target.value);
                       if (!isNaN(val) && val >= 1) {
                         setGuestsCount(val);
+                      } else if (e.target.value === "") {
+                        setGuestsCount(1);
                       }
                     }}
                     min="1"
                     max="20"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-900"
+                    className={inputClass}
+                    style={inputStyle}
                   />
                 </div>
               </div>
@@ -374,8 +392,10 @@ export default function PublicReservationsPage() {
                 <>
                   {new Date(checkIn).toLocaleDateString("es-AR")} →{" "}
                   {new Date(checkOut).toLocaleDateString("es-AR")} •{" "}
-                  {calculateNights()} {calculateNights() === 1 ? "noche" : "noches"} •{" "}
-                  {guestsCount} {guestsCount === 1 ? "huésped" : "huéspedes"}
+                  {calculateNights()}{" "}
+                  {calculateNights() === 1 ? "noche" : "noches"} •{" "}
+                  {guestsCount}{" "}
+                  {guestsCount === 1 ? "huésped" : "huéspedes"}
                 </>
               )}
             </p>
@@ -402,7 +422,8 @@ export default function PublicReservationsPage() {
               {availableUnits.map((unit) => {
                 const nights = calculateNights();
                 const total = nights * unit.price_per_night;
-                const primaryPhoto = unit.photos.find((p) => p.is_primary) || unit.photos[0];
+                const primaryPhoto =
+                  unit.photos.find((p) => p.is_primary) || unit.photos[0];
 
                 return (
                   <div
@@ -553,7 +574,8 @@ export default function PublicReservationsPage() {
                     setFormData({ ...formData, guestName: e.target.value })
                   }
                   required
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  className={inputClass}
+                  style={inputStyle}
                   placeholder="Juan Pérez"
                 />
               </div>
@@ -569,7 +591,8 @@ export default function PublicReservationsPage() {
                     setFormData({ ...formData, guestEmail: e.target.value })
                   }
                   required
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  className={inputClass}
+                  style={inputStyle}
                   placeholder="juan@email.com"
                 />
               </div>
@@ -584,7 +607,8 @@ export default function PublicReservationsPage() {
                   onChange={(e) =>
                     setFormData({ ...formData, guestPhone: e.target.value })
                   }
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  className={inputClass}
+                  style={inputStyle}
                   placeholder="011 1234-5678"
                 />
               </div>
@@ -599,7 +623,8 @@ export default function PublicReservationsPage() {
                   onChange={(e) =>
                     setFormData({ ...formData, guestDocument: e.target.value })
                   }
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  className={inputClass}
+                  style={inputStyle}
                   placeholder="12345678"
                 />
               </div>
@@ -617,7 +642,8 @@ export default function PublicReservationsPage() {
                     })
                   }
                   rows={3}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  className={inputClass}
+                  style={inputStyle}
                   placeholder="Viajamos con mascota, necesitamos cuna, etc."
                 />
               </div>
@@ -740,9 +766,7 @@ export default function PublicReservationsPage() {
                 alt="Mi Estadía"
                 className="h-8 w-auto"
               />
-              <span className="text-sm text-gray-600">
-                © 2026 Mi Estadía
-              </span>
+              <span className="text-sm text-gray-600">© 2026 Mi Estadía</span>
             </div>
             <div className="flex items-center gap-4 text-sm text-gray-500">
               <span className="flex items-center gap-1">
