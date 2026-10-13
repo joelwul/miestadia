@@ -1,5 +1,4 @@
 'use client'
-
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -7,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Plus, Edit, Trash2, Save, X, Bed, Package } from 'lucide-react'
+import UnitPhotoUpload from '@/components/admin/UnitPhotoUpload'
 
 interface Props {
   params: Promise<{ tenantSlug: string }>
@@ -21,6 +21,13 @@ interface InventoryItem {
   quantity: number
   description: string | null
   order: number
+}
+
+interface UnitPhoto {
+  id: string
+  image_url: string
+  order_index: number
+  is_primary: boolean
 }
 
 const DEFAULT_CATEGORIES = [
@@ -42,6 +49,7 @@ export default function UnitsPage({ params }: Props) {
   const [editingInventoryId, setEditingInventoryId] = useState<string | null>(null)
   const [customCategories, setCustomCategories] = useState<string[]>([])
   const [newCustomCategory, setNewCustomCategory] = useState('')
+  const [unitPhotos, setUnitPhotos] = useState<UnitPhoto[]>([])
   const supabase = createClient()
 
   const [formData, setFormData] = useState({
@@ -67,13 +75,11 @@ export default function UnitsPage({ params }: Props) {
     const init = async () => {
       const resolvedParams = await params
       setTenantSlug(resolvedParams.tenantSlug)
-
       const { data: tenant } = await supabase
         .from('tenants')
         .select('id')
         .eq('slug', resolvedParams.tenantSlug)
         .single()
-
       if (tenant) {
         setTenantId(tenant.id)
         await loadUnits(tenant.id)
@@ -89,7 +95,6 @@ export default function UnitsPage({ params }: Props) {
       .select('*')
       .eq('tenant_id', tid)
       .order('name')
-
     if (data) setUnits(data)
     setLoading(false)
   }
@@ -100,7 +105,6 @@ export default function UnitsPage({ params }: Props) {
       .select('custom_category')
       .eq('tenant_id', tid)
       .not('custom_category', 'is', null)
-
     if (data) {
       const categories = [...new Set(data.map(item => item.custom_category))]
       setCustomCategories(categories.filter((c): c is string => c !== null))
@@ -114,8 +118,17 @@ export default function UnitsPage({ params }: Props) {
       .eq('unit_id', unitId)
       .order('category')
       .order('order')
-
     if (data) setInventory(data)
+  }
+
+  async function loadUnitPhotos(unitId: string) {
+    const { data } = await supabase
+      .from('unit_photos')
+      .select('*')
+      .eq('unit_id', unitId)
+      .order('order_index')
+    if (data) setUnitPhotos(data)
+    else setUnitPhotos([])
   }
 
   function resetForm() {
@@ -127,11 +140,12 @@ export default function UnitsPage({ params }: Props) {
       price_per_night: 0,
       status: 'active',
     })
+    setUnitPhotos([])
     setEditingId(null)
     setShowForm(false)
   }
 
-  function handleEdit(unit: any) {
+  async function handleEdit(unit: any) {
     setFormData({
       name: unit.name || '',
       type: unit.type || '',
@@ -142,6 +156,7 @@ export default function UnitsPage({ params }: Props) {
     })
     setEditingId(unit.id)
     setShowForm(true)
+    await loadUnitPhotos(unit.id)
   }
 
   async function handleSave() {
@@ -149,7 +164,6 @@ export default function UnitsPage({ params }: Props) {
       alert('El nombre es obligatorio')
       return
     }
-
     const unitData = {
       tenant_id: tenantId,
       name: formData.name,
@@ -159,7 +173,6 @@ export default function UnitsPage({ params }: Props) {
       price_per_night: formData.price_per_night,
       status: formData.status,
     }
-
     let result
     if (editingId) {
       result = await supabase
@@ -171,7 +184,6 @@ export default function UnitsPage({ params }: Props) {
         .from('units')
         .insert(unitData)
     }
-
     if (result.error) {
       alert('Error: ' + result.error.message)
     } else {
@@ -182,12 +194,10 @@ export default function UnitsPage({ params }: Props) {
 
   async function handleDelete(id: string) {
     if (!confirm('¿Eliminar esta unidad?')) return
-    
     await supabase
       .from('units')
       .delete()
       .eq('id', id)
-    
     await loadUnits(tenantId)
   }
 
@@ -234,7 +244,6 @@ export default function UnitsPage({ params }: Props) {
       alert('Nombre y categoría son obligatorios')
       return
     }
-
     const itemData = {
       tenant_id: tenantId,
       unit_id: inventoryFormData.unit_id,
@@ -245,7 +254,6 @@ export default function UnitsPage({ params }: Props) {
       description: inventoryFormData.description || null,
       order: inventoryFormData.order,
     }
-
     let result
     if (editingInventoryId) {
       result = await supabase
@@ -257,7 +265,6 @@ export default function UnitsPage({ params }: Props) {
         .from('unit_inventory_items')
         .insert(itemData)
     }
-
     if (result.error) {
       alert('Error: ' + result.error.message)
     } else {
@@ -269,12 +276,10 @@ export default function UnitsPage({ params }: Props) {
 
   async function handleDeleteInventory(id: string) {
     if (!confirm('¿Eliminar este item?')) return
-    
     await supabase
       .from('unit_inventory_items')
       .delete()
       .eq('id', id)
-    
     await loadInventory(showInventory!)
   }
 
@@ -351,6 +356,23 @@ export default function UnitsPage({ params }: Props) {
                 </select>
               </div>
             </div>
+
+            {/* SECCIÓN DE FOTOS */}
+            {editingId && (
+              <div className="border-t border-gray-200 pt-4">
+                <UnitPhotoUpload
+                  unitId={editingId}
+                  existingPhotos={unitPhotos}
+                  onPhotosUpdate={(photos) => setUnitPhotos(photos)}
+                />
+              </div>
+            )}
+            {!editingId && (
+              <div className="border-t border-gray-200 pt-4">
+                <p className="text-sm text-gray-500 italic">Guardá la unidad primero para poder subir fotos.</p>
+              </div>
+            )}
+
             <div className="flex gap-2">
               <Button onClick={handleSave}>
                 <Save className="mr-2 h-4 w-4" />
@@ -389,7 +411,7 @@ export default function UnitsPage({ params }: Props) {
                       <p className="text-sm text-gray-600 mt-1">{unit.description}</p>
                     )}
                     <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
-                      <span>👥 Capacidad: {unit.capacity}</span>
+                      <span> Capacidad: {unit.capacity}</span>
                       {unit.price_per_night > 0 && <span>💰 ${unit.price_per_night}/noche</span>}
                     </div>
                   </div>
@@ -418,7 +440,6 @@ export default function UnitsPage({ params }: Props) {
                       Agregar Item
                     </Button>
                   </div>
-
                   {showInventoryForm && (
                     <Card className="mb-4 bg-gray-50">
                       <CardContent className="p-4 space-y-3">
@@ -493,7 +514,6 @@ export default function UnitsPage({ params }: Props) {
                       </CardContent>
                     </Card>
                   )}
-
                   {inventory.length === 0 ? (
                     <p className="text-center text-gray-500 py-8">No hay items en el inventario</p>
                   ) : (
