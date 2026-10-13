@@ -50,6 +50,7 @@ interface Unit {
 
 interface Payment {
   id: string;
+  reservation_id: string;
   amount: number;
   method: string;
   date: string;
@@ -317,7 +318,7 @@ export default function ReservationsPage() {
 
     switch (type) {
       case "reminder":
-        return `¡Hola ${firstName}! \n\nTe recordamos tu próxima reserva en *${tenant.name}*:\n\n📅 Check-in: ${checkIn}\n📅 Check-out: ${checkOut}\n🏠 Unidad: ${unitName}\n🔑 Código: ${code}\n\nAccedé a tu panel de huésped: ${guestPanelUrl}\n\n¡Te esperamos!\n\n— ${tenant.name}`;
+        return `¡Hola ${firstName}! \n\nTe recordamos tu próxima reserva en *${tenant.name}*:\n\n📅 Check-in: ${checkIn}\n📅 Check-out: ${checkOut}\n Unidad: ${unitName}\n🔑 Código: ${code}\n\nAccedé a tu panel de huésped: ${guestPanelUrl}\n\n¡Te esperamos!\n\n— ${tenant.name}`;
       case "precheckin":
         return `¡Hola ${firstName}! \n\nTu check-in en *${tenant.name}* se acerca (${checkIn}).\n\nPara agilizar tu llegada, completá el pre check-in digital:\n${guestPanelUrl}\n\nAsí llegás directo a tu unidad sin trámites.\n\n— ${tenant.name}`;
       case "during":
@@ -523,6 +524,7 @@ export default function ReservationsPage() {
         setPayments([
           {
             id: newPayment.id,
+            reservation_id: newPayment.reservation_id,
             amount: newPayment.amount,
             method: newPayment.payment_method,
             date: newPayment.payment_date,
@@ -1174,6 +1176,7 @@ export default function ReservationsPage() {
               </button>
             </div>
             <div className="p-6 space-y-4">
+              {/* Resumen de totales */}
               <div className="bg-gray-50 rounded-lg p-4">
                 <div className="grid grid-cols-3 gap-3 text-sm">
                   <div>
@@ -1192,50 +1195,15 @@ export default function ReservationsPage() {
                   </div>
                 </div>
               </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Monto a pagar</label>
-                <input
-                  type="number"
-                  value={paymentData.amount}
-                  onChange={(e) => setPaymentData({ ...paymentData, amount: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
-                  placeholder="0"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Máximo permitido: $
-                  {Math.max(0, (selectedReservation.total_amount || 0) - (selectedReservation.paid_amount || 0))}
-                </p>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Método de pago</label>
-                <select
-                  value={paymentData.method}
-                  onChange={(e) => setPaymentData({ ...paymentData, method: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
-                >
-                  <option value="cash">Efectivo</option>
-                  <option value="transfer">Transferencia</option>
-                  <option value="card">Tarjeta</option>
-                  <option value="mercadopago">Mercado Pago</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Notas (opcional)</label>
-                <textarea
-                  value={paymentData.notes}
-                  onChange={(e) => setPaymentData({ ...paymentData, notes: e.target.value })}
-                  rows={2}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
-                  placeholder="Observaciones..."
-                />
-              </div>
+
+              {/* HISTORIAL DE PAGOS - AHORA ARRIBA Y PROMINENTE */}
               {getReservationPayments(selectedReservation.id).length > 0 && (
-                <div className="border-t border-gray-200 pt-4">
-                  <p className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                <div className="border-2 border-green-200 bg-green-50 rounded-lg p-4">
+                  <p className="text-sm font-bold text-green-900 mb-3 flex items-center gap-2">
                     <History className="w-4 h-4" />
                     Historial de pagos ({getReservationPayments(selectedReservation.id).length})
                   </p>
-                  <div className="space-y-3 max-h-48 overflow-y-auto">
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
                     {getReservationPayments(selectedReservation.id).map((p) => {
                       const paymentDate = new Date(p.date);
                       const formattedDate = paymentDate.toLocaleDateString("es-AR", {
@@ -1249,17 +1217,17 @@ export default function ReservationsPage() {
                       });
                       
                       return (
-                        <div key={p.id} className="bg-gradient-to-r from-gray-50 to-white border border-gray-200 rounded-lg p-4">
-                          <div className="flex items-start justify-between mb-2">
+                        <div key={p.id} className="bg-white border border-green-200 rounded-lg p-3">
+                          <div className="flex items-center justify-between mb-1">
                             <div className="flex items-center gap-2">
                               <DollarSign className="w-4 h-4 text-green-600" />
-                              <p className="font-bold text-lg text-gray-900">${p.amount.toLocaleString("es-AR")}</p>
+                              <p className="font-bold text-green-900">${p.amount.toLocaleString("es-AR")}</p>
                             </div>
-                            <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full font-medium">
+                            <span className="text-xs bg-green-200 text-green-800 px-2 py-1 rounded-full font-medium">
                               {getPaymentMethodLabel(p.method)}
                             </span>
                           </div>
-                          <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">
+                          <div className="flex items-center gap-2 text-xs text-gray-600">
                             <Calendar className="w-3 h-3" />
                             <span className="font-medium">{formattedDate}</span>
                             <span className="text-gray-400">•</span>
@@ -1267,9 +1235,7 @@ export default function ReservationsPage() {
                             <span>{formattedTime} hs</span>
                           </div>
                           {p.notes && (
-                            <div className="mt-2 pt-2 border-t border-gray-100">
-                              <p className="text-xs text-gray-600 italic">"{p.notes}"</p>
-                            </div>
+                            <p className="text-xs text-gray-600 mt-1 italic">"{p.notes}"</p>
                           )}
                         </div>
                       );
@@ -1277,6 +1243,48 @@ export default function ReservationsPage() {
                   </div>
                 </div>
               )}
+
+              {/* Formulario de nuevo pago */}
+              <div className="border-t border-gray-200 pt-4">
+                <p className="text-sm font-semibold text-gray-700 mb-3">Nuevo pago</p>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Monto a pagar</label>
+                  <input
+                    type="number"
+                    value={paymentData.amount}
+                    onChange={(e) => setPaymentData({ ...paymentData, amount: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
+                    placeholder="0"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Máximo permitido: $
+                    {Math.max(0, (selectedReservation.total_amount || 0) - (selectedReservation.paid_amount || 0))}
+                  </p>
+                </div>
+                <div className="mt-3">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Método de pago</label>
+                  <select
+                    value={paymentData.method}
+                    onChange={(e) => setPaymentData({ ...paymentData, method: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
+                  >
+                    <option value="cash">Efectivo</option>
+                    <option value="transfer">Transferencia</option>
+                    <option value="card">Tarjeta</option>
+                    <option value="mercadopago">Mercado Pago</option>
+                  </select>
+                </div>
+                <div className="mt-3">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Notas (opcional)</label>
+                  <textarea
+                    value={paymentData.notes}
+                    onChange={(e) => setPaymentData({ ...paymentData, notes: e.target.value })}
+                    rows={2}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
+                    placeholder="Observaciones..."
+                  />
+                </div>
+              </div>
             </div>
             <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
               <button
