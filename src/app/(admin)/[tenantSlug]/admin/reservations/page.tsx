@@ -616,14 +616,17 @@ export default function ReservationsPage() {
       if (error) throw error;
 
       if (paid > 0) {
-        await supabase.from("reservation_payments").insert({
-          tenant_id: tenant!.id,
-          reservation_id: (await supabase.from("reservations").select("id").eq("reservation_code", reservationCode).single()).data?.id,
-          amount: paid,
-          payment_method: formData.payment_method,
-          payment_date: new Date().toISOString(),
-          notes: "Pago inicial al crear reserva",
-        });
+        const { data: newRes } = await supabase.from("reservations").select("id").eq("reservation_code", reservationCode).single();
+        if (newRes) {
+          await supabase.from("reservation_payments").insert({
+            tenant_id: tenant!.id,
+            reservation_id: newRes.id,
+            amount: paid,
+            payment_method: formData.payment_method,
+            payment_date: new Date().toISOString(),
+            notes: "Pago inicial al crear reserva",
+          });
+        }
       }
 
       const { data: newRes } = await supabase.from("reservations").select("*").eq("reservation_code", reservationCode).single();
