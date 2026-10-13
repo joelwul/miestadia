@@ -1,5 +1,5 @@
 ﻿"use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useParams } from "next/navigation";
 import {
@@ -10,13 +10,9 @@ import {
   Loader2,
   AlertCircle,
   ChevronLeft,
-  ChevronRight,
-  Home,
-  DollarSign,
-  Clock,
   Shield,
+  Clock,
   Star,
-  MapPin,
 } from "lucide-react";
 
 interface Unit {
@@ -33,13 +29,8 @@ interface Tenant {
   id: string;
   name: string;
   slug: string;
-  description: string;
-  logo_url: string;
-}
-
-interface Photo {
-  image_url: string;
-  is_primary?: boolean;
+  settings?: any;
+  branding?: any;
 }
 
 type Step = "dates" | "units" | "form" | "success";
@@ -59,7 +50,6 @@ export default function PublicReservationsPage() {
   const [selectedUnit, setSelectedUnit] = useState<Unit | null>(null);
   const [checkingAvailability, setCheckingAvailability] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [requestId, setRequestId] = useState("");
   const supabase = createClient();
 
   const [formData, setFormData] = useState({
@@ -69,6 +59,11 @@ export default function PublicReservationsPage() {
     guestDocument: "",
     specialRequests: "",
   });
+
+  // Calcular minDate una sola vez
+  const minDate = useMemo(() => {
+    return new Date().toISOString().split("T")[0];
+  }, []);
 
   useEffect(() => {
     async function loadData() {
@@ -210,7 +205,6 @@ export default function PublicReservationsPage() {
         throw new Error(data.error || "Error al crear la solicitud");
       }
 
-      setRequestId(data.requestId);
       setStep("success");
     } catch (err: any) {
       alert(err.message);
@@ -245,7 +239,7 @@ export default function PublicReservationsPage() {
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Error</h2>
           <p className="text-gray-600 mb-6">{error || "Alojamiento no encontrado"}</p>
           <button
-            onClick={() => window.location.href = `/${tenantSlug}`}
+            onClick={() => (window.location.href = `/${tenantSlug}`)}
             className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors"
           >
             Volver al inicio
@@ -255,6 +249,9 @@ export default function PublicReservationsPage() {
     );
   }
 
+  const branding = tenant.branding || {};
+  const settings = tenant.settings || {};
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -262,8 +259,8 @@ export default function PublicReservationsPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              {tenant.logo_url && (
-                <img src={tenant.logo_url} alt={tenant.name} className="h-10 w-auto" />
+              {branding.logoUrl && (
+                <img src={branding.logoUrl} alt={tenant.name} className="h-10 w-auto" />
               )}
               <div>
                 <h1 className="text-xl font-bold text-gray-900">{tenant.name}</h1>
@@ -271,7 +268,7 @@ export default function PublicReservationsPage() {
               </div>
             </div>
             <button
-              onClick={() => window.location.href = `/${tenantSlug}`}
+              onClick={() => (window.location.href = `/${tenantSlug}`)}
               className="text-sm text-gray-600 hover:text-gray-900"
             >
               ← Volver al inicio
@@ -299,8 +296,8 @@ export default function PublicReservationsPage() {
                     type="date"
                     value={checkIn}
                     onChange={(e) => setCheckIn(e.target.value)}
-                    min={new Date().toISOString().split("T")[0]}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    min={minDate}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-900"
                   />
                 </div>
                 <div>
@@ -312,8 +309,8 @@ export default function PublicReservationsPage() {
                     type="date"
                     value={checkOut}
                     onChange={(e) => setCheckOut(e.target.value)}
-                    min={checkIn || new Date().toISOString().split("T")[0]}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    min={checkIn || minDate}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-900"
                   />
                 </div>
                 <div>
@@ -324,10 +321,15 @@ export default function PublicReservationsPage() {
                   <input
                     type="number"
                     value={guestsCount}
-                    onChange={(e) => setGuestsCount(parseInt(e.target.value) || 1)}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value);
+                      if (!isNaN(val) && val >= 1) {
+                        setGuestsCount(val);
+                      }
+                    }}
                     min="1"
                     max="20"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-900"
                   />
                 </div>
               </div>
