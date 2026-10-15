@@ -14,6 +14,7 @@ import {
   FileText,
   Package,
   CreditCard,
+  Clock,
 } from 'lucide-react'
 
 interface Props {
@@ -32,7 +33,7 @@ export default async function AdminLayout({ children, params }: Props) {
 
   const { data: tenantUser } = await supabase
     .from('tenant_users')
-    .select('*, tenants(name)')
+    .select('*, tenants(id, name)')
     .eq('user_id', user.id)
     .eq('tenants.slug', tenantSlug)
     .single()
@@ -51,8 +52,26 @@ export default async function AdminLayout({ children, params }: Props) {
     )
   }
 
+  // Contar solicitudes pendientes
+  let pendingRequests = 0
+  if (tenantUser.tenants?.id) {
+    const { count } = await supabase
+      .from('reservation_requests')
+      .select('*', { count: 'exact', head: true })
+      .eq('tenant_id', tenantUser.tenants.id)
+      .eq('status', 'pending')
+    
+    pendingRequests = count || 0
+  }
+
   const navigation = [
     { name: 'Dashboard', href: `/${tenantSlug}/admin`, icon: LayoutDashboard },
+    { 
+      name: 'Solicitudes', 
+      href: `/${tenantSlug}/admin/requests`, 
+      icon: Clock,
+      badge: pendingRequests > 0 ? pendingRequests : null
+    },
     { name: 'Reservas', href: `/${tenantSlug}/admin/reservations`, icon: Calendar },
     { name: 'Pre-Checkins', href: `/${tenantSlug}/admin/pre-checkins`, icon: CheckCircle },
     { name: 'Huéspedes', href: `/${tenantSlug}/admin/guests`, icon: Users },
@@ -80,16 +99,26 @@ export default async function AdminLayout({ children, params }: Props) {
             <p className="text-xs text-gray-500">Panel de administración</p>
           </div>
           <nav className="flex-1 space-y-1 px-3 py-4 overflow-y-auto">
-            {navigation.map((item) => (
-              <Link
-                key={item.name}
-                href={item.href}
-                className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors"
-              >
-                <item.icon className="h-5 w-5" />
-                {item.name}
-              </Link>
-            ))}
+            {navigation.map((item) => {
+              const Icon = item.icon
+              return (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  className="flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <Icon className="h-5 w-5" />
+                    {item.name}
+                  </div>
+                  {item.badge && (
+                    <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded-full text-xs font-bold">
+                      {item.badge}
+                    </span>
+                  )}
+                </Link>
+              )
+            })}
           </nav>
           <div className="border-t border-gray-200 p-3">
             <Link
