@@ -14,6 +14,7 @@ import {
   FileText,
   Package,
   CreditCard,
+  Code,
   Clock,
 } from 'lucide-react'
 
@@ -82,6 +83,7 @@ export default async function AdminLayout({ children, params }: Props) {
     { name: 'Mensajes', href: `/${tenantSlug}/admin/messages`, icon: MessageSquare },
     { name: 'Servicios', href: `/${tenantSlug}/admin/services`, icon: Package },
     { name: 'Pagos y Suscripción', href: `/${tenantSlug}/admin/billing`, icon: CreditCard },
+    { name: 'Código para tu web', href: `/${tenantSlug}/admin/embed`, icon: Code },
     { name: 'Configuración', href: `/${tenantSlug}/admin/settings`, icon: Settings },
   ]
 
