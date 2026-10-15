@@ -159,11 +159,11 @@ export default function LandingConfigPage() {
   }
 
   const tabs = [
-    { id: "hero", label: "Hero", icon: Image },
+    { id: "hero", label: "Hero", icon: ImageIcon },
     { id: "about", label: "Sobre nosotros", icon: Type },
     { id: "services", label: "Servicios", icon: Star },
     { id: "amenities", label: "Comodidades", icon: Settings },
-    { id: "gallery", label: "Galería", icon: Image },
+    { id: "gallery", label: "Galería", icon: ImageIcon },
     { id: "policies", label: "Políticas", icon: Type },
     { id: "nearby", label: "Alrededores", icon: MapPin },
   ];
@@ -217,7 +217,7 @@ export default function LandingConfigPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Image className="w-5 h-5" />
+              <ImageIcon className="w-5 h-5" />
               Sección Hero (parte superior)
             </CardTitle>
           </CardHeader>
@@ -447,7 +447,7 @@ export default function LandingConfigPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Image className="w-5 h-5" />
+              <ImageIcon className="w-5 h-5" />
               Galería de fotos
             </CardTitle>
           </CardHeader>
