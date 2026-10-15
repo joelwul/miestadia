@@ -16,6 +16,7 @@ import {
   CreditCard,
   Code,
   Clock,
+  Globe,
 } from 'lucide-react'
 
 interface Props {
@@ -53,7 +54,6 @@ export default async function AdminLayout({ children, params }: Props) {
     )
   }
 
-  // Contar solicitudes pendientes
   let pendingRequests = 0
   if (tenantUser.tenants?.id) {
     const { count } = await supabase
@@ -61,15 +61,14 @@ export default async function AdminLayout({ children, params }: Props) {
       .select('*', { count: 'exact', head: true })
       .eq('tenant_id', tenantUser.tenants.id)
       .eq('status', 'pending')
-    
     pendingRequests = count || 0
   }
 
   const navigation = [
     { name: 'Dashboard', href: `/${tenantSlug}/admin`, icon: LayoutDashboard },
-    { 
-      name: 'Solicitudes', 
-      href: `/${tenantSlug}/admin/requests`, 
+    {
+      name: 'Solicitudes',
+      href: `/${tenantSlug}/admin/requests`,
       icon: Clock,
       badge: pendingRequests > 0 ? pendingRequests : null
     },
@@ -84,6 +83,7 @@ export default async function AdminLayout({ children, params }: Props) {
     { name: 'Servicios', href: `/${tenantSlug}/admin/services`, icon: Package },
     { name: 'Pagos y Suscripción', href: `/${tenantSlug}/admin/billing`, icon: CreditCard },
     { name: 'Código para tu web', href: `/${tenantSlug}/admin/embed`, icon: Code },
+    { name: 'Configurar Landing', href: `/${tenantSlug}/admin/landing`, icon: Globe },
     { name: 'Configuración', href: `/${tenantSlug}/admin/settings`, icon: Settings },
   ]
 
@@ -139,5 +139,5 @@ export default async function AdminLayout({ children, params }: Props) {
         </main>
       </div>
     </div>
-  ) 
+  )
 }
