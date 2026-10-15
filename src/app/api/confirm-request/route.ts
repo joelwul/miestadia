@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
 // ============================================
-// FUNCIONES AUXILIARES (AL PRINCIPIO)
+// FUNCIONES AUXILIARES
 // ============================================
 
 function generateCode(slug: string): string {
@@ -30,11 +30,20 @@ function formatDate(dateStr: string): string {
   });
 }
 
-async function sendEmail(
-  to: string,
-  subject: string,
-  html: string
-): Promise<void> {
+function getLastName(fullName: string): string {
+  const parts = fullName.trim().split(/\s+/);
+  return parts.length > 1 ? parts[parts.length - 1] : fullName;
+}
+
+function buildGuestPanelUrl(tenantSlug: string, reservationCode: string, lastName: string): string {
+  return `https://miestadia.online/${tenantSlug}?code=${reservationCode}&lastName=${encodeURIComponent(lastName)}`;
+}
+
+function buildQrCodeUrl(data: string): string {
+  return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(data)}`;
+}
+
+async function sendEmail(to: string, subject: string, html: string): Promise<void> {
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
@@ -60,6 +69,7 @@ async function sendConfirmationEmail(
   guestEmail: string,
   guestName: string,
   tenantName: string,
+  tenantSlug: string,
   unitName: string,
   checkIn: string,
   checkOut: string,
@@ -68,6 +78,10 @@ async function sendConfirmationEmail(
   reservationCode: string,
   adminNotes: string | null
 ): Promise<void> {
+  const lastName = getLastName(guestName);
+  const guestPanelUrl = buildGuestPanelUrl(tenantSlug, reservationCode, lastName);
+  const qrCodeUrl = buildQrCodeUrl(guestPanelUrl);
+
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
       <div style="background: linear-gradient(135deg, #059669 0%, #047857 100%); padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
@@ -79,7 +93,7 @@ async function sendConfirmationEmail(
           Hola <strong>${guestName}</strong>, tu reserva fue confirmada.
         </p>
         <div style="background: #f0fdf4; border-left: 4px solid #059669; padding: 16px; margin-bottom: 20px; border-radius: 4px;">
-          <p style="margin: 6px 0;"><strong>Código:</strong> ${reservationCode}</p>
+          <p style="margin: 6px 0;"><strong>Código de reserva:</strong> ${reservationCode}</p>
           <p style="margin: 6px 0;"><strong>Unidad:</strong> ${unitName}</p>
           <p style="margin: 6px 0;"><strong>Check-in:</strong> ${formatDate(checkIn)}</p>
           <p style="margin: 6px 0;"><strong>Check-out:</strong> ${formatDate(checkOut)}</p>
@@ -87,6 +101,34 @@ async function sendConfirmationEmail(
           <p style="margin: 6px 0;"><strong>Total:</strong> ${formatMoney(totalAmount)}</p>
         </div>
         ${adminNotes ? `<div style="background: #eff6ff; padding: 16px; border-radius: 4px; margin-bottom: 20px;"><p style="margin: 0;"><strong>Mensaje del anfitrión:</strong> ${adminNotes}</p></div>` : ""}
+        
+        <!-- PANEL DEL HUÉSPED + QR -->
+        <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 20px; border-radius: 4px; margin-bottom: 20px; text-align: center;">
+          <h3 style="margin: 0 0 12px 0; color: #92400e; font-size: 18px;">📱 Tu panel de huésped</h3>
+          <p style="margin: 0 0 16px 0; color: #78350f; font-size: 14px;">
+            Accedé a tu panel personal para ver toda la información de tu estadía, clima, inventario y más.
+          </p>
+          
+          <!-- QR Code -->
+          <div style="background: white; padding: 16px; border-radius: 8px; display: inline-block; margin-bottom: 16px;">
+            <img src="${qrCodeUrl}" alt="QR Code" style="width: 200px; height: 200px; display: block;" />
+            <p style="margin: 8px 0 0 0; font-size: 12px; color: #6b7280;">Escaneá este código para acceder</p>
+          </div>
+          
+          <br/>
+          
+          <!-- Botón de acceso -->
+          <a href="${guestPanelUrl}" 
+             style="background: #059669; color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; display: inline-block; margin-top: 12px;">
+            Acceder a mi panel →
+          </a>
+          
+          <p style="margin: 12px 0 0 0; font-size: 12px; color: #92400e;">
+            <strong>URL directa:</strong><br/>
+            <a href="${guestPanelUrl}" style="color: #059669; word-break: break-all;">${guestPanelUrl}</a>
+          </p>
+        </div>
+
         <p style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; font-size: 12px; color: #9ca3af; text-align: center;">
           Enviado por Mi Estadía
         </p>
@@ -280,12 +322,13 @@ export async function POST(request: Request) {
         })
         .eq("id", requestId);
 
-      // Enviar email
+      // Enviar email con QR y link al panel
       try {
         await sendConfirmationEmail(
           requestData.guest_email,
           requestData.guest_name,
           tenant.name,
+          tenant.slug,
           unit.name,
           requestData.check_in,
           requestData.check_out,
