@@ -19,7 +19,7 @@ export async function POST(request: Request) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
-    // 1. Obtener la solicitud con todos los datos relacionados
+    // 1. Obtener la solicitud con datos relacionados
     const { data: request, error: requestError } = await supabase
       .from("reservation_requests")
       .select(`
@@ -31,11 +31,13 @@ export async function POST(request: Request) {
       .single();
 
     if (requestError || !request) {
+      console.error("Error obteniendo solicitud:", requestError);
       return NextResponse.json({ error: "Solicitud no encontrada" }, { status: 404 });
     }
 
-    // 2. Verificar que no haya conflictos (solo para confirmación)
+    // 2. Si se confirma, crear el huésped primero y luego la reserva
     if (action === "confirmed") {
+      // Verificar disponibilidad una última vez
       const { data: conflicts } = await supabase
         .from("reservations")
         .select("id")
@@ -50,40 +52,63 @@ export async function POST(request: Request) {
           error: "Hay una reserva confirmada en esas fechas. No se puede confirmar la solicitud.",
         }, { status: 409 });
       }
-    }
 
-    // 3. Actualizar la solicitud
-    const updateData: any = {
-      status: action,
-      admin_notes: adminNotes || rejectionReason || null,
-    };
+      // Crear o buscar huésped por email
+      let guestId = null;
 
-    if (action === "confirmed") {
-      updateData.confirmed_at = new Date().toISOString();
-    } else {
-      updateData.rejected_at = new Date().toISOString();
-    }
+      if (request.guest_email) {
+        const { data: existingGuest } = await supabase
+          .from("guests")
+          .select("id")
+          .eq("tenant_id", request.tenant_id)
+          .eq("email", request.guest_email)
+          .maybeSingle();
 
-    const { error: updateError } = await supabase
-      .from("reservation_requests")
-      .update(updateData)
-      .eq("id", requestId);
+        if (existingGuest) {
+          guestId = existingGuest.id;
+        } else {
+          // Crear nuevo huésped
+          const nameParts = (request.guest_name || "").split(" ");
+          const firstName = nameParts[0] || "Huésped";
+          const lastName = nameParts.slice(1).join(" ") || "";
 
-    if (updateError) {
-      console.error("Error actualizando solicitud:", updateError);
-      return NextResponse.json({ error: "Error al actualizar la solicitud" }, { status: 500 });
-    }
+          const { data: newGuest, error: guestError } = await supabase
+            .from("guests")
+            .insert({
+              tenant_id: request.tenant_id,
+              first_name: firstName,
+              last_name: lastName,
+              email: request.guest_email,
+              phone: request.guest_phone || null,
+              document_number: request.guest_document || null,
+            })
+            .select("id")
+            .single();
 
-    // 4. Si se confirma, crear la reserva real
-    if (action === "confirmed") {
-      const reservationCode = generateReservationCode(request.tenants.slug);
-      
+          if (guestError) {
+            console.error("Error creando huésped:", guestError);
+            return NextResponse.json({ error: "Error al crear el huésped" }, { status: 500 });
+          }
+
+          guestId = newGuest.id;
+        }
+      }
+
+      // Generar código de reserva
+      const tenantSlug = request.tenants?.slug || "RES";
+      const prefix = tenantSlug.substring(0, 3).toUpperCase();
+      const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+      let code = "";
+      for (let i = 0; i < 5; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
+      const reservationCode = `${prefix}-${code}`;
+
+      // Crear la reserva con el guest_id ya definido
       const { data: newReservation, error: reservationError } = await supabase
         .from("reservations")
         .insert({
           tenant_id: request.tenant_id,
           reservation_code: reservationCode,
-          guest_id: null, // Se creará el huésped si no existe
+          guest_id: guestId,
           unit_id: request.unit_id,
           check_in: request.check_in,
           check_out: request.check_out,
@@ -99,234 +124,176 @@ export async function POST(request: Request) {
 
       if (reservationError) {
         console.error("Error creando reserva:", reservationError);
-        return NextResponse.json({ error: "Error al crear la reserva" }, { status: 500 });
+        return NextResponse.json({ 
+          error: "Error al crear la reserva: " + reservationError.message 
+        }, { status: 500 });
       }
 
-      // Crear huésped si no existe (buscar por email)
-      if (request.guest_email) {
-        const { data: existingGuest } = await supabase
-          .from("guests")
-          .select("id")
-          .eq("tenant_id", request.tenant_id)
-          .eq("email", request.guest_email)
-          .single();
+      // Actualizar la solicitud
+      const { error: updateError } = await supabase
+        .from("reservation_requests")
+        .update({
+          status: "confirmed",
+          admin_notes: adminNotes || null,
+          confirmed_at: new Date().toISOString(),
+        })
+        .eq("id", requestId);
 
-        let guestId = existingGuest?.id;
-
-        if (!guestId) {
-          const { data: newGuest, error: guestError } = await supabase
-            .from("guests")
-            .insert({
-              tenant_id: request.tenant_id,
-              first_name: request.guest_name.split(" ")[0] || request.guest_name,
-              last_name: request.guest_name.split(" ").slice(1).join(" ") || "",
-              email: request.guest_email,
-              phone: request.guest_phone || null,
-              document_number: request.guest_document || null,
-            })
-            .select()
-            .single();
-
-          if (!guestError && newGuest) {
-            guestId = newGuest.id;
-          }
-        }
-
-        if (guestId) {
-          await supabase
-            .from("reservations")
-            .update({ guest_id: guestId })
-            .eq("id", newReservation.id);
-        }
+      if (updateError) {
+        console.error("Error actualizando solicitud:", updateError);
       }
+
+      // Enviar email al huésped (sin bloquear si falla)
+      try {
+        await sendConfirmationEmail(request, adminNotes, reservationCode);
+      } catch (emailError) {
+        console.error("Error enviando email:", emailError);
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: "Solicitud confirmada y reserva creada",
+        reservationId: newReservation.id,
+      });
     }
 
-    // 5. Enviar email al huésped
-    await sendGuestEmail(request, action, adminNotes, rejectionReason);
+    // 3. Si se rechaza
+    const { error: rejectError } = await supabase
+      .from("reservation_requests")
+      .update({
+        status: "rejected",
+        admin_notes: rejectionReason || adminNotes || null,
+        rejected_at: new Date().toISOString(),
+      })
+      .eq("id", requestId);
+
+    if (rejectError) {
+      console.error("Error rechazando solicitud:", rejectError);
+      return NextResponse.json({ error: "Error al rechazar la solicitud" }, { status: 500 });
+    }
+
+    // Enviar email de rechazo
+    try {
+      await sendRejectionEmail(request, rejectionReason || adminNotes);
+    } catch (emailError) {
+      console.error("Error enviando email de rechazo:", emailError);
+    }
 
     return NextResponse.json({
       success: true,
-      message: action === "confirmed" ? "Solicitud confirmada" : "Solicitud rechazada",
+      message: "Solicitud rechazada",
     });
   } catch (error: any) {
     console.error("Error en confirm-request:", error);
-    return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 });
+    return NextResponse.json({ 
+      error: "Error interno del servidor: " + error.message 
+    }, { status: 500 });
   }
 }
 
-function generateReservationCode(slug: string): string {
-  const prefix = slug.substring(0, 3).toUpperCase();
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-  let code = "";
-  for (let i = 0; i < 5; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
-  return `${prefix}-${code}`;
-}
-
-async function sendGuestEmail(
-  request: any,
-  action: string,
-  adminNotes: string | null,
-  rejectionReason: string | null
-) {
+async function sendConfirmationEmail(request: any, adminNotes: string | null, reservationCode: string) {
   const tenant = request.tenants;
   const unit = request.units;
   const checkInFormatted = new Date(request.check_in).toLocaleDateString("es-AR", {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
+    weekday: "long", year: "numeric", month: "long", day: "numeric",
   });
   const checkOutFormatted = new Date(request.check_out).toLocaleDateString("es-AR", {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
+    weekday: "long", year: "numeric", month: "long", day: "numeric",
   });
   const nights = Math.ceil(
     (new Date(request.check_out).getTime() - new Date(request.check_in).getTime()) / (1000 * 60 * 60 * 24)
   );
   const totalFormatted = new Intl.NumberFormat("es-AR", {
-    style: "currency",
-    currency: "ARS",
-    minimumFractionDigits: 0,
+    style: "currency", currency: "ARS", minimumFractionDigits: 0,
   }).format(request.total_amount || 0);
 
-  if (action === "confirmed") {
-    // Email de confirmación
-    try {
-      await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          from: "Mi Estadía <notificaciones@miestadia.online>",
-          to: [request.guest_email],
-          subject: `✅ ¡Reserva confirmada! - ${tenant.name}`,
-          html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-              <div style="background: linear-gradient(135deg, #059669 0%, #047857 100%); padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
-                <h1 style="color: white; margin: 0; font-size: 24px;">✅ ¡Reserva confirmada!</h1>
-                <p style="color: #d1fae5; margin: 10px 0 0 0; font-size: 16px;">${tenant.name}</p>
-              </div>
-              <div style="background: white; padding: 30px; border: 1px solid #e5e7eb; border-top: none;">
-                <p style="font-size: 16px; color: #374151; margin-bottom: 20px;">
-                  Hola <strong>${request.guest_name}</strong>,
-                </p>
-                <p style="font-size: 16px; color: #374151; margin-bottom: 20px;">
-                  ¡Excelentes noticias! Tu reserva ha sido <strong style="color: #059669;">confirmada</strong> por el anfitrión.
-                </p>
-
-                <div style="background: #f0fdf4; border-left: 4px solid #059669; padding: 16px; margin-bottom: 20px; border-radius: 4px;">
-                  <h2 style="margin: 0 0 12px 0; color: #111827; font-size: 18px;">📋 Detalles de tu reserva</h2>
-                  <p style="margin: 6px 0; color: #374151;"><strong>Código:</strong> ${generateReservationCode(tenant.slug)}</p>
-                  <p style="margin: 6px 0; color: #374151;"><strong>Unidad:</strong> ${unit?.name || "—"}</p>
-                  <p style="margin: 6px 0; color: #374151;"><strong>Check-in:</strong> ${checkInFormatted}</p>
-                  <p style="margin: 6px 0; color: #374151;"><strong>Check-out:</strong> ${checkOutFormatted}</p>
-                  <p style="margin: 6px 0; color: #374151;"><strong>Noches:</strong> ${nights}</p>
-                  <p style="margin: 6px 0; color: #374151;"><strong>Huéspedes:</strong> ${request.guests_count || 1}</p>
-                  <p style="margin: 6px 0; color: #374151;"><strong>Total:</strong> ${totalFormatted}</p>
-                </div>
-
-                ${adminNotes ? `
-                  <div style="background: #eff6ff; border-left: 4px solid #3b82f6; padding: 16px; margin-bottom: 20px; border-radius: 4px;">
-                    <h2 style="margin: 0 0 8px 0; color: #1e40af; font-size: 16px;"> Mensaje del anfitrión</h2>
-                    <p style="margin: 0; color: #1e3a8a; font-style: italic;">${adminNotes}</p>
-                  </div>
-                ` : ""}
-
-                <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 16px; margin-bottom: 20px; border-radius: 4px;">
-                  <h2 style="margin: 0 0 8px 0; color: #92400e; font-size: 16px;">💳 Información de pago</h2>
-                  <p style="margin: 0; color: #78350f;">
-                    El saldo pendiente de <strong>${totalFormatted}</strong> se abona al momento del check-in.
-                    Podés ver el estado de tu pago en tu panel de huésped.
-                  </p>
-                </div>
-
-                <div style="text-align: center; margin-top: 30px;">
-                  <a href="https://miestadia.online/${tenant.slug}" 
-                     style="background: #059669; color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; display: inline-block;">
-                    Acceder a mi panel de huésped →
-                  </a>
-                </div>
-
-                <p style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; font-size: 12px; color: #9ca3af; text-align: center;">
-                  Este email fue enviado automáticamente por Mi Estadía. Guardá este mensaje como comprobante de tu reserva.
-                </p>
-              </div>
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: "Mi Estadía <notificaciones@miestadia.online>",
+      to: [request.guest_email],
+      subject: `✅ ¡Reserva confirmada! - ${tenant?.name || "Alojamiento"}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background: linear-gradient(135deg, #059669 0%, #047857 100%); padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
+            <h1 style="color: white; margin: 0; font-size: 24px;">¡Reserva confirmada!</h1>
+            <p style="color: #d1fae5; margin: 10px 0 0 0; font-size: 16px;">${tenant?.name || ""}</p>
+          </div>
+          <div style="background: white; padding: 30px; border: 1px solid #e5e7eb; border-top: none;">
+            <p style="font-size: 16px; color: #374151; margin-bottom: 20px;">
+              Hola <strong>${request.guest_name}</strong>, tu reserva fue confirmada.
+            </p>
+            <div style="background: #f0fdf4; border-left: 4px solid #059669; padding: 16px; margin-bottom: 20px; border-radius: 4px;">
+              <p style="margin: 6px 0;"><strong>Código:</strong> ${reservationCode}</p>
+              <p style="margin: 6px 0;"><strong>Unidad:</strong> ${unit?.name || "—"}</p>
+              <p style="margin: 6px 0;"><strong>Check-in:</strong> ${checkInFormatted}</p>
+              <p style="margin: 6px 0;"><strong>Check-out:</strong> ${checkOutFormatted}</p>
+              <p style="margin: 6px 0;"><strong>Noches:</strong> ${nights}</p>
+              <p style="margin: 6px 0;"><strong>Total:</strong> ${totalFormatted}</p>
             </div>
-          `,
-        }),
-      });
-    } catch (emailError) {
-      console.error("Error enviando email de confirmación al huésped:", emailError);
-    }
-  } else {
-    // Email de rechazo
-    try {
-      await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          from: "Mi Estadía <notificaciones@miestadia.online>",
-          to: [request.guest_email],
-          subject: `Sobre tu solicitud de reserva - ${tenant.name}`,
-          html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-              <div style="background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%); padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
-                <h1 style="color: white; margin: 0; font-size: 24px;">Sobre tu solicitud</h1>
-                <p style="color: #fee2e2; margin: 10px 0 0 0; font-size: 16px;">${tenant.name}</p>
-              </div>
-              <div style="background: white; padding: 30px; border: 1px solid #e5e7eb; border-top: none;">
-                <p style="font-size: 16px; color: #374151; margin-bottom: 20px;">
-                  Hola <strong>${request.guest_name}</strong>,
-                </p>
-                <p style="font-size: 16px; color: #374151; margin-bottom: 20px;">
-                  Lamentamos informarte que tu solicitud de reserva <strong style="color: #dc2626;">no pudo ser confirmada</strong> en esta oportunidad.
-                </p>
+            ${adminNotes ? `<div style="background: #eff6ff; padding: 16px; border-radius: 4px; margin-bottom: 20px;"><p style="margin: 0;"><strong>Mensaje del anfitrión:</strong> ${adminNotes}</p></div>` : ""}
+            <p style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; font-size: 12px; color: #9ca3af; text-align: center;">
+              Enviado por Mi Estadía
+            </p>
+          </div>
+        </div>
+      `,
+    }),
+  });
 
-                <div style="background: #fef2f2; border-left: 4px solid #dc2626; padding: 16px; margin-bottom: 20px; border-radius: 4px;">
-                  <h2 style="margin: 0 0 12px 0; color: #111827; font-size: 18px;">📋 Detalles de la solicitud</h2>
-                  <p style="margin: 6px 0; color: #374151;"><strong>Unidad:</strong> ${unit?.name || "—"}</p>
-                  <p style="margin: 6px 0; color: #374151;"><strong>Fechas:</strong> ${checkInFormatted} → ${checkOutFormatted}</p>
-                  <p style="margin: 6px 0; color: #374151;"><strong>Noches:</strong> ${nights}</p>
-                </div>
+  if (!response.ok) {
+    const errorData = await response.text();
+    console.error("Resend error:", errorData);
+    throw new Error("Error enviando email");
+  }
+}
 
-                ${rejectionReason ? `
-                  <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 16px; margin-bottom: 20px; border-radius: 4px;">
-                    <h2 style="margin: 0 0 8px 0; color: #92400e; font-size: 16px;"> Motivo</h2>
-                    <p style="margin: 0; color: #78350f; font-style: italic;">${rejectionReason}</p>
-                  </div>
-                ` : ""}
+async function sendRejectionEmail(request: any, reason: string | null) {
+  const tenant = request.tenants;
+  const unit = request.units;
+  const checkInFormatted = new Date(request.check_in).toLocaleDateString("es-AR");
+  const checkOutFormatted = new Date(request.check_out).toLocaleDateString("es-AR");
 
-                <div style="background: #f0fdf4; border-left: 4px solid #059669; padding: 16px; margin-bottom: 20px; border-radius: 4px;">
-                  <h2 style="margin: 0 0 8px 0; color: #065f46; font-size: 16px;"> ¿Qué podés hacer?</h2>
-                  <p style="margin: 0; color: #064e3b;">
-                    Te invitamos a consultar otras fechas disponibles o contactarnos directamente para explorar alternativas.
-                  </p>
-                </div>
-
-                <div style="text-align: center; margin-top: 30px;">
-                  <a href="https://miestadia.online/${tenant.slug}/reservas" 
-                     style="background: #059669; color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; display: inline-block;">
-                    Ver otras fechas disponibles →
-                  </a>
-                </div>
-
-                <p style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; font-size: 12px; color: #9ca3af; text-align: center;">
-                  Este email fue enviado automáticamente por Mi Estadía.
-                </p>
-              </div>
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: "Mi Estadía <notificaciones@miestadia.online>",
+      to: [request.guest_email],
+      subject: `Sobre tu solicitud - ${tenant?.name || "Alojamiento"}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%); padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
+            <h1 style="color: white; margin: 0; font-size: 24px;">Sobre tu solicitud</h1>
+            <p style="color: #fee2e2; margin: 10px 0 0 0; font-size: 16px;">${tenant?.name || ""}</p>
+          </div>
+          <div style="background: white; padding: 30px; border: 1px solid #e5e7eb; border-top: none;">
+            <p style="font-size: 16px; color: #374151; margin-bottom: 20px;">
+              Hola <strong>${request.guest_name}</strong>, lamentamos informarte que tu solicitud no pudo ser confirmada.
+            </p>
+            <div style="background: #fef2f2; padding: 16px; border-radius: 4px; margin-bottom: 20px;">
+              <p style="margin: 6px 0;"><strong>Unidad:</strong> ${unit?.name || "—"}</p>
+              <p style="margin: 6px 0;"><strong>Fechas:</strong> ${checkInFormatted} → ${checkOutFormatted}</p>
             </div>
-          `,
-        }),
-      });
-    } catch (emailError) {
-      console.error("Error enviando email de rechazo al huésped:", emailError);
-    }
+            ${reason ? `<div style="background: #fef3c7; padding: 16px; border-radius: 4px; margin-bottom: 20px;"><p style="margin: 0;"><strong>Motivo:</strong> ${reason}</p></div>` : ""}
+            <p style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; font-size: 12px; color: #9ca3af; text-align: center;">
+              Enviado por Mi Estadía
+            </p>
+          </div>
+        </div>
+      `,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.text();
+    console.error("Resend error:", errorData);
   }
 }
