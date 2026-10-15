@@ -139,5 +139,5 @@ export default async function AdminLayout({ children, params }: Props) {
         </main>
       </div>
     </div>
-  )
+  ) 
 }
