@@ -44,6 +44,43 @@ interface Props {
   units: (Unit & { photos: { image_url: string; is_primary: boolean }[] })[];
 }
 
+function getGoogleMapsEmbedUrl(mapsUrl: string): string | null {
+  if (!mapsUrl) return null;
+  
+  // Si ya es una URL embed, usarla directamente
+  if (mapsUrl.includes("/embed")) return mapsUrl;
+  
+  // Si es una URL de Google Maps normal, extraer coordenadas
+  const patterns = [
+    /@(-?\d+\.\d+),(-?\d+\.\d+)/,
+    /[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/,
+  ];
+  
+  for (const pattern of patterns) {
+    const match = mapsUrl.match(pattern);
+    if (match) {
+      const lat = match[1];
+      const lng = match[2];
+      return `https://www.google.com/maps/embed/v1/view?key=AIzaSyBFw0Qbyq9zTFTd-tUY6dZWTgaQzuU17R8&center=${lat},${lng}&zoom=15`;
+    }
+  }
+  
+  // Si es una URL de lugar, usar el formato de embed
+  if (mapsUrl.includes("/maps/place/")) {
+    const encodedUrl = encodeURIComponent(mapsUrl);
+    return `https://maps.google.com/maps?q=${encodedUrl}&output=embed`;
+  }
+  
+  // Si es una búsqueda, usar el formato de embed
+  if (mapsUrl.includes("/maps/search/")) {
+    const encodedUrl = encodeURIComponent(mapsUrl);
+    return `https://maps.google.com/maps?q=${encodedUrl}&output=embed`;
+  }
+  
+  // Fallback: intentar con la URL directa
+  return mapsUrl;
+}
+
 export default function TenantLanding({ tenant, units }: Props) {
   const [showAllUnits, setShowAllUnits] = useState(false);
   const [heroPhotoIndex, setHeroPhotoIndex] = useState(0);
@@ -59,7 +96,6 @@ export default function TenantLanding({ tenant, units }: Props) {
   const policies = landing.policies || {};
   const nearbyPlaces = landing.nearbyPlaces || [];
 
-  // Auto-rotate hero photos
   useEffect(() => {
     if (heroPhotos.length <= 1) return;
     const interval = setInterval(() => {
@@ -85,11 +121,12 @@ export default function TenantLanding({ tenant, units }: Props) {
   const ctaText = landing.ctaText || "Reservar ahora";
   const ctaSubtext = landing.ctaSubtext || "";
 
+  const mapsEmbedUrl = getGoogleMapsEmbedUrl(settings.googleMapsUrl);
+
   return (
     <div className="min-h-screen bg-white">
       {/* HERO con carrusel de fotos */}
       <header className="relative bg-gray-900 text-white overflow-hidden">
-        {/* Fondo con fotos en carrusel */}
         {heroPhotos.length > 0 ? (
           <div className="absolute inset-0">
             {heroPhotos.map((photo, idx) => (
@@ -98,11 +135,7 @@ export default function TenantLanding({ tenant, units }: Props) {
                 className="absolute inset-0 transition-opacity duration-1000"
                 style={{ opacity: idx === heroPhotoIndex ? 1 : 0 }}
               >
-                <img
-                  src={photo.url}
-                  alt=""
-                  className="w-full h-full object-cover"
-                />
+                <img src={photo.url} alt="" className="w-full h-full object-cover" />
               </div>
             ))}
             <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black/70" />
@@ -111,7 +144,6 @@ export default function TenantLanding({ tenant, units }: Props) {
           <div className="absolute inset-0 bg-gradient-to-br from-green-700 to-emerald-900" />
         )}
 
-        {/* Flechas del carrusel */}
         {heroPhotos.length > 1 && (
           <>
             <button
@@ -126,8 +158,7 @@ export default function TenantLanding({ tenant, units }: Props) {
             >
               <ChevronRight className="w-6 h-6" />
             </button>
-            {/* Indicadores */}
-            <div className="absolute bottom-24 left-1/2 -translate-x-1/2 z-10 flex gap-2">
+            <div className="absolute bottom-32 left-1/2 -translate-x-1/2 z-10 flex gap-2">
               {heroPhotos.map((_, idx) => (
                 <button
                   key={idx}
@@ -142,15 +173,17 @@ export default function TenantLanding({ tenant, units }: Props) {
         )}
 
         <div className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-24 md:py-36">
-          <div className="flex items-center gap-4 mb-8">
+          {/* LOGO MUCHO MÁS GRANDE */}
+          <div className="flex items-center gap-6 mb-10">
             {branding.logoUrl && (
               <img
                 src={branding.logoUrl}
                 alt={tenant.name}
-                className="h-24 w-auto bg-white rounded-xl p-3 shadow-2xl"
+                className="h-40 md:h-48 w-auto bg-white rounded-2xl p-4 shadow-2xl"
               />
             )}
           </div>
+          
           <h1 className="text-5xl md:text-7xl font-bold mb-6 leading-tight drop-shadow-lg">
             {heroTitle}
           </h1>
@@ -485,16 +518,16 @@ export default function TenantLanding({ tenant, units }: Props) {
         </section>
       )}
 
-      {/* UBICACIÓN CON MAPA EXACTO */}
-      {settings.googleMapsUrl && (
+      {/* UBICACIÓN CON MAPA */}
+      {mapsEmbedUrl && (
         <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
           <div className="text-center mb-12">
             <h2 className="text-4xl font-bold text-gray-900 mb-3">Ubicación</h2>
             <p className="text-lg text-gray-600">Cómo llegar al alojamiento</p>
           </div>
-          <div className="rounded-2xl overflow-hidden border border-gray-200 shadow-lg">
+          <div className="rounded-2xl overflow-hidden border border-gray-200 shadow-lg bg-gray-100">
             <iframe
-              src={settings.googleMapsUrl}
+              src={mapsEmbedUrl}
               width="100%"
               height="450"
               style={{ border: 0 }}
@@ -561,5 +594,5 @@ export default function TenantLanding({ tenant, units }: Props) {
         </div>
       </footer>
     </div>
-  );
+  ); 
 }
