@@ -16,11 +16,5 @@
       "source": "/api/webhooks/lemonsqueezy",
       "destination": "/api/webhooks/lemonsqueezy"
     }
-  ],
-  "crons": [
-    {
-      "path": "/api/cron/sync-calendar",
-      "schedule": "0 */3 * * *"
-    }
   ]
 }
