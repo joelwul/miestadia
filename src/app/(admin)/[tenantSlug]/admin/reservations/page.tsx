@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useParams } from "next/navigation";
 import {
@@ -30,6 +30,8 @@ import {
   Bell,
   DollarSign,
   History,
+  Filter,
+  Info,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -57,6 +59,27 @@ interface Payment {
   notes: string;
 }
 
+interface PreCheckin {
+  id: string;
+  reservation_id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone: string;
+  document_number: string;
+  document_type: string;
+  nationality: string;
+  birth_date: string;
+  emergency_contact_name: string;
+  emergency_contact_phone: string;
+  special_requests: string;
+  arrival_time: string;
+  vehicle_plate: string;
+  agree_to_rules: boolean;
+  status: string;
+  completed_at: string;
+}
+
 interface Reservation {
   id: string;
   tenant_id: string;
@@ -75,6 +98,7 @@ interface Reservation {
   created_at: string;
   guest?: Guest;
   unit?: Unit;
+  preCheckin?: PreCheckin | null;
 }
 
 interface Tenant {
@@ -84,7 +108,8 @@ interface Tenant {
 }
 
 type FilterType = "all" | "today" | "tomorrow" | "nextweek";
-type ModalType = "none" | "add" | "edit" | "qr" | "delete" | "checkin" | "checkout" | "whatsapp" | "payment";
+type StatusFilterType = "all" | "booked" | "pre_checkin_pending" | "pre_checkin_completed" | "checked_in" | "checked_out" | "cancelled";
+type ModalType = "none" | "add" | "edit" | "qr" | "delete" | "checkin" | "checkout" | "whatsapp" | "payment" | "legend";
 type WhatsAppType = "reminder" | "precheckin" | "during" | "checkout" | "postcheckout";
 type AddMethod = "manual" | "csv" | "text";
 
@@ -96,10 +121,12 @@ export default function ReservationsPage() {
   const [guests, setGuests] = useState<Guest[]>([]);
   const [units, setUnits] = useState<Unit[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [preCheckins, setPreCheckins] = useState<PreCheckin[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [filter, setFilter] = useState<FilterType>("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilterType>("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [activeModal, setActiveModal] = useState<ModalType>("none");
@@ -179,15 +206,26 @@ export default function ReservationsPage() {
           .eq("tenant_id", tenantData.id)
           .order("payment_date", { ascending: false });
 
+        // Cargar pre-checkins
+        const { data: preCheckinsData } = await supabase
+          .from("pre_checkins")
+          .select("*")
+          .eq("tenant_id", tenantData.id);
+
         setGuests(guestsData || []);
         setUnits(unitsData || []);
         setPayments(paymentsData || []);
+        setPreCheckins(preCheckinsData || []);
 
-        const enriched: Reservation[] = (reservationsData || []).map((res: any) => ({
-          ...res,
-          guest: guestsData?.find((g: any) => g.id === res.guest_id),
-          unit: unitsData?.find((u: any) => u.id === res.unit_id),
-        }));
+        const enriched: Reservation[] = (reservationsData || []).map((res: any) => {
+          const preCheckin = (preCheckinsData || []).find((pc: any) => pc.reservation_id === res.id);
+          return {
+            ...res,
+            guest: guestsData?.find((g: any) => g.id === res.guest_id),
+            unit: unitsData?.find((u: any) => u.id === res.unit_id),
+            preCheckin: preCheckin || null,
+          };
+        });
         setReservations(enriched);
       } catch (err: any) {
         setError("Error: " + err.message);
@@ -222,6 +260,14 @@ export default function ReservationsPage() {
     return t;
   };
 
+  // Determinar el estado real de la reserva (considerando pre-checkin)
+  const getRealStatus = (res: Reservation): string => {
+    if (res.status === "pre_checkin") {
+      return res.preCheckin && res.preCheckin.status === "completed" ? "pre_checkin_completed" : "pre_checkin_pending";
+    }
+    return res.status;
+  };
+
   const filteredReservations = reservations.filter((res) => {
     const checkIn = new Date(res.check_in);
     const today = getToday();
@@ -229,6 +275,8 @@ export default function ReservationsPage() {
     const nextWeekStart = getNextWeekStart();
     const nextWeekEnd = getNextWeekEnd();
     const guestName = `${res.guest?.first_name || ""} ${res.guest?.last_name || ""}`.toLowerCase();
+    const realStatus = getRealStatus(res);
+
     const matchesSearch =
       searchTerm === "" ||
       guestName.includes(searchTerm.toLowerCase()) ||
@@ -236,29 +284,39 @@ export default function ReservationsPage() {
       res.unit?.name.toLowerCase().includes(searchTerm.toLowerCase());
 
     if (!matchesSearch) return false;
+
     if (dateFrom && checkIn < new Date(dateFrom)) return false;
     if (dateTo && checkIn > new Date(dateTo)) return false;
 
+    // Filtro por fecha
     switch (filter) {
       case "today":
-        return checkIn.toDateString() === today.toDateString();
+        if (checkIn.toDateString() !== today.toDateString()) return false;
+        break;
       case "tomorrow":
-        return checkIn.toDateString() === tomorrow.toDateString();
+        if (checkIn.toDateString() !== tomorrow.toDateString()) return false;
+        break;
       case "nextweek":
-        return checkIn >= nextWeekStart && checkIn <= nextWeekEnd;
-      default:
-        return true;
+        if (checkIn < nextWeekStart || checkIn > nextWeekEnd) return false;
+        break;
     }
+
+    // Filtro por estado
+    if (statusFilter !== "all" && realStatus !== statusFilter) return false;
+
+    return true;
   });
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case "booked":
-        return "bg-green-100 text-green-800 border-green-200";
-      case "pre_checkin":
-        return "bg-purple-100 text-purple-800 border-purple-200";
-      case "checked_in":
         return "bg-blue-100 text-blue-800 border-blue-200";
+      case "pre_checkin_pending":
+        return "bg-yellow-100 text-yellow-800 border-yellow-200";
+      case "pre_checkin_completed":
+        return "bg-green-100 text-green-800 border-green-200";
+      case "checked_in":
+        return "bg-purple-100 text-purple-800 border-purple-200";
       case "checked_out":
         return "bg-gray-100 text-gray-800 border-gray-200";
       case "cancelled":
@@ -272,8 +330,10 @@ export default function ReservationsPage() {
     switch (status) {
       case "booked":
         return "Reservada";
-      case "pre_checkin":
-        return "Pre check-in";
+      case "pre_checkin_pending":
+        return "Pre-checkin pendiente";
+      case "pre_checkin_completed":
+        return "Pre-checkin completado";
       case "checked_in":
         return "Check-in";
       case "checked_out":
@@ -289,8 +349,10 @@ export default function ReservationsPage() {
     switch (status) {
       case "booked":
         return <CheckCircle className="w-4 h-4" />;
-      case "pre_checkin":
+      case "pre_checkin_pending":
         return <Clock className="w-4 h-4" />;
+      case "pre_checkin_completed":
+        return <CheckCircle className="w-4 h-4" />;
       case "checked_in":
         return <Calendar className="w-4 h-4" />;
       case "checked_out":
@@ -315,18 +377,17 @@ export default function ReservationsPage() {
     const unitName = reservation.unit?.name || "—";
     const code = reservation.reservation_code;
     const firstName = reservation.guest.first_name;
-
     switch (type) {
       case "reminder":
-        return `¡Hola ${firstName}! 👋\n\nTe recordamos tu próxima reserva en *${tenant.name}*:\n\n📅 Check-in: ${checkIn}\n📅 Check-out: ${checkOut}\n🏠 Unidad: ${unitName}\n Código: ${code}\n\nAccedé a tu panel de huésped: ${guestPanelUrl}\n\n¡Te esperamos!\n\n— ${tenant.name}`;
+        return `¡Hola ${firstName}! 👋\n\nTe recordamos tu próxima reserva en *${tenant.name}*:\n\n📅 Check-in: ${checkIn}\n📅 Check-out: ${checkOut}\n🏠 Unidad: ${unitName}\n🔑 Código: ${code}\n\nAccedé a tu panel de huésped: ${guestPanelUrl}\n\n¡Te esperamos!\n\n— ${tenant.name}`;
       case "precheckin":
-        return `¡Hola ${firstName}! \n\nTu check-in en *${tenant.name}* se acerca (${checkIn}).\n\nPara agilizar tu llegada, completá el pre check-in digital:\n${guestPanelUrl}\n\nAsí llegás directo a tu unidad sin trámites.\n\n— ${tenant.name}`;
+        return `¡Hola ${firstName}! 📋\n\nTu check-in en *${tenant.name}* se acerca (${checkIn}).\n\nPara agilizar tu llegada, completá el pre check-in digital:\n${guestPanelUrl}\n\nAsí llegás directo a tu unidad sin trámites.\n\n— ${tenant.name}`;
       case "during":
         return `¡Hola ${firstName}! 😊\n\nEsperamos que estés disfrutando tu estadía en *${tenant.name}*.\n\nSi necesitás algo, no dudes en contactarnos.\n\nPanel de huésped: ${guestPanelUrl}\n\n— ${tenant.name}`;
       case "checkout":
-        return `¡Hola ${firstName}! \n\nTe recordamos que tu check-out en *${tenant.name}* es el ${checkOut}.\n\nPor favor dejá la unidad en las condiciones acordadas.\n\n¡Gracias por elegirnos!\n\n— ${tenant.name}`;
+        return `¡Hola ${firstName}! 📅\n\nTe recordamos que tu check-out en *${tenant.name}* es el ${checkOut}.\n\nPor favor dejá la unidad en las condiciones acordadas.\n\n¡Gracias por elegirnos!\n\n— ${tenant.name}`;
       case "postcheckout":
-        return `¡Hola ${firstName}! \n\nEsperamos que hayas disfrutado tu estadía en *${tenant.name}*.\n\n¿Nos ayudarías dejando una reseña en Google Maps? Nos ayuda mucho a crecer:\nhttps://g.page/r/TU_LINK_AQUI\n\n¡Te esperamos de vuelta!\n\n— ${tenant.name}`;
+        return `¡Hola ${firstName}! ⭐\n\nEsperamos que hayas disfrutado tu estadía en *${tenant.name}*.\n\n¿Nos ayudarías dejando una reseña en Google Maps? Nos ayuda mucho a crecer:\nhttps://g.page/r/TU_LINK_AQUI\n\n¡Te esperamos de vuelta!\n\n— ${tenant.name}`;
       default:
         return "";
     }
@@ -356,19 +417,17 @@ export default function ReservationsPage() {
 
   const openCheckInModal = (reservation: Reservation) => {
     setSelectedReservation(reservation);
-    let preCheckinData: any = {};
-    if (reservation.notes) {
-      try {
-        preCheckinData = JSON.parse(reservation.notes);
-      } catch (e) {
-        preCheckinData = { observations: reservation.notes };
-      }
-    }
+    
+    // Buscar pre-checkin completado
+    const preCheckin = reservation.preCheckin;
+    
     setCheckinData({
-      document_number: preCheckinData.document_number || "",
-      vehicle_plate: preCheckinData.vehicle_plate || "",
-      emergency_contact: preCheckinData.emergency_contact || "",
-      observations: preCheckinData.observations || preCheckinData.special_requests || "",
+      document_number: preCheckin?.document_number || "",
+      vehicle_plate: preCheckin?.vehicle_plate || "",
+      emergency_contact: preCheckin?.emergency_contact_name 
+        ? `${preCheckin.emergency_contact_name} - ${preCheckin.emergency_contact_phone || ""}` 
+        : "",
+      observations: preCheckin?.special_requests || "",
       attended_by: "",
       additional_payment: "",
       payment_method: "cash",
@@ -390,13 +449,11 @@ export default function ReservationsPage() {
         const paymentAmount = parseFloat(checkinData.additional_payment);
         const currentPaid = selectedReservation.paid_amount || 0;
         const total = selectedReservation.total_amount || 0;
-
         if (currentPaid + paymentAmount > total) {
           alert(`El pago excede el total. Máximo permitido: $${total - currentPaid}`);
           setActionLoading(null);
           return;
         }
-
         const { error: payError } = await supabase.from("reservation_payments").insert({
           tenant_id: tenant!.id,
           reservation_id: selectedReservation.id,
@@ -469,16 +526,13 @@ export default function ReservationsPage() {
       alert("Ingresá un monto válido.");
       return;
     }
-
     const paymentAmount = parseFloat(paymentData.amount);
     const currentPaid = selectedReservation.paid_amount || 0;
     const total = selectedReservation.total_amount || 0;
-
     if (currentPaid + paymentAmount > total) {
       alert(`El pago excede el total. Máximo permitido: $${total - currentPaid}`);
       return;
     }
-
     setActionLoading("payment");
     try {
       const { error } = await supabase.from("reservation_payments").insert({
@@ -519,7 +573,6 @@ export default function ReservationsPage() {
         .order("payment_date", { ascending: false })
         .limit(1)
         .single();
-
       if (newPayment) {
         setPayments([
           {
@@ -533,7 +586,6 @@ export default function ReservationsPage() {
           ...payments,
         ]);
       }
-
       setActiveModal("none");
     } catch (err: any) {
       alert("Error: " + err.message);
@@ -554,7 +606,6 @@ export default function ReservationsPage() {
     setActionLoading("create");
     try {
       let guestId = formData.guest_id;
-
       if (formData.create_new_guest) {
         const { data: newGuest, error: guestError } = await supabase
           .from("guests")
@@ -573,7 +624,6 @@ export default function ReservationsPage() {
         guestId = newGuest.id;
         setGuests([...guests, newGuest]);
       }
-
       if (!guestId) {
         alert("Seleccioná un huésped o creá uno nuevo.");
         setActionLoading(null);
@@ -589,16 +639,13 @@ export default function ReservationsPage() {
         setActionLoading(null);
         return;
       }
-
       const total = parseFloat(formData.total_amount) || 0;
       const paid = parseFloat(formData.paid_amount) || 0;
-
       if (paid > total) {
         alert("El monto pagado no puede ser mayor al total.");
         setActionLoading(null);
         return;
       }
-
       const reservationCode = generateReservationCode();
       const { error } = await supabase.from("reservations").insert({
         tenant_id: tenant!.id,
@@ -647,10 +694,10 @@ export default function ReservationsPage() {
                 }
               : undefined),
           unit: units.find((u) => u.id === newRes.unit_id),
+          preCheckin: null,
         };
         setReservations([enriched, ...reservations]);
       }
-
       setFormData({
         guest_id: "",
         unit_id: "",
@@ -681,13 +728,9 @@ export default function ReservationsPage() {
     let realNotes = reservation.notes || "";
     try {
       const parsed = JSON.parse(reservation.notes);
-      if (parsed.special_requests) {
-        realNotes = parsed.special_requests;
-      } else if (parsed.observations) {
-        realNotes = parsed.observations;
-      } else {
-        realNotes = "";
-      }
+      if (parsed.special_requests) realNotes = parsed.special_requests;
+      else if (parsed.observations) realNotes = parsed.observations;
+      else realNotes = "";
     } catch (e) {
       realNotes = reservation.notes || "";
     }
@@ -717,13 +760,11 @@ export default function ReservationsPage() {
     try {
       const total = formData.total_amount ? parseFloat(formData.total_amount) : selectedReservation.total_amount;
       const paid = formData.paid_amount ? parseFloat(formData.paid_amount) : selectedReservation.paid_amount;
-
       if (paid > total) {
         alert("El monto pagado no puede ser mayor al total.");
         setActionLoading(null);
         return;
       }
-
       const { error } = await supabase.from("reservations").update({
         guest_id: formData.guest_id || selectedReservation.guest_id,
         unit_id: formData.unit_id || selectedReservation.unit_id,
@@ -742,6 +783,7 @@ export default function ReservationsPage() {
           ...updatedRes,
           guest: guests.find((g) => g.id === updatedRes.guest_id),
           unit: units.find((u) => u.id === updatedRes.unit_id),
+          preCheckin: preCheckins.find((pc) => pc.reservation_id === updatedRes.id) || null,
         };
         setReservations(reservations.map((r) => (r.id === updatedRes.id ? enriched : r)));
       }
@@ -758,17 +800,23 @@ export default function ReservationsPage() {
 
   const getPaymentMethodLabel = (method: string) => {
     switch (method) {
-      case "cash":
-        return "Efectivo";
-      case "transfer":
-        return "Transferencia";
-      case "card":
-        return "Tarjeta";
-      case "mercadopago":
-        return "Mercado Pago";
-      default:
-        return method || "—";
+      case "cash": return "Efectivo";
+      case "transfer": return "Transferencia";
+      case "card": return "Tarjeta";
+      case "mercadopago": return "Mercado Pago";
+      default: return method || "—";
     }
+  };
+
+  // Contadores por estado para el filtro
+  const statusCounts = {
+    all: reservations.length,
+    booked: reservations.filter((r) => getRealStatus(r) === "booked").length,
+    pre_checkin_pending: reservations.filter((r) => getRealStatus(r) === "pre_checkin_pending").length,
+    pre_checkin_completed: reservations.filter((r) => getRealStatus(r) === "pre_checkin_completed").length,
+    checked_in: reservations.filter((r) => getRealStatus(r) === "checked_in").length,
+    checked_out: reservations.filter((r) => getRealStatus(r) === "checked_out").length,
+    cancelled: reservations.filter((r) => getRealStatus(r) === "cancelled").length,
   };
 
   if (loading)
@@ -810,7 +858,9 @@ export default function ReservationsPage() {
         </button>
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-xl p-4">
+      {/* FILTROS */}
+      <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-4">
+        {/* Fila 1: Búsqueda y fechas */}
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -872,139 +922,239 @@ export default function ReservationsPage() {
             </button>
           </div>
         </div>
+
+        {/* Fila 2: Filtro por estado */}
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <Filter className="w-4 h-4" />
+            <span className="font-medium">Estado:</span>
+          </div>
+          {[
+            { key: "all", label: "Todas", count: statusCounts.all, color: "gray" },
+            { key: "booked", label: "Reservada", count: statusCounts.booked, color: "blue" },
+            { key: "pre_checkin_pending", label: "Pre-checkin pendiente", count: statusCounts.pre_checkin_pending, color: "yellow" },
+            { key: "pre_checkin_completed", label: "Pre-checkin completado", count: statusCounts.pre_checkin_completed, color: "green" },
+            { key: "checked_in", label: "Check-in", count: statusCounts.checked_in, color: "purple" },
+            { key: "checked_out", label: "Check-out", count: statusCounts.checked_out, color: "gray" },
+            { key: "cancelled", label: "Cancelada", count: statusCounts.cancelled, color: "red" },
+          ].map((item) => (
+            <button
+              key={item.key}
+              onClick={() => setStatusFilter(item.key as StatusFilterType)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 ${
+                statusFilter === item.key
+                  ? "bg-[#0F766E] text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
+            >
+              <span className={`w-2 h-2 rounded-full ${
+                item.color === "blue" ? "bg-blue-500" :
+                item.color === "yellow" ? "bg-yellow-500" :
+                item.color === "green" ? "bg-green-500" :
+                item.color === "purple" ? "bg-purple-500" :
+                item.color === "red" ? "bg-red-500" :
+                "bg-gray-400"
+              }`} />
+              {item.label}
+              {item.count > 0 && (
+                <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                  statusFilter === item.key ? "bg-white/20" : "bg-gray-200"
+                }`}>
+                  {item.count}
+                </span>
+              )}
+            </button>
+          ))}
+          <button
+            onClick={() => setActiveModal("legend")}
+            className="ml-auto flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-100 transition-colors"
+            title="Ver leyenda de colores"
+          >
+            <Info className="w-4 h-4" />
+            ¿Qué significa cada color?
+          </button>
+        </div>
       </div>
 
+      {/* LISTA DE RESERVAS */}
       {filteredReservations.length === 0 ? (
         <div className="bg-white border border-gray-200 rounded-xl p-12 text-center">
           <Calendar className="w-16 h-16 text-gray-300 mx-auto mb-4" />
           <h3 className="text-xl font-bold text-gray-900 mb-2">No hay reservas</h3>
           <p className="text-gray-600">
-            {searchTerm || filter !== "all" || dateFrom || dateTo
+            {searchTerm || filter !== "all" || statusFilter !== "all" || dateFrom || dateTo
               ? "No se encontraron reservas con los filtros aplicados."
               : "Comenzá agregando tu primera reserva."}
           </p>
         </div>
       ) : (
         <div className="space-y-3">
-          {filteredReservations.map((reservation) => (
-            <div key={reservation.id} className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-md transition-shadow">
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-3">
-                    <h3 className="text-lg font-bold text-gray-900">
-                      {reservation.guest?.first_name || "—"} {reservation.guest?.last_name || ""}
-                    </h3>
-                    <span
-                      className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(
-                        reservation.status
-                      )}`}
-                    >
-                      {getStatusIcon(reservation.status)}
-                      {getStatusLabel(reservation.status)}
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
-                    <div>
-                      <p className="text-gray-500 text-xs">Código</p>
-                      <p className="font-mono font-semibold text-gray-900">{reservation.reservation_code || "—"}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-500 text-xs">Check-in</p>
-                      <p className="font-semibold text-gray-900">{new Date(reservation.check_in).toLocaleDateString("es-AR")}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-500 text-xs">Check-out</p>
-                      <p className="font-semibold text-gray-900">{new Date(reservation.check_out).toLocaleDateString("es-AR")}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-500 text-xs">Unidad</p>
-                      <p className="font-semibold text-gray-900">{reservation.unit?.name || "—"}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-500 text-xs">Pago</p>
-                      <p className="font-semibold text-gray-900">
-                        ${reservation.paid_amount || 0} / ${reservation.total_amount || 0}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="mt-3 flex items-center gap-4 text-sm">
-                    {reservation.guest?.email && (
-                      <span className="text-gray-600 flex items-center gap-1">
-                        <Mail className="w-4 h-4" />
-                        {reservation.guest.email}
+          {filteredReservations.map((reservation) => {
+            const realStatus = getRealStatus(reservation);
+            return (
+              <div key={reservation.id} className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-md transition-shadow">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-3">
+                      <h3 className="text-lg font-bold text-gray-900">
+                        {reservation.guest?.first_name || "—"} {reservation.guest?.last_name || ""}
+                      </h3>
+                      <span
+                        className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(realStatus)}`}
+                      >
+                        {getStatusIcon(realStatus)}
+                        {getStatusLabel(realStatus)}
                       </span>
-                    )}
-                    {reservation.guest?.phone && (
-                      <span className="text-gray-600 flex items-center gap-1">
-                        <Phone className="w-4 h-4" />
-                        {reservation.guest.phone}
-                      </span>
-                    )}
+                      {reservation.preCheckin && (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-50 text-green-700 border border-green-200">
+                          <CheckCircle className="w-3 h-3" />
+                          Pre-checkin completado
+                        </span>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
+                      <div>
+                        <p className="text-gray-500 text-xs">Código</p>
+                        <p className="font-mono font-semibold text-gray-900">{reservation.reservation_code || "—"}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500 text-xs">Check-in</p>
+                        <p className="font-semibold text-gray-900">{new Date(reservation.check_in).toLocaleDateString("es-AR")}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500 text-xs">Check-out</p>
+                        <p className="font-semibold text-gray-900">{new Date(reservation.check_out).toLocaleDateString("es-AR")}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500 text-xs">Unidad</p>
+                        <p className="font-semibold text-gray-900">{reservation.unit?.name || "—"}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500 text-xs">Pago</p>
+                        <p className="font-semibold text-gray-900">
+                          ${reservation.paid_amount || 0} / ${reservation.total_amount || 0}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-3 flex items-center gap-4 text-sm">
+                      {reservation.guest?.email && (
+                        <span className="text-gray-600 flex items-center gap-1">
+                          <Mail className="w-4 h-4" />
+                          {reservation.guest.email}
+                        </span>
+                      )}
+                      {reservation.guest?.phone && (
+                        <span className="text-gray-600 flex items-center gap-1">
+                          <Phone className="w-4 h-4" />
+                          {reservation.guest.phone}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-2 ml-4">
-                  {reservation.status === "booked" || reservation.status === "pre_checkin" ? (
+                  <div className="flex items-center gap-2 ml-4">
+                    {reservation.status === "booked" || reservation.status === "pre_checkin" ? (
+                      <button
+                        onClick={() => openCheckInModal(reservation)}
+                        className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        title="Hacer check-in"
+                      >
+                        <CheckSquare className="w-5 h-5" />
+                      </button>
+                    ) : reservation.status === "checked_in" ? (
+                      <button
+                        onClick={() => openCheckOutModal(reservation)}
+                        className="p-2 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
+                        title="Hacer check-out"
+                      >
+                        <LogOut className="w-5 h-5" />
+                      </button>
+                    ) : null}
                     <button
-                      onClick={() => openCheckInModal(reservation)}
-                      className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                      title="Hacer check-in"
+                      onClick={() => openPaymentModal(reservation)}
+                      className="p-2 text-gray-400 hover:text-[#0F766E] hover:bg-gray-100 rounded-lg transition-colors"
+                      title="Registrar pago"
                     >
-                      <CheckSquare className="w-5 h-5" />
+                      <DollarSign className="w-5 h-5" />
                     </button>
-                  ) : reservation.status === "checked_in" ? (
                     <button
-                      onClick={() => openCheckOutModal(reservation)}
-                      className="p-2 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
-                      title="Hacer check-out"
+                      onClick={() => openWhatsAppModal(reservation)}
+                      className="p-2 text-gray-400 hover:text-[#25D366] hover:bg-green-50 rounded-lg transition-colors"
+                      title="Enviar WhatsApp"
                     >
-                      <LogOut className="w-5 h-5" />
+                      <Send className="w-5 h-5" />
                     </button>
-                  ) : null}
-                  <button
-                    onClick={() => openPaymentModal(reservation)}
-                    className="p-2 text-gray-400 hover:text-[#0F766E] hover:bg-gray-100 rounded-lg transition-colors"
-                    title="Registrar pago"
-                  >
-                    <DollarSign className="w-5 h-5" />
-                  </button>
-                  <button
-                    onClick={() => openWhatsAppModal(reservation)}
-                    className="p-2 text-gray-400 hover:text-[#25D366] hover:bg-green-50 rounded-lg transition-colors"
-                    title="Enviar WhatsApp"
-                  >
-                    <Send className="w-5 h-5" />
-                  </button>
-                  <button
-                    onClick={() => {
-                      setSelectedReservation(reservation);
-                      setActiveModal("qr");
-                    }}
-                    className="p-2 text-gray-400 hover:text-[#0F766E] hover:bg-gray-100 rounded-lg transition-colors"
-                    title="Ver QR y link"
-                  >
-                    <QrCode className="w-5 h-5" />
-                  </button>
-                  <button
-                    onClick={() => openEditModal(reservation)}
-                    className="p-2 text-gray-400 hover:text-[#0F766E] hover:bg-gray-100 rounded-lg transition-colors"
-                    title="Editar"
-                  >
-                    <Edit className="w-5 h-5" />
-                  </button>
-                  <button
-                    onClick={() => {
-                      setSelectedReservation(reservation);
-                      setActiveModal("delete");
-                    }}
-                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                    title="Eliminar"
-                  >
-                    <Trash2 className="w-5 h-5" />
-                  </button>
+                    <button
+                      onClick={() => {
+                        setSelectedReservation(reservation);
+                        setActiveModal("qr");
+                      }}
+                      className="p-2 text-gray-400 hover:text-[#0F766E] hover:bg-gray-100 rounded-lg transition-colors"
+                      title="Ver QR y link"
+                    >
+                      <QrCode className="w-5 h-5" />
+                    </button>
+                    <button
+                      onClick={() => openEditModal(reservation)}
+                      className="p-2 text-gray-400 hover:text-[#0F766E] hover:bg-gray-100 rounded-lg transition-colors"
+                      title="Editar"
+                    >
+                      <Edit className="w-5 h-5" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        setSelectedReservation(reservation);
+                        setActiveModal("delete");
+                      }}
+                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      title="Eliminar"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                    </button>
+                  </div>
                 </div>
               </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* MODAL: Leyenda de colores */}
+      {activeModal === "legend" && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                <Info className="w-5 h-5 text-[#0F766E]" />
+                Estados de reservas
+              </h3>
+              <button onClick={() => setActiveModal("none")} className="text-gray-400 hover:text-gray-600">
+                <X className="w-6 h-6" />
+              </button>
             </div>
-          ))}
+            <div className="space-y-3">
+              {[
+                { color: "bg-blue-100 text-blue-800 border-blue-200", label: "Reservada", desc: "Reserva confirmada, huésped aún no completó pre-checkin" },
+                { color: "bg-yellow-100 text-yellow-800 border-yellow-200", label: "Pre-checkin pendiente", desc: "Huésped no completó el formulario de pre-checkin" },
+                { color: "bg-green-100 text-green-800 border-green-200", label: "Pre-checkin completado", desc: "Huésped completó el formulario de pre-checkin" },
+                { color: "bg-purple-100 text-purple-800 border-purple-200", label: "Check-in", desc: "Huésped actualmente alojado" },
+                { color: "bg-gray-100 text-gray-800 border-gray-200", label: "Check-out", desc: "Huésped ya se fue, reserva finalizada" },
+                { color: "bg-red-100 text-red-800 border-red-200", label: "Cancelada", desc: "Reserva cancelada" },
+              ].map((item, idx) => (
+                <div key={idx} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+                  <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border ${item.color} flex-shrink-0`}>
+                    {item.label}
+                  </span>
+                  <p className="text-sm text-gray-600">{item.desc}</p>
+                </div>
+              ))}
+            </div>
+            <button
+              onClick={() => setActiveModal("none")}
+              className="w-full mt-6 px-4 py-2 bg-[#0F766E] text-white rounded-lg text-sm font-medium hover:bg-[#0F766E]/90"
+            >
+              Entendido
+            </button>
+          </div>
         </div>
       )}
 
@@ -1051,6 +1201,52 @@ export default function ReservationsPage() {
                   </div>
                 </div>
               </div>
+
+              {/* Datos del pre-checkin si existen */}
+              {selectedReservation.preCheckin && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <p className="text-xs font-bold text-green-800 mb-3 flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4" />
+                    Datos del pre-checkin completado
+                  </p>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    {selectedReservation.preCheckin.document_number && (
+                      <div>
+                        <p className="text-green-600 text-xs">Documento</p>
+                        <p className="font-semibold text-green-900">{selectedReservation.preCheckin.document_number}</p>
+                      </div>
+                    )}
+                    {selectedReservation.preCheckin.vehicle_plate && (
+                      <div>
+                        <p className="text-green-600 text-xs">Patente</p>
+                        <p className="font-semibold text-green-900">{selectedReservation.preCheckin.vehicle_plate}</p>
+                      </div>
+                    )}
+                    {selectedReservation.preCheckin.arrival_time && (
+                      <div>
+                        <p className="text-green-600 text-xs">Hora de llegada</p>
+                        <p className="font-semibold text-green-900">{selectedReservation.preCheckin.arrival_time}</p>
+                      </div>
+                    )}
+                    {selectedReservation.preCheckin.emergency_contact_name && (
+                      <div>
+                        <p className="text-green-600 text-xs">Contacto emergencia</p>
+                        <p className="font-semibold text-green-900">{selectedReservation.preCheckin.emergency_contact_name}</p>
+                        {selectedReservation.preCheckin.emergency_contact_phone && (
+                          <p className="text-green-700 text-xs">{selectedReservation.preCheckin.emergency_contact_phone}</p>
+                        )}
+                      </div>
+                    )}
+                    {selectedReservation.preCheckin.special_requests && (
+                      <div className="col-span-2">
+                        <p className="text-green-600 text-xs">Solicitudes especiales</p>
+                        <p className="font-semibold text-green-900">{selectedReservation.preCheckin.special_requests}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">Documento (DNI/Pasaporte)</label>
                 <input
@@ -1194,8 +1390,6 @@ export default function ReservationsPage() {
                   </div>
                 </div>
               </div>
-
-              {/* HISTORIAL DE PAGOS */}
               {getReservationPayments(selectedReservation.id).length > 0 && (
                 <div className="border-2 border-green-200 bg-green-50 rounded-lg p-4">
                   <p className="text-sm font-bold text-green-900 mb-3 flex items-center gap-2">
@@ -1205,15 +1399,8 @@ export default function ReservationsPage() {
                   <div className="space-y-2 max-h-48 overflow-y-auto">
                     {getReservationPayments(selectedReservation.id).map((p) => {
                       const paymentDate = new Date(p.date);
-                      const formattedDate = paymentDate.toLocaleDateString("es-AR", {
-                        day: "2-digit",
-                        month: "2-digit",
-                        year: "numeric",
-                      });
-                      const formattedTime = paymentDate.toLocaleTimeString("es-AR", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      });
+                      const formattedDate = paymentDate.toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric" });
+                      const formattedTime = paymentDate.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
                       return (
                         <div key={p.id} className="bg-white border border-green-200 rounded-lg p-3">
                           <div className="flex items-center justify-between mb-1">
@@ -1232,17 +1419,13 @@ export default function ReservationsPage() {
                             <Clock className="w-3 h-3" />
                             <span>{formattedTime} hs</span>
                           </div>
-                          {p.notes && (
-                            <p className="text-xs text-gray-600 mt-1 italic">"{p.notes}"</p>
-                          )}
+                          {p.notes && <p className="text-xs text-gray-600 mt-1 italic">"{p.notes}"</p>}
                         </div>
                       );
                     })}
                   </div>
                 </div>
               )}
-
-              {/* Formulario de nuevo pago */}
               <div className="border-t border-gray-200 pt-4">
                 <p className="text-sm font-semibold text-gray-700 mb-3">Nuevo pago</p>
                 <div>
@@ -1255,8 +1438,7 @@ export default function ReservationsPage() {
                     placeholder="0"
                   />
                   <p className="text-xs text-gray-500 mt-1">
-                    Máximo permitido: $
-                    {Math.max(0, (selectedReservation.total_amount || 0) - (selectedReservation.paid_amount || 0))}
+                    Máximo permitido: ${Math.max(0, (selectedReservation.total_amount || 0) - (selectedReservation.paid_amount || 0))}
                   </p>
                 </div>
                 <div className="mt-3">
@@ -1285,10 +1467,7 @@ export default function ReservationsPage() {
               </div>
             </div>
             <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
-              <button
-                onClick={() => setActiveModal("none")}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
-              >
+              <button onClick={() => setActiveModal("none")} className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">
                 Cancelar
               </button>
               <button
@@ -1341,19 +1520,11 @@ export default function ReservationsPage() {
                       key={item.type}
                       onClick={() => handleWhatsAppTypeChange(item.type)}
                       className={`p-3 rounded-lg border-2 transition-colors flex flex-col items-center gap-2 ${
-                        whatsAppType === item.type
-                          ? "border-[#0F766E] bg-[#0F766E]/5"
-                          : "border-gray-200 hover:border-gray-300"
+                        whatsAppType === item.type ? "border-[#0F766E] bg-[#0F766E]/5" : "border-gray-200 hover:border-gray-300"
                       }`}
                     >
-                      <item.icon
-                        className={`w-5 h-5 ${whatsAppType === item.type ? "text-[#0F766E]" : "text-gray-400"}`}
-                      />
-                      <span
-                        className={`text-xs font-medium ${
-                          whatsAppType === item.type ? "text-[#0F766E]" : "text-gray-600"
-                        }`}
-                      >
+                      <item.icon className={`w-5 h-5 ${whatsAppType === item.type ? "text-[#0F766E]" : "text-gray-400"}`} />
+                      <span className={`text-xs font-medium ${whatsAppType === item.type ? "text-[#0F766E]" : "text-gray-600"}`}>
                         {item.label}
                       </span>
                     </button>
@@ -1371,10 +1542,7 @@ export default function ReservationsPage() {
               </div>
             </div>
             <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
-              <button
-                onClick={() => setActiveModal("none")}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
-              >
+              <button onClick={() => setActiveModal("none")} className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">
                 Cancelar
               </button>
               <button
@@ -1400,21 +1568,13 @@ export default function ReservationsPage() {
                   {selectedReservation.guest?.first_name} {selectedReservation.guest?.last_name}
                 </p>
               </div>
-              <button
-                onClick={() => {
-                  setActiveModal("none");
-                  setSelectedReservation(null);
-                }}
-                className="text-gray-400 hover:text-gray-600"
-              >
+              <button onClick={() => { setActiveModal("none"); setSelectedReservation(null); }} className="text-gray-400 hover:text-gray-600">
                 <X className="w-6 h-6" />
               </button>
             </div>
             <div className="bg-white border-2 border-gray-200 rounded-xl p-6 mb-4 flex justify-center">
               <img
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(
-                  getGuestPanelUrl(selectedReservation)
-                )}`}
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(getGuestPanelUrl(selectedReservation))}`}
                 alt="QR Code"
                 className="w-48 h-48"
               />
@@ -1453,13 +1613,7 @@ export default function ReservationsPage() {
           <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b border-gray-200 flex items-center justify-between">
               <h2 className="text-2xl font-bold text-gray-900">Editar reserva {selectedReservation.reservation_code}</h2>
-              <button
-                onClick={() => {
-                  setActiveModal("none");
-                  setSelectedReservation(null);
-                }}
-                className="text-gray-400 hover:text-gray-600"
-              >
+              <button onClick={() => { setActiveModal("none"); setSelectedReservation(null); }} className="text-gray-400 hover:text-gray-600">
                 <X className="w-6 h-6" />
               </button>
             </div>
@@ -1497,41 +1651,21 @@ export default function ReservationsPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Check-in</label>
-                  <input
-                    type="date"
-                    value={formData.check_in}
-                    onChange={(e) => setFormData({ ...formData, check_in: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
-                  />
+                  <input type="date" value={formData.check_in} onChange={(e) => setFormData({ ...formData, check_in: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Check-out</label>
-                  <input
-                    type="date"
-                    value={formData.check_out}
-                    onChange={(e) => setFormData({ ...formData, check_out: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
-                  />
+                  <input type="date" value={formData.check_out} onChange={(e) => setFormData({ ...formData, check_out: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]" />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Monto total</label>
-                  <input
-                    type="number"
-                    value={formData.total_amount}
-                    onChange={(e) => setFormData({ ...formData, total_amount: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
-                  />
+                  <input type="number" value={formData.total_amount} onChange={(e) => setFormData({ ...formData, total_amount: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Monto pagado</label>
-                  <input
-                    type="number"
-                    value={formData.paid_amount}
-                    onChange={(e) => setFormData({ ...formData, paid_amount: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
-                  />
+                  <input type="number" value={formData.paid_amount} onChange={(e) => setFormData({ ...formData, paid_amount: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]" />
                 </div>
               </div>
               <div>
@@ -1558,13 +1692,7 @@ export default function ReservationsPage() {
               </div>
             </div>
             <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
-              <button
-                onClick={() => {
-                  setActiveModal("none");
-                  setSelectedReservation(null);
-                }}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
-              >
+              <button onClick={() => { setActiveModal("none"); setSelectedReservation(null); }} className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">
                 Cancelar
               </button>
               <button
@@ -1572,11 +1700,7 @@ export default function ReservationsPage() {
                 disabled={actionLoading === "update"}
                 className="px-4 py-2 bg-[#0F766E] text-white rounded-lg text-sm font-medium hover:bg-[#0F766E]/90 disabled:opacity-50 flex items-center gap-2"
               >
-                {actionLoading === "update" ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <CheckCircle className="w-4 h-4" />
-                )}
+                {actionLoading === "update" ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
                 Guardar cambios
               </button>
             </div>
@@ -1613,14 +1737,9 @@ export default function ReservationsPage() {
                 </div>
               </div>
             </div>
-            <p className="text-gray-600 mb-6">
-              ¿Confirmás el check-out de este huésped? Se marcará la reserva como completada.
-            </p>
+            <p className="text-gray-600 mb-6">¿Confirmás el check-out de este huésped? Se marcará la reserva como completada.</p>
             <div className="flex gap-3">
-              <button
-                onClick={() => setActiveModal("none")}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
-              >
+              <button onClick={() => setActiveModal("none")} className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">
                 Cancelar
               </button>
               <button
@@ -1628,14 +1747,7 @@ export default function ReservationsPage() {
                 disabled={actionLoading === "checkout"}
                 className="flex-1 px-4 py-2 bg-orange-600 text-white rounded-lg text-sm font-medium hover:bg-orange-700 disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {actionLoading === "checkout" ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <>
-                    <LogOut className="w-4 h-4" />
-                    Confirmar check-out
-                  </>
-                )}
+                {actionLoading === "checkout" ? <Loader2 className="w-4 h-4 animate-spin" /> : <><LogOut className="w-4 h-4" />Confirmar check-out</>}
               </button>
             </div>
           </div>
@@ -1656,20 +1768,10 @@ export default function ReservationsPage() {
               </div>
             </div>
             <p className="text-gray-600 mb-6">
-              ¿Estás seguro que querés eliminar la reserva de{" "}
-              <strong>
-                {selectedReservation.guest?.first_name} {selectedReservation.guest?.last_name}
-              </strong>
-              ? Esta acción no se puede deshacer.
+              ¿Estás seguro que querés eliminar la reserva de <strong>{selectedReservation.guest?.first_name} {selectedReservation.guest?.last_name}</strong>? Esta acción no se puede deshacer.
             </p>
             <div className="flex gap-3">
-              <button
-                onClick={() => {
-                  setActiveModal("none");
-                  setSelectedReservation(null);
-                }}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
-              >
+              <button onClick={() => { setActiveModal("none"); setSelectedReservation(null); }} className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">
                 Cancelar
               </button>
               <button
@@ -1677,14 +1779,7 @@ export default function ReservationsPage() {
                 disabled={actionLoading === `delete-${selectedReservation.id}`}
                 className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {actionLoading === `delete-${selectedReservation.id}` ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <>
-                    <Trash2 className="w-4 h-4" />
-                    Eliminar
-                  </>
-                )}
+                {actionLoading === `delete-${selectedReservation.id}` ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Trash2 className="w-4 h-4" />Eliminar</>}
               </button>
             </div>
           </div>
@@ -1703,287 +1798,109 @@ export default function ReservationsPage() {
             </div>
             <div className="p-6">
               <div className="flex gap-2 mb-6">
-                <button
-                  onClick={() => setAddMethod("manual")}
-                  className={`flex-1 py-3 px-4 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${
-                    addMethod === "manual" ? "bg-[#0F766E] text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                  }`}
-                >
-                  <Edit className="w-4 h-4" />
-                  Manual
+                <button onClick={() => setAddMethod("manual")} className={`flex-1 py-3 px-4 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${addMethod === "manual" ? "bg-[#0F766E] text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}>
+                  <Edit className="w-4 h-4" />Manual
                 </button>
-                <button
-                  onClick={() => setAddMethod("csv")}
-                  className={`flex-1 py-3 px-4 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${
-                    addMethod === "csv" ? "bg-[#0F766E] text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                  }`}
-                >
-                  <Upload className="w-4 h-4" />
-                  Importar CSV
+                <button onClick={() => setAddMethod("csv")} className={`flex-1 py-3 px-4 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${addMethod === "csv" ? "bg-[#0F766E] text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}>
+                  <Upload className="w-4 h-4" />Importar CSV
                 </button>
-                <button
-                  onClick={() => setAddMethod("text")}
-                  className={`flex-1 py-3 px-4 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${
-                    addMethod === "text" ? "bg-[#0F766E] text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                  }`}
-                >
-                  <MessageSquare className="w-4 h-4" />
-                  Mensaje de texto
+                <button onClick={() => setAddMethod("text")} className={`flex-1 py-3 px-4 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${addMethod === "text" ? "bg-[#0F766E] text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}>
+                  <MessageSquare className="w-4 h-4" />Mensaje de texto
                 </button>
               </div>
-
               {addMethod === "manual" && (
                 <div className="space-y-4">
                   <div className="flex items-center gap-3 mb-2">
                     <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={formData.create_new_guest}
-                        onChange={(e) =>
-                          setFormData({ ...formData, create_new_guest: e.target.checked, guest_id: "" })
-                        }
-                        className="w-4 h-4 rounded border-gray-300"
-                      />
+                      <input type="checkbox" checked={formData.create_new_guest} onChange={(e) => setFormData({ ...formData, create_new_guest: e.target.checked, guest_id: "" })} className="w-4 h-4 rounded border-gray-300" />
                       <span className="text-sm font-medium text-gray-700">Crear huésped nuevo</span>
                     </label>
                   </div>
-
                   {formData.create_new_guest ? (
                     <div className="space-y-3 bg-gray-50 p-4 rounded-lg">
                       <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">Nombre</label>
-                          <input
-                            type="text"
-                            value={formData.new_guest_first_name}
-                            onChange={(e) => setFormData({ ...formData, new_guest_first_name: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
-                            placeholder="Juan"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">Apellido</label>
-                          <input
-                            type="text"
-                            value={formData.new_guest_last_name}
-                            onChange={(e) => setFormData({ ...formData, new_guest_last_name: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
-                            placeholder="Pérez"
-                          />
-                        </div>
+                        <div><label className="block text-xs font-medium text-gray-700 mb-1">Nombre</label><input type="text" value={formData.new_guest_first_name} onChange={(e) => setFormData({ ...formData, new_guest_first_name: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]" placeholder="Juan" /></div>
+                        <div><label className="block text-xs font-medium text-gray-700 mb-1">Apellido</label><input type="text" value={formData.new_guest_last_name} onChange={(e) => setFormData({ ...formData, new_guest_last_name: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]" placeholder="Pérez" /></div>
                       </div>
                       <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">Email</label>
-                          <input
-                            type="email"
-                            value={formData.new_guest_email}
-                            onChange={(e) => setFormData({ ...formData, new_guest_email: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
-                            placeholder="juan@email.com"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">Teléfono</label>
-                          <input
-                            type="text"
-                            value={formData.new_guest_phone}
-                            onChange={(e) => setFormData({ ...formData, new_guest_phone: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
-                            placeholder="01131923742"
-                          />
-                        </div>
+                        <div><label className="block text-xs font-medium text-gray-700 mb-1">Email</label><input type="email" value={formData.new_guest_email} onChange={(e) => setFormData({ ...formData, new_guest_email: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]" placeholder="juan@email.com" /></div>
+                        <div><label className="block text-xs font-medium text-gray-700 mb-1">Teléfono</label><input type="text" value={formData.new_guest_phone} onChange={(e) => setFormData({ ...formData, new_guest_phone: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]" placeholder="01131923742" /></div>
                       </div>
                       <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">Nacionalidad</label>
-                          <input
-                            type="text"
-                            value={formData.new_guest_nationality}
-                            onChange={(e) => setFormData({ ...formData, new_guest_nationality: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">Documento</label>
-                          <input
-                            type="text"
-                            value={formData.new_guest_document}
-                            onChange={(e) => setFormData({ ...formData, new_guest_document: e.target.value })}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
-                            placeholder="DNI/Pasaporte"
-                          />
-                        </div>
+                        <div><label className="block text-xs font-medium text-gray-700 mb-1">Nacionalidad</label><input type="text" value={formData.new_guest_nationality} onChange={(e) => setFormData({ ...formData, new_guest_nationality: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]" /></div>
+                        <div><label className="block text-xs font-medium text-gray-700 mb-1">Documento</label><input type="text" value={formData.new_guest_document} onChange={(e) => setFormData({ ...formData, new_guest_document: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]" placeholder="DNI/Pasaporte" /></div>
                       </div>
                     </div>
                   ) : (
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">Huésped existente</label>
-                      <select
-                        value={formData.guest_id}
-                        onChange={(e) => setFormData({ ...formData, guest_id: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
-                      >
+                      <select value={formData.guest_id} onChange={(e) => setFormData({ ...formData, guest_id: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]">
                         <option value="">Seleccionar huésped...</option>
-                        {guests.map((g) => (
-                          <option key={g.id} value={g.id}>
-                            {g.first_name} {g.last_name} ({g.email})
-                          </option>
-                        ))}
+                        {guests.map((g) => (<option key={g.id} value={g.id}>{g.first_name} {g.last_name} ({g.email})</option>))}
                       </select>
                     </div>
                   )}
-
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">Unidad</label>
-                    <select
-                      value={formData.unit_id}
-                      onChange={(e) => setFormData({ ...formData, unit_id: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
-                    >
+                    <select value={formData.unit_id} onChange={(e) => setFormData({ ...formData, unit_id: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]">
                       <option value="">Seleccionar unidad...</option>
-                      {units.map((u) => (
-                        <option key={u.id} value={u.id}>
-                          {u.name} ({u.type} - {u.capacity} pers.)
-                        </option>
-                      ))}
+                      {units.map((u) => (<option key={u.id} value={u.id}>{u.name} ({u.type} - {u.capacity} pers.)</option>))}
                     </select>
                   </div>
-
                   <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Check-in</label>
-                      <input
-                        type="date"
-                        value={formData.check_in}
-                        onChange={(e) => setFormData({ ...formData, check_in: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Check-out</label>
-                      <input
-                        type="date"
-                        value={formData.check_out}
-                        onChange={(e) => setFormData({ ...formData, check_out: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
-                      />
-                    </div>
+                    <div><label className="block text-xs font-medium text-gray-700 mb-1">Check-in</label><input type="date" value={formData.check_in} onChange={(e) => setFormData({ ...formData, check_in: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]" /></div>
+                    <div><label className="block text-xs font-medium text-gray-700 mb-1">Check-out</label><input type="date" value={formData.check_out} onChange={(e) => setFormData({ ...formData, check_out: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]" /></div>
                   </div>
-
                   <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Monto total</label>
-                      <input
-                        type="number"
-                        value={formData.total_amount}
-                        onChange={(e) => setFormData({ ...formData, total_amount: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
-                        placeholder="0"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Monto pagado</label>
-                      <input
-                        type="number"
-                        value={formData.paid_amount}
-                        onChange={(e) => setFormData({ ...formData, paid_amount: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
-                        placeholder="0"
-                      />
-                    </div>
+                    <div><label className="block text-xs font-medium text-gray-700 mb-1">Monto total</label><input type="number" value={formData.total_amount} onChange={(e) => setFormData({ ...formData, total_amount: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]" placeholder="0" /></div>
+                    <div><label className="block text-xs font-medium text-gray-700 mb-1">Monto pagado</label><input type="number" value={formData.paid_amount} onChange={(e) => setFormData({ ...formData, paid_amount: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]" placeholder="0" /></div>
                   </div>
-
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">Método de pago</label>
-                    <select
-                      value={formData.payment_method}
-                      onChange={(e) => setFormData({ ...formData, payment_method: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
-                    >
+                    <select value={formData.payment_method} onChange={(e) => setFormData({ ...formData, payment_method: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]">
                       <option value="cash">Efectivo</option>
                       <option value="transfer">Transferencia</option>
                       <option value="card">Tarjeta</option>
                       <option value="mercadopago">Mercado Pago</option>
                     </select>
                   </div>
-
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">Notas</label>
-                    <textarea
-                      value={formData.notes}
-                      onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                      rows={3}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
-                      placeholder="Observaciones..."
-                    />
+                    <textarea value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} rows={3} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]" placeholder="Observaciones..." />
                   </div>
                 </div>
               )}
-
               {addMethod === "csv" && (
                 <div className="space-y-4">
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <p className="text-sm text-blue-800">
-                      <strong>Formato CSV esperado:</strong>
-                    </p>
-                    <p className="text-xs text-blue-700 mt-1 font-mono">
-                      first_name,last_name,email,phone,check_in,check_out,unit_name,total_amount
-                    </p>
+                    <p className="text-sm text-blue-800"><strong>Formato CSV esperado:</strong></p>
+                    <p className="text-xs text-blue-700 mt-1 font-mono">first_name,last_name,email,phone,check_in,check_out,unit_name,total_amount</p>
                   </div>
                   <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
                     <Upload className="w-12 h-12 text-gray-400 mx-auto mb-3" />
                     <p className="text-gray-600 mb-3">Arrastrá tu archivo CSV o hacé clic para seleccionar</p>
                     <input type="file" accept=".csv" className="hidden" id="csv-upload" />
-                    <label
-                      htmlFor="csv-upload"
-                      className="inline-block px-4 py-2 bg-[#0F766E] text-white rounded-lg cursor-pointer hover:bg-[#0F766E]/90"
-                    >
-                      Seleccionar archivo
-                    </label>
+                    <label htmlFor="csv-upload" className="inline-block px-4 py-2 bg-[#0F766E] text-white rounded-lg cursor-pointer hover:bg-[#0F766E]/90">Seleccionar archivo</label>
                   </div>
                 </div>
               )}
-
               {addMethod === "text" && (
                 <div className="space-y-4">
                   <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-                    <p className="text-sm text-purple-800">
-                      <strong>Parser inteligente:</strong> Pegá un mensaje de WhatsApp o texto libre y el sistema
-                      detectará automáticamente los datos de la reserva.
-                    </p>
+                    <p className="text-sm text-purple-800"><strong>Parser inteligente:</strong> Pegá un mensaje de WhatsApp o texto libre y el sistema detectará automáticamente los datos de la reserva.</p>
                   </div>
-                  <textarea
-                    rows={6}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
-                    placeholder="Ej: Hola, quiero reservar para Juan Pérez, del 15 al 20 de octubre, cabaña 3, total $50000..."
-                  />
+                  <textarea rows={6} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]" placeholder="Ej: Hola, quiero reservar para Juan Pérez, del 15 al 20 de octubre, cabaña 3, total $50000..." />
                   <button className="w-full bg-[#0F766E] text-white py-3 rounded-lg font-medium hover:bg-[#0F766E]/90 flex items-center justify-center gap-2">
-                    <MessageSquare className="w-4 h-4" />
-                    Analizar texto
+                    <MessageSquare className="w-4 h-4" />Analizar texto
                   </button>
                 </div>
               )}
             </div>
-
             {addMethod === "manual" && (
               <div className="p-6 border-t border-gray-200 flex justify-end gap-3">
-                <button
-                  onClick={() => setActiveModal("none")}
-                  className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={handleCreateReservation}
-                  disabled={actionLoading === "create"}
-                  className="px-4 py-2 bg-[#0F766E] text-white rounded-lg text-sm font-medium hover:bg-[#0F766E]/90 disabled:opacity-50 flex items-center gap-2"
-                >
-                  {actionLoading === "create" ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Plus className="w-4 h-4" />
-                  )}
+                <button onClick={() => setActiveModal("none")} className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">Cancelar</button>
+                <button onClick={handleCreateReservation} disabled={actionLoading === "create"} className="px-4 py-2 bg-[#0F766E] text-white rounded-lg text-sm font-medium hover:bg-[#0F766E]/90 disabled:opacity-50 flex items-center gap-2">
+                  {actionLoading === "create" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
                   Crear reserva
                 </button>
               </div>
