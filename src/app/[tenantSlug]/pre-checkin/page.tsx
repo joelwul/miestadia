@@ -17,6 +17,7 @@ import {
   Calendar,
   Home,
   ArrowLeft,
+  ClipboardList,
 } from "lucide-react";
 
 export default function PreCheckinPage() {
@@ -50,13 +51,11 @@ export default function PreCheckinPage() {
 
   useEffect(() => {
     const init = async () => {
-      // 1. Intentar obtener parámetros de URL
       const code = searchParams.get("code");
       const lastNameParam = searchParams.get("lastName");
 
       let reservationId: string | null = null;
 
-      // 2. Si hay parámetros en URL, validar y crear sesión
       if (code && lastNameParam) {
         const { data: res } = await supabase
           .from("reservations")
@@ -79,7 +78,6 @@ export default function PreCheckinPage() {
         }
       }
 
-      // 3. Si no hay parámetros, intentar con sessionStorage
       if (!reservationId) {
         const sessionStr = sessionStorage.getItem("guest_session");
         if (sessionStr) {
@@ -94,7 +92,6 @@ export default function PreCheckinPage() {
         }
       }
 
-      // 4. Si aún no hay, intentar con localStorage
       if (!reservationId) {
         const sessionStr = localStorage.getItem("guest_session");
         if (sessionStr) {
@@ -115,7 +112,6 @@ export default function PreCheckinPage() {
         return;
       }
 
-      // 5. Cargar datos de la reserva
       const { data: res, error: resError } = await supabase
         .from("reservations")
         .select(
@@ -139,14 +135,12 @@ export default function PreCheckinPage() {
         .single();
       setTenant(tenantData);
 
-      // 6. Cargar datos existentes del pre-checkin si los hay
       const { data: existingPreCheckin } = await supabase
         .from("pre_checkins")
         .select("*")
         .eq("reservation_id", reservationId)
         .maybeSingle();
 
-      // 7. Pre-llenar formulario con datos del huésped
       const guest = res.guests;
       setFormData({
         firstName: existingPreCheckin?.first_name || guest?.first_name || "",
@@ -207,7 +201,6 @@ export default function PreCheckinPage() {
 
       if (preCheckinError) throw preCheckinError;
 
-      // Actualizar estado de la reserva a pre_checkin
       await supabase
         .from("reservations")
         .update({ status: "pre_checkin" })
@@ -288,7 +281,6 @@ export default function PreCheckinPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 py-8 px-4">
       <div className="max-w-3xl mx-auto">
-        {/* Header */}
         <div className="mb-6">
           <Button
             variant="ghost"
@@ -321,9 +313,7 @@ export default function PreCheckinPage() {
           </div>
         </div>
 
-        {/* Formulario */}
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Datos personales */}
           <Card>
             <CardContent className="p-6">
               <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
@@ -410,7 +400,6 @@ export default function PreCheckinPage() {
             </CardContent>
           </Card>
 
-          {/* Contacto de emergencia */}
           <Card>
             <CardContent className="p-6">
               <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
@@ -438,7 +427,6 @@ export default function PreCheckinPage() {
             </CardContent>
           </Card>
 
-          {/* Detalles de llegada */}
           <Card>
             <CardContent className="p-6">
               <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
@@ -476,7 +464,6 @@ export default function PreCheckinPage() {
             </CardContent>
           </Card>
 
-          {/* Aceptación de reglas */}
           <Card className="border-2 border-amber-200 bg-amber-50">
             <CardContent className="p-6">
               <label className="flex items-start gap-3 cursor-pointer">
@@ -497,7 +484,6 @@ export default function PreCheckinPage() {
             </CardContent>
           </Card>
 
-          {/* Botón enviar */}
           <div className="flex gap-3">
             <Button
               type="button"
