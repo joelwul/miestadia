@@ -22,5 +22,5 @@
       "path": "/api/cron/sync-calendar",
       "schedule": "0 */3 * * *"
     }
-  ] 
-} 
+  ]
+}
