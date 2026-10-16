@@ -172,30 +172,30 @@ export default function PreCheckinPage() {
     }
     setSaving(true);
     try {
+      // Convertir strings vacíos a null para campos opcionales
+      const payload = {
+        reservation_id: reservation.id,
+        first_name: formData.firstName || null,
+        last_name: formData.lastName || null,
+        email: formData.email || null,
+        phone: formData.phone || null,
+        document_number: formData.documentNumber || null,
+        document_type: formData.documentType || "DNI",
+        nationality: formData.nationality || "Argentina",
+        birth_date: formData.birthDate || null,
+        emergency_contact_name: formData.emergencyContactName || null,
+        emergency_contact_phone: formData.emergencyContactPhone || null,
+        special_requests: formData.specialRequests || null,
+        arrival_time: formData.arrivalTime || null,
+        vehicle_plate: formData.vehiclePlate || null,
+        agree_to_rules: formData.agreeToRules,
+        status: "completed",
+        completed_at: new Date().toISOString(),
+      };
+
       const { data: preCheckin, error: preCheckinError } = await supabase
         .from("pre_checkins")
-        .upsert(
-          {
-            reservation_id: reservation.id,
-            first_name: formData.firstName,
-            last_name: formData.lastName,
-            email: formData.email,
-            phone: formData.phone,
-            document_number: formData.documentNumber,
-            document_type: formData.documentType,
-            nationality: formData.nationality,
-            birth_date: formData.birthDate,
-            emergency_contact_name: formData.emergencyContactName,
-            emergency_contact_phone: formData.emergencyContactPhone,
-            special_requests: formData.specialRequests,
-            arrival_time: formData.arrivalTime,
-            vehicle_plate: formData.vehiclePlate,
-            agree_to_rules: formData.agreeToRules,
-            status: "completed",
-            completed_at: new Date().toISOString(),
-          },
-          { onConflict: "reservation_id" }
-        )
+        .upsert(payload, { onConflict: "reservation_id" })
         .select()
         .single();
 
