@@ -17,6 +17,7 @@ import {
   Code,
   Clock,
   Globe,
+  RefreshCw,
 } from 'lucide-react'
 
 interface Props {
@@ -77,6 +78,7 @@ export default async function AdminLayout({ children, params }: Props) {
     { name: 'Huéspedes', href: `/${tenantSlug}/admin/guests`, icon: Users },
     { name: 'Unidades', href: `/${tenantSlug}/admin/units`, icon: Bed },
     { name: 'Calendario', href: `/${tenantSlug}/admin/calendar`, icon: Calendar },
+    { name: 'Sincronización iCal', href: `/${tenantSlug}/admin/calendar-sync`, icon: RefreshCw },
     { name: 'Guías', href: `/${tenantSlug}/admin/guides`, icon: FileText },
     { name: 'Destino', href: `/${tenantSlug}/admin/destination`, icon: MapPin },
     { name: 'Mensajes', href: `/${tenantSlug}/admin/messages`, icon: MessageSquare },
