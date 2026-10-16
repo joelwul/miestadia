@@ -204,7 +204,7 @@ export default function CalendarSyncPage() {
   }
 
   function getSourceIcon(source: string) {
-    if (source === "airbnb") return "";
+    if (source === "airbnb") return "🏠";
     if (source === "booking") return "🏨";
     if (source === "vrbo") return "🏡";
     return "📅";
@@ -241,7 +241,6 @@ export default function CalendarSyncPage() {
         </p>
       </div>
 
-      {/* EXPORTACIÓN */}
       <Card className="border-2 border-green-200 bg-gradient-to-br from-green-50 to-white">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-green-900">
@@ -280,7 +279,6 @@ export default function CalendarSyncPage() {
         </CardContent>
       </Card>
 
-      {/* IMPORTACIÓN */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -502,7 +500,7 @@ export default function CalendarSyncPage() {
             <div>
               <strong>3. Sincronización automática:</strong>
               <p className="mt-1">
-                Las sincronizaciones ocurren automáticamente según la frecuencia que configures. También podés forzar una sincronización manual con el botón "Sync ahora".
+                Las sincronizaciones ocurren automáticamente cada 3 horas. También podés forzar una sincronización manual con el botón "Sync ahora".
               </p>
             </div>
           </div>
