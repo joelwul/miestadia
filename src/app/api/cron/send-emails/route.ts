@@ -3,7 +3,6 @@ import { createClient } from "@supabase/supabase-js";
 import { Resend } from "resend";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
-
 const supabase = createClient(
   process.env.SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -25,7 +24,7 @@ export async function GET(request: Request) {
     // 1. Obtener todos los tenants con emails automáticos activados
     const { data: tenants, error: tenantsError } = await supabase
       .from("tenants")
-      .select("id, name, slug, owner_email, settings, auto_email_enabled, pre_checkin_days, post_checkout_days, email_templates")
+      .select("id, name, slug, owner_email, settings, auto_email_enabled, pre_checkin_days, post_checkout_days, email_templates, review_url")
       .eq("auto_email_enabled", true);
 
     if (tenantsError) {
@@ -40,9 +39,11 @@ export async function GET(request: Request) {
     for (const tenant of tenants || []) {
       const settings = typeof tenant.settings === "string" ? JSON.parse(tenant.settings) : tenant.settings;
       const emailTemplates = typeof tenant.email_templates === "string" ? JSON.parse(tenant.email_templates) : tenant.email_templates;
-
       const preCheckinDays = tenant.pre_checkin_days || 1;
       const postCheckoutDays = tenant.post_checkout_days || 1;
+
+      // Determinar link de reseñas: review_url > googleMapsUrl
+      const reviewLink = tenant.review_url || settings.googleMapsUrl;
 
       // Calcular fechas objetivo
       const preCheckinDate = new Date(today);
@@ -62,7 +63,7 @@ export async function GET(request: Request) {
         .in("status", ["booked", "pre_checkin"]);
 
       if (preError) {
-        logs.push(` Error fetching pre-checkin reservations for ${tenant.name}: ${preError.message}`);
+        logs.push(`❌ Error fetching pre-checkin reservations for ${tenant.name}: ${preError.message}`);
         continue;
       }
 
@@ -134,7 +135,7 @@ export async function GET(request: Request) {
         }
       }
 
-      // 3. Agradecimientos post-checkout
+      // 3. Agradecimientos post-checkout CON RESEÑAS
       const { data: postCheckoutReservations, error: postError } = await supabase
         .from("reservations")
         .select("id, reservation_code, check_in, check_out, guest_id, unit_id")
@@ -160,6 +161,24 @@ export async function GET(request: Request) {
         const subject = `Gracias por tu estadía en ${tenant.name}`;
         const guestPanelUrl = `${APP_DOMAIN}/${tenant.slug}?code=${res.reservation_code}&lastName=${encodeURIComponent(guest.last_name || "")}`;
 
+        // Generar sección de reseñas
+        let reviewSection = "";
+        if (reviewLink) {
+          const reviewText = tenant.review_url 
+            ? "Dejanos tu reseña en nuestra página" 
+            : "Dejanos tu reseña en Google Maps";
+          
+          reviewSection = `
+            <div style="text-align: center; margin: 30px 0; padding: 20px; background: #fef3c7; border-radius: 8px; border: 2px solid #fbbf24;">
+              <h2 style="color: #92400e; margin: 0 0 10px 0; font-size: 20px;">⭐ ¿Cómo fue tu estadía?</h2>
+              <p style="color: #78350f; margin: 0 0 15px 0; font-size: 14px;">Tu opinión nos ayuda a mejorar</p>
+              <a href="${reviewLink}" target="_blank" rel="noopener noreferrer" style="background: #fbbf24; color: #92400e; padding: 12px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">
+                ${reviewText}
+              </a>
+            </div>
+          `;
+        }
+
         const body = template
           .replace(/\{\{guestName\}\}/g, guest.first_name || "huésped")
           .replace(/\{\{propertyName\}\}/g, tenant.name)
@@ -167,7 +186,8 @@ export async function GET(request: Request) {
           .replace(/\{\{checkOut\}\}/g, new Date(res.check_out).toLocaleDateString("es-AR"))
           .replace(/\{\{unitName\}\}/g, "")
           .replace(/\{\{reservationCode\}\}/g, res.reservation_code)
-          .replace(/\{\{loginUrl\}\}/g, guestPanelUrl);
+          .replace(/\{\{loginUrl\}\}/g, guestPanelUrl)
+          .replace(/\{\{reviewSection\}\}/g, reviewSection);
 
         try {
           await resend.emails.send({
@@ -182,6 +202,7 @@ export async function GET(request: Request) {
                 </div>
                 <div style="background: white; padding: 30px; border: 1px solid #e5e7eb; border-top: none;">
                   <p style="color: #374151; font-size: 16px; line-height: 1.6; white-space: pre-wrap;">${body}</p>
+                  ${reviewSection}
                 </div>
                 <div style="background: #f9fafb; padding: 20px; text-align: center; border-radius: 0 0 10px 10px; border: 1px solid #e5e7eb; border-top: none;">
                   <p style="color: #6b7280; font-size: 12px; margin: 0;">
