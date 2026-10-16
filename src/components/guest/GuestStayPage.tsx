@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { useParams } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -35,6 +36,7 @@ import {
   DollarSign,
   CreditCard,
   TrendingUp,
+  Star,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -67,33 +69,33 @@ const CATEGORY_CONFIG: Record<string, { label: string; icon: any; color: string;
 
 function getWeatherInfo(code: number): { emoji: string; icon: any; description: string; color: string } {
   const weatherMap: Record<number, { emoji: string; icon: any; description: string; color: string }> = {
-    0: { emoji: "️", icon: Sun, description: "Despejado", color: "text-yellow-500" },
-    1: { emoji: "️", icon: Sun, description: "Mayormente despejado", color: "text-yellow-400" },
+    0: { emoji: "☀️", icon: Sun, description: "Despejado", color: "text-yellow-500" },
+    1: { emoji: "🌤️", icon: Sun, description: "Mayormente despejado", color: "text-yellow-400" },
     2: { emoji: "⛅", icon: Cloud, description: "Parcialmente nublado", color: "text-gray-400" },
     3: { emoji: "☁️", icon: Cloud, description: "Nublado", color: "text-gray-500" },
     45: { emoji: "🌫️", icon: Cloud, description: "Niebla", color: "text-gray-400" },
     48: { emoji: "🌫️", icon: Cloud, description: "Niebla con escarcha", color: "text-gray-400" },
     51: { emoji: "🌦️", icon: CloudRain, description: "Llovizna ligera", color: "text-blue-400" },
-    53: { emoji: "️", icon: CloudRain, description: "Llovizna moderada", color: "text-blue-400" },
-    55: { emoji: "🌧️", icon: CloudRain, description: "Llovizna densa", color: "text-blue-500" },
+    53: { emoji: "🌦️", icon: CloudRain, description: "Llovizna moderada", color: "text-blue-400" },
+    55: { emoji: "️", icon: CloudRain, description: "Llovizna densa", color: "text-blue-500" },
     56: { emoji: "🌧️", icon: CloudRain, description: "Llovizna helada", color: "text-blue-600" },
     57: { emoji: "🌧️", icon: CloudRain, description: "Llovizna helada densa", color: "text-blue-600" },
     61: { emoji: "🌧️", icon: CloudRain, description: "Lluvia ligera", color: "text-blue-500" },
     63: { emoji: "🌧️", icon: CloudRain, description: "Lluvia moderada", color: "text-blue-600" },
-    65: { emoji: "🌧️", icon: CloudRain, description: "Lluvia intensa", color: "text-blue-700" },
-    66: { emoji: "️", icon: CloudRain, description: "Lluvia helada", color: "text-blue-700" },
+    65: { emoji: "️", icon: CloudRain, description: "Lluvia intensa", color: "text-blue-700" },
+    66: { emoji: "🌧️", icon: CloudRain, description: "Lluvia helada", color: "text-blue-700" },
     67: { emoji: "🌧️", icon: CloudRain, description: "Lluvia helada intensa", color: "text-blue-700" },
-    71: { emoji: "🌨️", icon: CloudSnow, description: "Nevada ligera", color: "text-blue-300" },
+    71: { emoji: "️", icon: CloudSnow, description: "Nevada ligera", color: "text-blue-300" },
     73: { emoji: "🌨️", icon: CloudSnow, description: "Nevada moderada", color: "text-blue-400" },
     75: { emoji: "❄️", icon: CloudSnow, description: "Nevada intensa", color: "text-blue-500" },
     77: { emoji: "❄️", icon: CloudSnow, description: "Granizo", color: "text-blue-400" },
     80: { emoji: "🌦️", icon: CloudRain, description: "Chubascos ligeros", color: "text-blue-400" },
     81: { emoji: "🌧️", icon: CloudRain, description: "Chubascos moderados", color: "text-blue-500" },
     82: { emoji: "🌧️", icon: CloudRain, description: "Chubascos violentos", color: "text-blue-600" },
-    85: { emoji: "🌨️", icon: CloudSnow, description: "Chubascos de nieve", color: "text-blue-300" },
+    85: { emoji: "️", icon: CloudSnow, description: "Chubascos de nieve", color: "text-blue-300" },
     86: { emoji: "❄️", icon: CloudSnow, description: "Chubascos de nieve intensos", color: "text-blue-400" },
-    95: { emoji: "️", icon: CloudLightning, description: "Tormenta", color: "text-purple-600" },
-    96: { emoji: "⛈️", icon: CloudLightning, description: "Tormenta con granizo", color: "text-purple-700" },
+    95: { emoji: "⛈️", icon: CloudLightning, description: "Tormenta", color: "text-purple-600" },
+    96: { emoji: "️", icon: CloudLightning, description: "Tormenta con granizo", color: "text-purple-700" },
     99: { emoji: "⛈️", icon: CloudLightning, description: "Tormenta con granizo intenso", color: "text-purple-800" },
   };
   return weatherMap[code] || { emoji: "🌡️", icon: Wind, description: "Desconocido", color: "text-gray-500" };
@@ -389,6 +391,9 @@ export default function GuestStayPage({ params }: Props) {
   const paymentPercentage = totalAmount > 0 ? Math.min(100, (paidAmount / totalAmount) * 100) : 0;
   const paymentStatus = reservation.payment_status || "pending";
 
+  // Link de reseñas: usa review_url del tenant, fallback a googleMapsUrl
+  const reviewLink = tenant.review_url || settings.googleMapsUrl;
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <header className="bg-green-700 text-white p-6 md:p-8">
@@ -534,7 +539,7 @@ export default function GuestStayPage({ params }: Props) {
                   {paymentStatus === "paid" ? (
                     <Badge className="bg-green-600 text-white">✅ Pagado</Badge>
                   ) : paymentStatus === "partial" ? (
-                    <Badge className="bg-yellow-600 text-white"> Parcial</Badge>
+                    <Badge className="bg-yellow-600 text-white">️ Parcial</Badge>
                   ) : (
                     <Badge variant="destructive">⏳ Pendiente</Badge>
                   )}
@@ -575,7 +580,7 @@ export default function GuestStayPage({ params }: Props) {
                   {paidAmount > 0 && (
                     <p className="text-xs text-gray-500 mt-1">
                       {reservation.payment_method === "cash" && "💵 Efectivo"}
-                      {reservation.payment_method === "transfer" && "🏦 Transferencia"}
+                      {reservation.payment_method === "transfer" && " Transferencia"}
                       {reservation.payment_method === "card" && "💳 Tarjeta"}
                       {reservation.payment_method === "mercadopago" && "📱 Mercado Pago"}
                     </p>
@@ -595,7 +600,7 @@ export default function GuestStayPage({ params }: Props) {
               {pendingAmount > 0 && (
                 <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
                   <p className="text-sm text-amber-800">
-                    💡 <strong>Recordá:</strong> El saldo pendiente de {formatCurrency(pendingAmount)} se abona al
+                     <strong>Recordá:</strong> El saldo pendiente de {formatCurrency(pendingAmount)} se abona al
                     momento del check-in.
                   </p>
                 </div>
@@ -954,7 +959,7 @@ export default function GuestStayPage({ params }: Props) {
                       href={`tel:${contact.phone}`}
                       className="text-sm bg-red-600 text-white px-3 py-1 rounded-lg hover:bg-red-700 transition-colors"
                     >
-                      📞 {contact.phone}
+                       {contact.phone}
                     </a>
                   </div>
                 ))}
@@ -962,6 +967,49 @@ export default function GuestStayPage({ params }: Props) {
             </CardContent>
           </Card>
         )}
+
+        {/* SECCIÓN DE RESEÑAS - Se muestra después del check-out */}
+        {reservation.status === "checked_out" && reviewLink && (
+          <Card className="border-2 border-yellow-200 bg-gradient-to-br from-yellow-50 to-amber-50">
+            <CardContent className="p-6">
+              <div className="flex items-start gap-4">
+                <div className="h-12 w-12 rounded-full bg-yellow-100 flex items-center justify-center flex-shrink-0">
+                  <Star className="h-6 w-6 text-yellow-600" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-semibold text-yellow-900 text-lg">¿Cómo fue tu estadía?</h3>
+                  <p className="text-sm text-yellow-700 mt-1">
+                    Tu opinión nos ayuda a mejorar y a otros huéspedes a elegirnos. ¡Dejanos tu reseña!
+                  </p>
+                  <a
+                    href={reviewLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-block mt-4"
+                  >
+                    <span className="inline-flex items-center gap-2 bg-yellow-600 text-white px-6 py-3 rounded-lg hover:bg-yellow-700 transition-colors font-medium shadow-sm">
+                      <Star className="h-4 w-4" />
+                      Dejar reseña
+                      <ExternalLink className="h-4 w-4" />
+                    </span>
+                  </a>
+                  {tenant.review_url ? (
+                    <p className="text-xs text-yellow-700 mt-3 flex items-center gap-1">
+                      <CheckCircle className="h-3 w-3" />
+                      Serás dirigido a nuestra página de reseñas
+                    </p>
+                  ) : settings.googleMapsUrl ? (
+                    <p className="text-xs text-yellow-700 mt-3 flex items-center gap-1">
+                      <MapPin className="h-3 w-3" />
+                      Serás dirigido a Google Maps para dejar tu reseña
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card
             className={
@@ -1039,29 +1087,6 @@ export default function GuestStayPage({ params }: Props) {
             </CardContent>
           </Card>
         </div>
-        {reservation.status === "checked_out" && settings.reviewUrl && (
-          <Card className="border-2 border-yellow-200 bg-yellow-50">
-            <CardContent className="p-6">
-              <div className="flex items-start gap-3">
-                <CheckCircle className="h-6 w-6 text-yellow-600 flex-shrink-0" />
-                <div>
-                  <h3 className="font-semibold text-yellow-900">¿Cómo fue tu estadía?</h3>
-                  <p className="text-sm text-yellow-700 mt-1">Dejanos tu reseña en Google</p>
-                  <a
-                    href={settings.reviewUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-block mt-3"
-                  >
-                    <span className="inline-block bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 transition-colors">
-                      Dejar reseña
-                    </span>
-                  </a>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
         <Link href={`/${tenantSlug}/guides`} className="block">
           <Card className="hover:shadow-lg transition-shadow cursor-pointer">
             <CardContent className="p-6">
