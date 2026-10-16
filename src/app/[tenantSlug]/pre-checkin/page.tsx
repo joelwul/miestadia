@@ -136,6 +136,7 @@ export default function PreCheckinPage() {
         .eq("reservation_id", reservationId)
         .maybeSingle();
 
+      // 🎯 AQUÍ ESTÁ LA MAGIA: Si no hay pre-checkin, usa los datos de la reserva (guest)
       const guest = res.guests;
       setFormData({
         firstName: existingPreCheckin?.first_name || guest?.first_name || "",
@@ -170,7 +171,7 @@ export default function PreCheckinPage() {
       const payload = {
         reservation_id: reservation.id,
         tenant_id: tenant.id,
-        guest_id: reservation.guest_id, // ← AGREGADO: guest_id requerido
+        guest_id: reservation.guest_id,
         first_name: formData.firstName || null,
         last_name: formData.lastName || null,
         email: formData.email || null,
@@ -513,4 +514,4 @@ export default function PreCheckinPage() {
       </div>
     </div>
   );
-} 
+}
