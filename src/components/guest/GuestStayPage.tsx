@@ -73,29 +73,29 @@ function getWeatherInfo(code: number): { emoji: string; icon: any; description: 
     1: { emoji: "🌤️", icon: Sun, description: "Mayormente despejado", color: "text-yellow-400" },
     2: { emoji: "⛅", icon: Cloud, description: "Parcialmente nublado", color: "text-gray-400" },
     3: { emoji: "☁️", icon: Cloud, description: "Nublado", color: "text-gray-500" },
-    45: { emoji: "🌫️", icon: Cloud, description: "Niebla", color: "text-gray-400" },
-    48: { emoji: "🌫️", icon: Cloud, description: "Niebla con escarcha", color: "text-gray-400" },
+    45: { emoji: "️", icon: Cloud, description: "Niebla", color: "text-gray-400" },
+    48: { emoji: "️", icon: Cloud, description: "Niebla con escarcha", color: "text-gray-400" },
     51: { emoji: "🌦️", icon: CloudRain, description: "Llovizna ligera", color: "text-blue-400" },
     53: { emoji: "🌦️", icon: CloudRain, description: "Llovizna moderada", color: "text-blue-400" },
-    55: { emoji: "️", icon: CloudRain, description: "Llovizna densa", color: "text-blue-500" },
+    55: { emoji: "🌧️", icon: CloudRain, description: "Llovizna densa", color: "text-blue-500" },
     56: { emoji: "🌧️", icon: CloudRain, description: "Llovizna helada", color: "text-blue-600" },
-    57: { emoji: "🌧️", icon: CloudRain, description: "Llovizna helada densa", color: "text-blue-600" },
+    57: { emoji: "️", icon: CloudRain, description: "Llovizna helada densa", color: "text-blue-600" },
     61: { emoji: "🌧️", icon: CloudRain, description: "Lluvia ligera", color: "text-blue-500" },
     63: { emoji: "🌧️", icon: CloudRain, description: "Lluvia moderada", color: "text-blue-600" },
-    65: { emoji: "️", icon: CloudRain, description: "Lluvia intensa", color: "text-blue-700" },
+    65: { emoji: "🌧️", icon: CloudRain, description: "Lluvia intensa", color: "text-blue-700" },
     66: { emoji: "🌧️", icon: CloudRain, description: "Lluvia helada", color: "text-blue-700" },
     67: { emoji: "🌧️", icon: CloudRain, description: "Lluvia helada intensa", color: "text-blue-700" },
-    71: { emoji: "️", icon: CloudSnow, description: "Nevada ligera", color: "text-blue-300" },
+    71: { emoji: "🌨️", icon: CloudSnow, description: "Nevada ligera", color: "text-blue-300" },
     73: { emoji: "🌨️", icon: CloudSnow, description: "Nevada moderada", color: "text-blue-400" },
     75: { emoji: "❄️", icon: CloudSnow, description: "Nevada intensa", color: "text-blue-500" },
     77: { emoji: "❄️", icon: CloudSnow, description: "Granizo", color: "text-blue-400" },
-    80: { emoji: "🌦️", icon: CloudRain, description: "Chubascos ligeros", color: "text-blue-400" },
+    80: { emoji: "️", icon: CloudRain, description: "Chubascos ligeros", color: "text-blue-400" },
     81: { emoji: "🌧️", icon: CloudRain, description: "Chubascos moderados", color: "text-blue-500" },
     82: { emoji: "🌧️", icon: CloudRain, description: "Chubascos violentos", color: "text-blue-600" },
-    85: { emoji: "️", icon: CloudSnow, description: "Chubascos de nieve", color: "text-blue-300" },
+    85: { emoji: "🌨️", icon: CloudSnow, description: "Chubascos de nieve", color: "text-blue-300" },
     86: { emoji: "❄️", icon: CloudSnow, description: "Chubascos de nieve intensos", color: "text-blue-400" },
-    95: { emoji: "⛈️", icon: CloudLightning, description: "Tormenta", color: "text-purple-600" },
-    96: { emoji: "️", icon: CloudLightning, description: "Tormenta con granizo", color: "text-purple-700" },
+    95: { emoji: "️", icon: CloudLightning, description: "Tormenta", color: "text-purple-600" },
+    96: { emoji: "⛈️", icon: CloudLightning, description: "Tormenta con granizo", color: "text-purple-700" },
     99: { emoji: "⛈️", icon: CloudLightning, description: "Tormenta con granizo intenso", color: "text-purple-800" },
   };
   return weatherMap[code] || { emoji: "🌡️", icon: Wind, description: "Desconocido", color: "text-gray-500" };
@@ -155,20 +155,33 @@ export default function GuestStayPage({ params }: Props) {
     const init = async () => {
       const resolvedParams = await params;
       setTenantSlug(resolvedParams.tenantSlug);
-      const sessionStr = localStorage.getItem("guest_session");
+      
+      // 1. Primero intentar con sessionStorage (acceso directo desde URL)
+      let sessionStr = sessionStorage.getItem("guest_session");
+      
+      // 2. Si no hay, intentar con localStorage (sesión persistente)
+      if (!sessionStr) {
+        sessionStr = localStorage.getItem("guest_session");
+      }
+      
       if (!sessionStr) {
         setError("No hay sesión activa.");
         setLoading(false);
         return;
       }
+      
       try {
         const session = JSON.parse(sessionStr);
+        
+        // Verificar si expiró
         if (session.expiresAt && Date.now() > session.expiresAt) {
+          sessionStorage.removeItem("guest_session");
           localStorage.removeItem("guest_session");
-          setError("La sesión expiró.");
+          setError("La sesión expiró. Por favor, volvé a ingresar desde el link.");
           setLoading(false);
           return;
         }
+        
         await loadStay(session.reservationId, resolvedParams.tenantSlug);
       } catch (e) {
         console.error("Error en init:", e);
@@ -337,6 +350,7 @@ export default function GuestStayPage({ params }: Props) {
   }
 
   function handleLogout() {
+    sessionStorage.removeItem("guest_session");
     localStorage.removeItem("guest_session");
     window.location.href = `/${tenantSlug}`;
   }
@@ -360,6 +374,7 @@ export default function GuestStayPage({ params }: Props) {
             <p className="text-gray-600 mb-6">{error || "No se encontró la reserva"}</p>
             <button
               onClick={() => {
+                sessionStorage.removeItem("guest_session");
                 localStorage.removeItem("guest_session");
                 window.location.href = `/${tenantSlug}`;
               }}
@@ -391,7 +406,6 @@ export default function GuestStayPage({ params }: Props) {
   const paymentPercentage = totalAmount > 0 ? Math.min(100, (paidAmount / totalAmount) * 100) : 0;
   const paymentStatus = reservation.payment_status || "pending";
 
-  // Link de reseñas: usa review_url del tenant, fallback a googleMapsUrl
   const reviewLink = tenant.review_url || settings.googleMapsUrl;
 
   return (
@@ -539,7 +553,7 @@ export default function GuestStayPage({ params }: Props) {
                   {paymentStatus === "paid" ? (
                     <Badge className="bg-green-600 text-white">✅ Pagado</Badge>
                   ) : paymentStatus === "partial" ? (
-                    <Badge className="bg-yellow-600 text-white">️ Parcial</Badge>
+                    <Badge className="bg-yellow-600 text-white">⚠️ Parcial</Badge>
                   ) : (
                     <Badge variant="destructive">⏳ Pendiente</Badge>
                   )}
@@ -580,7 +594,7 @@ export default function GuestStayPage({ params }: Props) {
                   {paidAmount > 0 && (
                     <p className="text-xs text-gray-500 mt-1">
                       {reservation.payment_method === "cash" && "💵 Efectivo"}
-                      {reservation.payment_method === "transfer" && " Transferencia"}
+                      {reservation.payment_method === "transfer" && "🏦 Transferencia"}
                       {reservation.payment_method === "card" && "💳 Tarjeta"}
                       {reservation.payment_method === "mercadopago" && "📱 Mercado Pago"}
                     </p>
@@ -600,7 +614,7 @@ export default function GuestStayPage({ params }: Props) {
               {pendingAmount > 0 && (
                 <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
                   <p className="text-sm text-amber-800">
-                     <strong>Recordá:</strong> El saldo pendiente de {formatCurrency(pendingAmount)} se abona al
+                    💡 <strong>Recordá:</strong> El saldo pendiente de {formatCurrency(pendingAmount)} se abona al
                     momento del check-in.
                   </p>
                 </div>
@@ -858,7 +872,7 @@ export default function GuestStayPage({ params }: Props) {
                         )}
                         {selectedPlace.phone && (
                           <div className="flex items-start gap-2 p-2 bg-white rounded-lg">
-                            <span className="text-gray-500 flex-shrink-0">📞</span>
+                            <span className="text-gray-500 flex-shrink-0"></span>
                             <div>
                               <p className="text-xs text-gray-500">Teléfono</p>
                               <a href={`tel:${selectedPlace.phone}`} className="text-blue-600 hover:underline">
@@ -886,7 +900,7 @@ export default function GuestStayPage({ params }: Props) {
                       </div>
                       {selectedPlace.tips && (
                         <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                          <p className="text-xs text-amber-800 font-medium mb-1">💡 Recomendación del anfitrión</p>
+                          <p className="text-xs text-amber-800 font-medium mb-1"> Recomendación del anfitrión</p>
                           <p className="text-sm text-amber-900">{selectedPlace.tips}</p>
                         </div>
                       )}
@@ -959,7 +973,7 @@ export default function GuestStayPage({ params }: Props) {
                       href={`tel:${contact.phone}`}
                       className="text-sm bg-red-600 text-white px-3 py-1 rounded-lg hover:bg-red-700 transition-colors"
                     >
-                       {contact.phone}
+                      📞 {contact.phone}
                     </a>
                   </div>
                 ))}
@@ -968,7 +982,7 @@ export default function GuestStayPage({ params }: Props) {
           </Card>
         )}
 
-        {/* SECCIÓN DE RESEÑAS - Se muestra después del check-out */}
+        {/* SECCIÓN DE RESEÑAS */}
         {reservation.status === "checked_out" && reviewLink && (
           <Card className="border-2 border-yellow-200 bg-gradient-to-br from-yellow-50 to-amber-50">
             <CardContent className="p-6">

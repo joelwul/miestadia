@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, useSearchParams, useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import GuestStayPage from "@/components/guest/GuestStayPage";
 import TenantLanding from "@/components/public/TenantLanding";
@@ -28,12 +28,12 @@ interface Tenant {
 export default function TenantPage() {
   const params = useParams();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const tenantSlug = params.tenantSlug as string;
   const [tenant, setTenant] = useState<Tenant | null>(null);
   const [units, setUnits] = useState<Unit[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isValidGuest, setIsValidGuest] = useState(false);
-  const [reservationData, setReservationData] = useState<any>(null);
+  const [shouldShowGuestPanel, setShouldShowGuestPanel] = useState(false);
   const supabase = createClient();
 
   useEffect(() => {
@@ -45,7 +45,7 @@ export default function TenantPage() {
 
         if (code && lastName) {
           // 2. Validar automáticamente contra la base de datos
-          const { data: reservation } = await supabase
+          const { data: reservation, error: resError } = await supabase
             .from("reservations")
             .select(`
               id,
@@ -56,20 +56,25 @@ export default function TenantPage() {
             .ilike("guests.last_name", `%${lastName}%`)
             .single();
 
-          if (reservation) {
-            // 3. Si es válido, guardar en sessionStorage (solo para esta sesión)
+          if (reservation && !resError) {
+            // 3. Si es válido, crear sesión temporal
             sessionStorage.setItem("guest_session", JSON.stringify({
               reservationId: reservation.id,
               code: code,
               lastName: lastName,
               expiresAt: Date.now() + (24 * 60 * 60 * 1000), // 24 horas
             }));
-            setIsValidGuest(true);
-            setReservationData(reservation);
+            
+            setShouldShowGuestPanel(true);
+          } else {
+            // Código o apellido inválido
+            alert("Código de reserva o apellido incorrecto. Verificá el email de confirmación.");
+            router.push(`/${tenantSlug}`);
+            return;
           }
         }
 
-        // 4. Cargar datos del tenant (necesario para ambos casos)
+        // 4. Cargar datos del tenant
         const { data: tenantData } = await supabase
           .from("tenants")
           .select("*")
@@ -107,7 +112,7 @@ export default function TenantPage() {
       }
     }
     loadData();
-  }, [tenantSlug, searchParams]);
+  }, [tenantSlug, searchParams, router]);
 
   if (loading) {
     return (
@@ -121,7 +126,7 @@ export default function TenantPage() {
   }
 
   // Si hay parámetros válidos → Panel del huésped
-  if (isValidGuest && tenant) {
+  if (shouldShowGuestPanel && tenant) {
     return <GuestStayPage params={Promise.resolve({ tenantSlug })} />;
   }
 
@@ -139,4 +144,4 @@ export default function TenantPage() {
       </div>
     </div>
   );
-} 
+}
