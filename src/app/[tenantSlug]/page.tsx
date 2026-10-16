@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import GuestStayPage from "@/components/guest/GuestStayPage";
 import TenantLanding from "@/components/public/TenantLanding";
@@ -27,32 +27,27 @@ interface Tenant {
 
 export default function TenantPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const tenantSlug = params.tenantSlug as string;
   const [tenant, setTenant] = useState<Tenant | null>(null);
   const [units, setUnits] = useState<Unit[]>([]);
   const [loading, setLoading] = useState(true);
-  const [hasSession, setHasSession] = useState(false);
+  const [showGuestPanel, setShowGuestPanel] = useState(false);
   const supabase = createClient();
 
   useEffect(() => {
     async function loadData() {
       try {
-        // Verificar si hay sesión de huésped
-        const sessionStr = localStorage.getItem("guest_session");
-        if (sessionStr) {
-          try {
-            const session = JSON.parse(sessionStr);
-            if (session.expiresAt && Date.now() < session.expiresAt) {
-              setHasSession(true);
-            } else {
-              localStorage.removeItem("guest_session");
-            }
-          } catch {
-            localStorage.removeItem("guest_session");
-          }
+        // Verificar si hay parámetros de acceso en la URL
+        const code = searchParams.get("code");
+        const lastName = searchParams.get("lastName");
+
+        if (code && lastName) {
+          // Hay parámetros → mostrar panel del huésped
+          setShowGuestPanel(true);
         }
 
-        // Cargar datos del tenant
+        // Cargar datos del tenant (necesario para ambos casos)
         const { data: tenantData } = await supabase
           .from("tenants")
           .select("*")
@@ -90,7 +85,7 @@ export default function TenantPage() {
       }
     }
     loadData();
-  }, [tenantSlug]);
+  }, [tenantSlug, searchParams]);
 
   if (loading) {
     return (
@@ -103,12 +98,12 @@ export default function TenantPage() {
     );
   }
 
-  // Si hay sesión de huésped, mostrar el panel del huésped
-  if (hasSession) {
+  // Si hay parámetros code y lastName → Panel del huésped
+  if (showGuestPanel && tenant) {
     return <GuestStayPage params={Promise.resolve({ tenantSlug })} />;
   }
 
-  // Si no hay sesión, mostrar la landing pública
+  // Si no hay parámetros → Landing pública
   if (tenant) {
     return <TenantLanding tenant={tenant} units={units} />;
   }
