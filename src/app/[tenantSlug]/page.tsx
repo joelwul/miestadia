@@ -32,22 +32,44 @@ export default function TenantPage() {
   const [tenant, setTenant] = useState<Tenant | null>(null);
   const [units, setUnits] = useState<Unit[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showGuestPanel, setShowGuestPanel] = useState(false);
+  const [isValidGuest, setIsValidGuest] = useState(false);
+  const [reservationData, setReservationData] = useState<any>(null);
   const supabase = createClient();
 
   useEffect(() => {
     async function loadData() {
       try {
-        // Verificar si hay parámetros de acceso en la URL
+        // 1. Verificar si hay parámetros de acceso en la URL
         const code = searchParams.get("code");
         const lastName = searchParams.get("lastName");
 
         if (code && lastName) {
-          // Hay parámetros → mostrar panel del huésped
-          setShowGuestPanel(true);
+          // 2. Validar automáticamente contra la base de datos
+          const { data: reservation } = await supabase
+            .from("reservations")
+            .select(`
+              id,
+              reservation_code,
+              guests (last_name)
+            `)
+            .eq("reservation_code", code)
+            .ilike("guests.last_name", `%${lastName}%`)
+            .single();
+
+          if (reservation) {
+            // 3. Si es válido, guardar en sessionStorage (solo para esta sesión)
+            sessionStorage.setItem("guest_session", JSON.stringify({
+              reservationId: reservation.id,
+              code: code,
+              lastName: lastName,
+              expiresAt: Date.now() + (24 * 60 * 60 * 1000), // 24 horas
+            }));
+            setIsValidGuest(true);
+            setReservationData(reservation);
+          }
         }
 
-        // Cargar datos del tenant (necesario para ambos casos)
+        // 4. Cargar datos del tenant (necesario para ambos casos)
         const { data: tenantData } = await supabase
           .from("tenants")
           .select("*")
@@ -57,7 +79,7 @@ export default function TenantPage() {
         if (tenantData) {
           setTenant(tenantData);
 
-          // Cargar unidades con fotos
+          // 5. Cargar unidades con fotos
           const { data: unitsData } = await supabase
             .from("units")
             .select("*")
@@ -98,8 +120,8 @@ export default function TenantPage() {
     );
   }
 
-  // Si hay parámetros code y lastName → Panel del huésped
-  if (showGuestPanel && tenant) {
+  // Si hay parámetros válidos → Panel del huésped
+  if (isValidGuest && tenant) {
     return <GuestStayPage params={Promise.resolve({ tenantSlug })} />;
   }
 
