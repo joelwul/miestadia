@@ -77,7 +77,6 @@ export default async function AdminLayout({ children, params }: Props) {
           badge: pendingRequests > 0 ? pendingRequests : null,
         },
         { name: 'Reservas', href: `/${tenantSlug}/admin/reservations`, icon: Calendar },
-        { name: 'Pre-Checkins', href: `/${tenantSlug}/admin/pre-checkins`, icon: CheckCircle },
         { name: 'Calendario', href: `/${tenantSlug}/admin/calendar`, icon: Calendar },
         { name: 'Analytics', href: `/${tenantSlug}/admin/analytics`, icon: BarChart3 },
       ],

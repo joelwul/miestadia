@@ -1,24 +1,24 @@
 'use client'
-
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { 
-  Calendar, 
-  Users, 
-  TrendingUp, 
-  Clock, 
-  AlertCircle, 
-  CheckCircle, 
+import {
+  Calendar,
+  Users,
+  TrendingUp,
+  Clock,
+  AlertCircle,
+  CheckCircle,
   Plus,
   ArrowUpRight,
   ArrowDownRight,
   Bed,
   UserCheck,
   UserPlus,
-  BarChart3
+  BarChart3,
+  RefreshCw,
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -42,6 +42,7 @@ export default function DashboardPage({ params }: Props) {
   const [currentGuests, setCurrentGuests] = useState<any[]>([])
   const [recentReservations, setRecentReservations] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const supabase = createClient()
 
   useEffect(() => {
@@ -54,8 +55,7 @@ export default function DashboardPage({ params }: Props) {
   }, [params])
 
   async function loadData(slug: string) {
-    setLoading(true)
-
+    setRefreshing(true)
     const { data: tenant } = await supabase
       .from('tenants')
       .select('id')
@@ -64,15 +64,14 @@ export default function DashboardPage({ params }: Props) {
 
     if (!tenant) {
       setLoading(false)
+      setRefreshing(false)
       return
     }
-
     setTenantId(tenant.id)
 
     const today = new Date().toISOString().split('T')[0]
     const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0]
 
-    // Llegadas hoy
     const { data: arrivalsToday } = await supabase
       .from('reservations')
       .select(`*, guests (first_name, last_name), units (name)`)
@@ -80,7 +79,6 @@ export default function DashboardPage({ params }: Props) {
       .eq('check_in', today)
       .neq('status', 'cancelled')
 
-    // Salidas hoy
     const { data: departuresToday } = await supabase
       .from('reservations')
       .select(`*, guests (first_name, last_name), units (name)`)
@@ -88,7 +86,6 @@ export default function DashboardPage({ params }: Props) {
       .eq('check_out', today)
       .neq('status', 'cancelled')
 
-    // Huéspedes alojados (check_in <= hoy AND check_out > hoy)
     const { data: currentGuestsData } = await supabase
       .from('reservations')
       .select(`*, guests (first_name, last_name), units (name)`)
@@ -97,7 +94,6 @@ export default function DashboardPage({ params }: Props) {
       .gt('check_out', today)
       .neq('status', 'cancelled')
 
-    // Próximas reservas (check_in > hoy)
     const { data: upcomingData } = await supabase
       .from('reservations')
       .select(`*, guests (first_name, last_name), units (name)`)
@@ -107,21 +103,19 @@ export default function DashboardPage({ params }: Props) {
       .order('check_in', { ascending: true })
       .limit(10)
 
-    // Total de reservas
     const { count: totalReservations } = await supabase
       .from('reservations')
       .select('*', { count: 'exact', head: true })
       .eq('tenant_id', tenant.id)
       .neq('status', 'cancelled')
 
-    // Ocupación (unidades activas vs ocupadas)
     const { data: activeUnits } = await supabase
       .from('units')
       .select('id')
       .eq('tenant_id', tenant.id)
       .eq('status', 'active')
 
-    const occupancyRate = activeUnits && activeUnits.length > 0 
+    const occupancyRate = activeUnits && activeUnits.length > 0
       ? Math.round((currentGuestsData?.length || 0) / activeUnits.length * 100)
       : 0
 
@@ -138,8 +132,8 @@ export default function DashboardPage({ params }: Props) {
     setUpcomingArrivals(upcomingData?.slice(0, 5) || [])
     setCurrentGuests(currentGuestsData || [])
     setRecentReservations(upcomingData?.slice(0, 5) || [])
-
     setLoading(false)
+    setRefreshing(false)
   }
 
   function getStatusBadge(status: string) {
@@ -167,18 +161,29 @@ export default function DashboardPage({ params }: Props) {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Header con botón de refresh */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
           <p className="text-gray-500 mt-1">Resumen de tu alojamiento</p>
         </div>
-        <Link href={`/${tenantSlug}/admin/reservations`}>
-          <Button size="lg">
-            <Plus className="mr-2 h-4 w-4" />
-            Nueva Reserva
+        <div className="flex items-center gap-3">
+          <Button
+            onClick={() => loadData(tenantSlug)}
+            disabled={refreshing}
+            variant="outline"
+            className="flex items-center gap-2"
+          >
+            <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+            {refreshing ? 'Actualizando...' : 'Actualizar'}
           </Button>
-        </Link>
+          <Link href={`/${tenantSlug}/admin/reservations`}>
+            <Button size="lg">
+              <Plus className="mr-2 h-4 w-4" />
+              Nueva Reserva
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -196,7 +201,6 @@ export default function DashboardPage({ params }: Props) {
             </div>
           </CardContent>
         </Card>
-
         <Card className="hover:shadow-lg transition-shadow">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -210,7 +214,6 @@ export default function DashboardPage({ params }: Props) {
             </div>
           </CardContent>
         </Card>
-
         <Card className="hover:shadow-lg transition-shadow">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -224,7 +227,6 @@ export default function DashboardPage({ params }: Props) {
             </div>
           </CardContent>
         </Card>
-
         <Card className="hover:shadow-lg transition-shadow">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -238,7 +240,6 @@ export default function DashboardPage({ params }: Props) {
             </div>
           </CardContent>
         </Card>
-
         <Card className="hover:shadow-lg transition-shadow">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
