@@ -108,7 +108,7 @@ interface Tenant {
 }
 
 type FilterType = "all" | "today" | "tomorrow" | "nextweek";
-type StatusFilterType = "all" | "booked" | "pre_checkin_pending" | "pre_checkin_completed" | "checked_in" | "checked_out" | "cancelled";
+type StatusFilterType = "all" | "booked" | "pre_checkin_completed" | "checked_in" | "checked_out" | "cancelled";
 type ModalType = "none" | "add" | "edit" | "qr" | "delete" | "checkin" | "checkout" | "whatsapp" | "payment" | "legend";
 type WhatsAppType = "reminder" | "precheckin" | "during" | "checkout" | "postcheckout";
 type AddMethod = "manual" | "csv" | "text";
@@ -206,7 +206,6 @@ export default function ReservationsPage() {
           .eq("tenant_id", tenantData.id)
           .order("payment_date", { ascending: false });
 
-        // Cargar pre-checkins
         const { data: preCheckinsData } = await supabase
           .from("pre_checkins")
           .select("*")
@@ -260,12 +259,19 @@ export default function ReservationsPage() {
     return t;
   };
 
-  // Determinar el estado real de la reserva (considerando pre-checkin)
+  // Determinar el estado real de la reserva (simplificado a 5 estados)
   const getRealStatus = (res: Reservation): string => {
-    if (res.status === "pre_checkin") {
-      return res.preCheckin && res.preCheckin.status === "completed" ? "pre_checkin_completed" : "pre_checkin_pending";
+    if (res.status === "cancelled") return "cancelled";
+    if (res.status === "checked_in") return "checked_in";
+    if (res.status === "checked_out") return "checked_out";
+    
+    // Si tiene pre-checkin completado → verde
+    if (res.preCheckin && res.preCheckin.status === "completed") {
+      return "pre_checkin_completed";
     }
-    return res.status;
+    
+    // Si no → Reservada (azul), independientemente de si accedió al panel o no
+    return "booked";
   };
 
   const filteredReservations = reservations.filter((res) => {
@@ -288,7 +294,6 @@ export default function ReservationsPage() {
     if (dateFrom && checkIn < new Date(dateFrom)) return false;
     if (dateTo && checkIn > new Date(dateTo)) return false;
 
-    // Filtro por fecha
     switch (filter) {
       case "today":
         if (checkIn.toDateString() !== today.toDateString()) return false;
@@ -301,7 +306,6 @@ export default function ReservationsPage() {
         break;
     }
 
-    // Filtro por estado
     if (statusFilter !== "all" && realStatus !== statusFilter) return false;
 
     return true;
@@ -311,8 +315,6 @@ export default function ReservationsPage() {
     switch (status) {
       case "booked":
         return "bg-blue-100 text-blue-800 border-blue-200";
-      case "pre_checkin_pending":
-        return "bg-yellow-100 text-yellow-800 border-yellow-200";
       case "pre_checkin_completed":
         return "bg-green-100 text-green-800 border-green-200";
       case "checked_in":
@@ -330,8 +332,6 @@ export default function ReservationsPage() {
     switch (status) {
       case "booked":
         return "Reservada";
-      case "pre_checkin_pending":
-        return "Pre-checkin pendiente";
       case "pre_checkin_completed":
         return "Pre-checkin completado";
       case "checked_in":
@@ -349,8 +349,6 @@ export default function ReservationsPage() {
     switch (status) {
       case "booked":
         return <CheckCircle className="w-4 h-4" />;
-      case "pre_checkin_pending":
-        return <Clock className="w-4 h-4" />;
       case "pre_checkin_completed":
         return <CheckCircle className="w-4 h-4" />;
       case "checked_in":
@@ -379,7 +377,7 @@ export default function ReservationsPage() {
     const firstName = reservation.guest.first_name;
     switch (type) {
       case "reminder":
-        return `¡Hola ${firstName}! 👋\n\nTe recordamos tu próxima reserva en *${tenant.name}*:\n\n📅 Check-in: ${checkIn}\n📅 Check-out: ${checkOut}\n🏠 Unidad: ${unitName}\n🔑 Código: ${code}\n\nAccedé a tu panel de huésped: ${guestPanelUrl}\n\n¡Te esperamos!\n\n— ${tenant.name}`;
+        return `¡Hola ${firstName}! 👋\n\nTe recordamos tu próxima reserva en *${tenant.name}*:\n\n Check-in: ${checkIn}\n Check-out: ${checkOut}\n🏠 Unidad: ${unitName}\n🔑 Código: ${code}\n\nAccedé a tu panel de huésped: ${guestPanelUrl}\n\n¡Te esperamos!\n\n— ${tenant.name}`;
       case "precheckin":
         return `¡Hola ${firstName}! 📋\n\nTu check-in en *${tenant.name}* se acerca (${checkIn}).\n\nPara agilizar tu llegada, completá el pre check-in digital:\n${guestPanelUrl}\n\nAsí llegás directo a tu unidad sin trámites.\n\n— ${tenant.name}`;
       case "during":
@@ -417,15 +415,12 @@ export default function ReservationsPage() {
 
   const openCheckInModal = (reservation: Reservation) => {
     setSelectedReservation(reservation);
-    
-    // Buscar pre-checkin completado
     const preCheckin = reservation.preCheckin;
-    
     setCheckinData({
       document_number: preCheckin?.document_number || "",
       vehicle_plate: preCheckin?.vehicle_plate || "",
-      emergency_contact: preCheckin?.emergency_contact_name 
-        ? `${preCheckin.emergency_contact_name} - ${preCheckin.emergency_contact_phone || ""}` 
+      emergency_contact: preCheckin?.emergency_contact_name
+        ? `${preCheckin.emergency_contact_name} - ${preCheckin.emergency_contact_phone || ""}`
         : "",
       observations: preCheckin?.special_requests || "",
       attended_by: "",
@@ -808,11 +803,10 @@ export default function ReservationsPage() {
     }
   };
 
-  // Contadores por estado para el filtro
+  // Contadores por estado (5 estados simplificados)
   const statusCounts = {
     all: reservations.length,
     booked: reservations.filter((r) => getRealStatus(r) === "booked").length,
-    pre_checkin_pending: reservations.filter((r) => getRealStatus(r) === "pre_checkin_pending").length,
     pre_checkin_completed: reservations.filter((r) => getRealStatus(r) === "pre_checkin_completed").length,
     checked_in: reservations.filter((r) => getRealStatus(r) === "checked_in").length,
     checked_out: reservations.filter((r) => getRealStatus(r) === "checked_out").length,
@@ -860,7 +854,6 @@ export default function ReservationsPage() {
 
       {/* FILTROS */}
       <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-4">
-        {/* Fila 1: Búsqueda y fechas */}
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -923,7 +916,7 @@ export default function ReservationsPage() {
           </div>
         </div>
 
-        {/* Fila 2: Filtro por estado */}
+        {/* Filtro por estado (5 estados simplificados) */}
         <div className="flex items-center gap-3 flex-wrap">
           <div className="flex items-center gap-2 text-sm text-gray-600">
             <Filter className="w-4 h-4" />
@@ -932,7 +925,6 @@ export default function ReservationsPage() {
           {[
             { key: "all", label: "Todas", count: statusCounts.all, color: "gray" },
             { key: "booked", label: "Reservada", count: statusCounts.booked, color: "blue" },
-            { key: "pre_checkin_pending", label: "Pre-checkin pendiente", count: statusCounts.pre_checkin_pending, color: "yellow" },
             { key: "pre_checkin_completed", label: "Pre-checkin completado", count: statusCounts.pre_checkin_completed, color: "green" },
             { key: "checked_in", label: "Check-in", count: statusCounts.checked_in, color: "purple" },
             { key: "checked_out", label: "Check-out", count: statusCounts.checked_out, color: "gray" },
@@ -949,7 +941,6 @@ export default function ReservationsPage() {
             >
               <span className={`w-2 h-2 rounded-full ${
                 item.color === "blue" ? "bg-blue-500" :
-                item.color === "yellow" ? "bg-yellow-500" :
                 item.color === "green" ? "bg-green-500" :
                 item.color === "purple" ? "bg-purple-500" :
                 item.color === "red" ? "bg-red-500" :
@@ -1052,7 +1043,7 @@ export default function ReservationsPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2 ml-4">
-                    {reservation.status === "booked" || reservation.status === "pre_checkin" ? (
+                    {reservation.status === "booked" || reservation.status === "pre_checkin" || realStatus === "pre_checkin_completed" ? (
                       <button
                         onClick={() => openCheckInModal(reservation)}
                         className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
@@ -1118,7 +1109,7 @@ export default function ReservationsPage() {
         </div>
       )}
 
-      {/* MODAL: Leyenda de colores */}
+      {/* MODAL: Leyenda de colores (5 estados simplificados) */}
       {activeModal === "legend" && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
@@ -1133,12 +1124,11 @@ export default function ReservationsPage() {
             </div>
             <div className="space-y-3">
               {[
-                { color: "bg-blue-100 text-blue-800 border-blue-200", label: "Reservada", desc: "Reserva confirmada, huésped aún no completó pre-checkin" },
-                { color: "bg-yellow-100 text-yellow-800 border-yellow-200", label: "Pre-checkin pendiente", desc: "Huésped no completó el formulario de pre-checkin" },
-                { color: "bg-green-100 text-green-800 border-green-200", label: "Pre-checkin completado", desc: "Huésped completó el formulario de pre-checkin" },
-                { color: "bg-purple-100 text-purple-800 border-purple-200", label: "Check-in", desc: "Huésped actualmente alojado" },
-                { color: "bg-gray-100 text-gray-800 border-gray-200", label: "Check-out", desc: "Huésped ya se fue, reserva finalizada" },
-                { color: "bg-red-100 text-red-800 border-red-200", label: "Cancelada", desc: "Reserva cancelada" },
+                { color: "bg-blue-100 text-blue-800 border-blue-200", label: "Reservada", desc: "Reserva confirmada. El huésped aún no completó el pre-checkin." },
+                { color: "bg-green-100 text-green-800 border-green-200", label: "Pre-checkin completado", desc: "El huésped completó el formulario de pre-checkin con sus datos." },
+                { color: "bg-purple-100 text-purple-800 border-purple-200", label: "Check-in", desc: "El admin confirmó la llegada del huésped. Está alojado actualmente." },
+                { color: "bg-gray-100 text-gray-800 border-gray-200", label: "Check-out", desc: "El huésped ya se fue. Reserva finalizada." },
+                { color: "bg-red-100 text-red-800 border-red-200", label: "Cancelada", desc: "Reserva cancelada por el admin o el huésped." },
               ].map((item, idx) => (
                 <div key={idx} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
                   <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border ${item.color} flex-shrink-0`}>
@@ -1202,7 +1192,6 @@ export default function ReservationsPage() {
                 </div>
               </div>
 
-              {/* Datos del pre-checkin si existen */}
               {selectedReservation.preCheckin && (
                 <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                   <p className="text-xs font-bold text-green-800 mb-3 flex items-center gap-2">
@@ -1568,7 +1557,13 @@ export default function ReservationsPage() {
                   {selectedReservation.guest?.first_name} {selectedReservation.guest?.last_name}
                 </p>
               </div>
-              <button onClick={() => { setActiveModal("none"); setSelectedReservation(null); }} className="text-gray-400 hover:text-gray-600">
+              <button
+                onClick={() => {
+                  setActiveModal("none");
+                  setSelectedReservation(null);
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
                 <X className="w-6 h-6" />
               </button>
             </div>
@@ -1613,7 +1608,13 @@ export default function ReservationsPage() {
           <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b border-gray-200 flex items-center justify-between">
               <h2 className="text-2xl font-bold text-gray-900">Editar reserva {selectedReservation.reservation_code}</h2>
-              <button onClick={() => { setActiveModal("none"); setSelectedReservation(null); }} className="text-gray-400 hover:text-gray-600">
+              <button
+                onClick={() => {
+                  setActiveModal("none");
+                  setSelectedReservation(null);
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
                 <X className="w-6 h-6" />
               </button>
             </div>
@@ -1747,7 +1748,14 @@ export default function ReservationsPage() {
                 disabled={actionLoading === "checkout"}
                 className="flex-1 px-4 py-2 bg-orange-600 text-white rounded-lg text-sm font-medium hover:bg-orange-700 disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {actionLoading === "checkout" ? <Loader2 className="w-4 h-4 animate-spin" /> : <><LogOut className="w-4 h-4" />Confirmar check-out</>}
+                {actionLoading === "checkout" ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <>
+                    <LogOut className="w-4 h-4" />
+                    Confirmar check-out
+                  </>
+                )}
               </button>
             </div>
           </div>
@@ -1771,7 +1779,13 @@ export default function ReservationsPage() {
               ¿Estás seguro que querés eliminar la reserva de <strong>{selectedReservation.guest?.first_name} {selectedReservation.guest?.last_name}</strong>? Esta acción no se puede deshacer.
             </p>
             <div className="flex gap-3">
-              <button onClick={() => { setActiveModal("none"); setSelectedReservation(null); }} className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">
+              <button
+                onClick={() => {
+                  setActiveModal("none");
+                  setSelectedReservation(null);
+                }}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
                 Cancelar
               </button>
               <button
@@ -1779,7 +1793,14 @@ export default function ReservationsPage() {
                 disabled={actionLoading === `delete-${selectedReservation.id}`}
                 className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {actionLoading === `delete-${selectedReservation.id}` ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Trash2 className="w-4 h-4" />Eliminar</>}
+                {actionLoading === `delete-${selectedReservation.id}` ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4" />
+                    Eliminar
+                  </>
+                )}
               </button>
             </div>
           </div>
