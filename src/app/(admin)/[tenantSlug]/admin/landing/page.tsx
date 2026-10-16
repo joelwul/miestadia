@@ -15,6 +15,7 @@ import {
   Settings,
   X,
   GripVertical,
+  ExternalLink,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -54,7 +55,7 @@ export default function LandingConfigPage() {
     async function init() {
       const { data: tenant } = await supabase
         .from("tenants")
-        .select("id, settings")
+        .select("id, settings, name")
         .eq("slug", tenantSlug)
         .single();
 
@@ -183,10 +184,21 @@ export default function LandingConfigPage() {
           <h1 className="text-3xl font-bold text-gray-900">Configuración de la Landing</h1>
           <p className="text-gray-500 mt-1">Personalizá cómo se ve tu página pública</p>
         </div>
-        <Button onClick={handleSave} disabled={saving} className="flex items-center gap-2">
-          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-          Guardar cambios
-        </Button>
+        <div className="flex items-center gap-3">
+          <a
+            href={`https://miestadia.online/${tenantSlug}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium shadow-sm"
+          >
+            <ExternalLink className="w-4 h-4" />
+            Ver mi sitio web
+          </a>
+          <Button onClick={handleSave} disabled={saving} className="flex items-center gap-2">
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            Guardar cambios
+          </Button>
+        </div>
       </div>
 
       {/* Tabs */}

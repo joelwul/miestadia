@@ -25,46 +25,63 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const [emailExists, setEmailExists] = useState(false);
+  const [checkingEmail, setCheckingEmail] = useState(false);
   const router = useRouter();
   const supabase = createClient();
+
+  // Verificar si el email ya está registrado (debounce)
+  async function checkEmailExists(emailToCheck: string) {
+    if (!emailToCheck || !emailToCheck.includes("@")) {
+      setEmailExists(false);
+      return;
+    }
+    setCheckingEmail(true);
+    try {
+      const { data } = await supabase
+        .from("tenants")
+        .select("id")
+        .eq("owner_email", emailToCheck)
+        .maybeSingle();
+
+      setEmailExists(!!data);
+    } catch {
+      setEmailExists(false);
+    } finally {
+      setCheckingEmail(false);
+    }
+  }
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError("");
-
     try {
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
-
       if (authError) {
         setError(authError.message);
         setLoading(false);
         return;
       }
-
       if (authData.user) {
-        // Buscar tenant por owner_email
         const { data: tenant } = await supabase
           .from("tenants")
           .select("slug")
           .eq("owner_email", email)
           .single();
-
         if (tenant?.slug) {
-          router.push(`/${tenant.slug}/admin/dashboard`);
+          router.push(`/${tenant.slug}/admin`);
         } else {
-          // Buscar por tenant_users
           const { data: tenantUser } = await supabase
             .from("tenant_users")
             .select("tenants(slug)")
             .eq("user_id", authData.user.id)
             .single();
-
           if (tenantUser?.tenants?.slug) {
-            router.push(`/${tenantUser.tenants.slug}/admin/dashboard`);
+            router.push(`/${tenantUser.tenants.slug}/admin`);
           } else {
             setError("No se encontró un panel asociado a esta cuenta. Contactá soporte.");
             setLoading(false);
@@ -82,6 +99,13 @@ export default function LoginPage() {
     setLoading(true);
     setError("");
 
+    // Validación de email duplicado
+    if (emailExists) {
+      setError("Este email ya está registrado. ¿Olvidaste tu contraseña?");
+      setLoading(false);
+      return;
+    }
+
     try {
       // 1. Crear usuario en Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -94,13 +118,15 @@ export default function LoginPage() {
           },
         },
       });
-
       if (authError) {
-        setError(authError.message);
+        if (authError.message.includes("already registered")) {
+          setError("Este email ya está registrado. ¿Olvidaste tu contraseña?");
+        } else {
+          setError(authError.message);
+        }
         setLoading(false);
         return;
       }
-
       if (!authData.user) {
         setError("No se pudo crear el usuario. Verificá tu email.");
         setLoading(false);
@@ -112,17 +138,14 @@ export default function LoginPage() {
         ?.toLowerCase()
         .replace(/\s+/g, "-")
         .replace(/[^a-z0-9-]/g, "") || "mi-propiedad";
-      
       let slug = baseSlug;
       let counter = 1;
-
       while (true) {
         const { data: existingSlug } = await supabase
           .from("tenants")
           .select("id")
           .eq("slug", slug)
           .single();
-
         if (!existingSlug) break;
         slug = `${baseSlug}-${counter}`;
         counter++;
@@ -132,7 +155,7 @@ export default function LoginPage() {
       const trialEndsAt = new Date();
       trialEndsAt.setDate(trialEndsAt.getDate() + 30);
 
-      // 4. Crear tenant (SIN owner_id - usamos owner_email y owner_name)
+      // 4. Crear tenant
       const { data: newTenant, error: tenantError } = await supabase
         .from("tenants")
         .insert({
@@ -195,12 +218,10 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     setError("");
-
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/login`,
       });
-
       if (error) {
         setError(error.message);
         setLoading(false);
@@ -221,7 +242,6 @@ export default function LoginPage() {
         <div className="absolute top-10 left-10 w-64 h-64 bg-white/5 rounded-full blur-3xl" />
         <div className="absolute bottom-10 right-10 w-96 h-96 bg-white/5 rounded-full blur-3xl" />
       </div>
-
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -270,7 +290,6 @@ export default function LoginPage() {
             <p className="text-sm text-white/70">© 2026 Mi Estadía. Todos los derechos reservados.</p>
           </div>
         </div>
-
         <div className="p-8 md:p-12 flex flex-col justify-center">
           <AnimatePresence mode="wait">
             {view === "login" && (
@@ -327,7 +346,6 @@ export default function LoginPage() {
                 <p className="text-xs text-center text-gray-500">30 días de prueba gratis • Sin tarjeta de crédito</p>
               </motion.div>
             )}
-
             {view === "register" && (
               <motion.div key="register" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
                 <div>
@@ -359,8 +377,42 @@ export default function LoginPage() {
                     <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
                     <div className="relative">
                       <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                      <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]" placeholder="tu@email.com" />
+                      <input
+                        type="email"
+                        value={email}
+                        onChange={(e) => {
+                          setEmail(e.target.value);
+                          checkEmailExists(e.target.value);
+                        }}
+                        onBlur={() => checkEmailExists(email)}
+                        required
+                        className={`w-full pl-10 pr-10 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E] ${
+                          emailExists ? "border-red-300 bg-red-50" : "border-gray-300"
+                        }`}
+                        placeholder="tu@email.com"
+                      />
+                      {checkingEmail && (
+                        <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 animate-spin" />
+                      )}
+                      {!checkingEmail && emailExists && (
+                        <AlertCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-red-500" />
+                      )}
+                      {!checkingEmail && !emailExists && email && email.includes("@") && (
+                        <CheckCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-green-500" />
+                      )}
                     </div>
+                    {emailExists && (
+                      <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3" />
+                        Este email ya está registrado
+                      </p>
+                    )}
+                    {!emailExists && email && email.includes("@") && (
+                      <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                        <CheckCircle className="w-3 h-3" />
+                        Email disponible
+                      </p>
+                    )}
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Contraseña</label>
@@ -369,14 +421,13 @@ export default function LoginPage() {
                       <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]" placeholder="Mínimo 6 caracteres" />
                     </div>
                   </div>
-                  <button type="submit" disabled={loading} className="w-full bg-[#0F766E] text-white py-3 rounded-lg font-semibold hover:bg-[#0F766E]/90 transition-colors flex items-center justify-center gap-2 disabled:opacity-50">
+                  <button type="submit" disabled={loading || emailExists} className="w-full bg-[#0F766E] text-white py-3 rounded-lg font-semibold hover:bg-[#0F766E]/90 transition-colors flex items-center justify-center gap-2 disabled:opacity-50">
                     {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <><span>Crear cuenta</span><ArrowRight className="w-5 h-5" /></>}
                   </button>
                 </form>
                 <button onClick={() => setView("login")} className="w-full text-center text-sm text-gray-600 hover:text-[#0F766E]">¿Ya tenés cuenta? Ingresá aquí</button>
               </motion.div>
             )}
-
             {view === "forgot" && (
               <motion.div key="forgot" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
                 <div>
@@ -404,7 +455,6 @@ export default function LoginPage() {
                 <button onClick={() => setView("login")} className="w-full text-center text-sm text-gray-600 hover:text-[#0F766E]">Volver al login</button>
               </motion.div>
             )}
-
             {view === "success" && (
               <motion.div key="success" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="text-center space-y-6 py-8">
                 <div className="inline-flex items-center justify-center w-20 h-20 bg-green-100 rounded-full">
