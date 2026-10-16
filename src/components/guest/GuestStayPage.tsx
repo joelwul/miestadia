@@ -34,7 +34,6 @@ import {
   Waves,
   ExternalLink,
   DollarSign,
-  CreditCard,
   TrendingUp,
   Star,
   Phone,
@@ -88,7 +87,7 @@ function getWeatherInfo(code: number): { emoji: string; icon: any; description: 
     57: { emoji: "🌧️", icon: CloudRain, description: "Llovizna helada densa", color: "text-blue-600" },
     61: { emoji: "🌧️", icon: CloudRain, description: "Lluvia ligera", color: "text-blue-500" },
     63: { emoji: "🌧️", icon: CloudRain, description: "Lluvia moderada", color: "text-blue-600" },
-    65: { emoji: "️", icon: CloudRain, description: "Lluvia intensa", color: "text-blue-700" },
+    65: { emoji: "🌧️", icon: CloudRain, description: "Lluvia intensa", color: "text-blue-700" },
     66: { emoji: "🌧️", icon: CloudRain, description: "Lluvia helada", color: "text-blue-700" },
     67: { emoji: "🌧️", icon: CloudRain, description: "Lluvia helada intensa", color: "text-blue-700" },
     71: { emoji: "🌨️", icon: CloudSnow, description: "Nevada ligera", color: "text-blue-300" },
@@ -96,11 +95,11 @@ function getWeatherInfo(code: number): { emoji: string; icon: any; description: 
     75: { emoji: "❄️", icon: CloudSnow, description: "Nevada intensa", color: "text-blue-500" },
     77: { emoji: "❄️", icon: CloudSnow, description: "Granizo", color: "text-blue-400" },
     80: { emoji: "🌦️", icon: CloudRain, description: "Chubascos ligeros", color: "text-blue-400" },
-    81: { emoji: "️", icon: CloudRain, description: "Chubascos moderados", color: "text-blue-500" },
+    81: { emoji: "🌧️", icon: CloudRain, description: "Chubascos moderados", color: "text-blue-500" },
     82: { emoji: "🌧️", icon: CloudRain, description: "Chubascos violentos", color: "text-blue-600" },
     85: { emoji: "🌨️", icon: CloudSnow, description: "Chubascos de nieve", color: "text-blue-300" },
     86: { emoji: "❄️", icon: CloudSnow, description: "Chubascos de nieve intensos", color: "text-blue-400" },
-    95: { emoji: "⛈️", icon: CloudLightning, description: "Tormenta", color: "text-purple-600" },
+    95: { emoji: "️", icon: CloudLightning, description: "Tormenta", color: "text-purple-600" },
     96: { emoji: "⛈️", icon: CloudLightning, description: "Tormenta con granizo", color: "text-purple-700" },
     99: { emoji: "⛈️", icon: CloudLightning, description: "Tormenta con granizo intenso", color: "text-purple-800" },
   };
@@ -137,7 +136,6 @@ function formatCurrency(amount: number): string {
   }).format(amount || 0);
 }
 
-// Componente de pestaña de color reutilizable
 function ColorTab({ 
   color, 
   icon: Icon, 
@@ -736,6 +734,33 @@ export default function GuestStayPage({ params }: Props) {
           )}
         </ColorTab>
 
+        {/* PRE CHECK-IN (MOVIDO ARRIBA) */}
+        <div className={`rounded-2xl p-6 border-2 shadow-lg ${preCheckinCompleted ? "border-green-200 bg-gradient-to-br from-green-50 to-emerald-50" : "border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50"}`}>
+          <div className="flex items-start gap-4">
+            <div className={`h-14 w-14 rounded-xl flex items-center justify-center flex-shrink-0 ${preCheckinCompleted ? "bg-green-600" : "bg-blue-600"}`}>
+              <ClipboardList className="h-7 w-7 text-white" />
+            </div>
+            <div className="flex-1">
+              <h3 className={`font-bold text-xl ${preCheckinCompleted ? "text-green-900" : "text-blue-900"}`}>
+                Pre Check-in
+              </h3>
+              <p className={`text-sm mt-1 mb-4 ${preCheckinCompleted ? "text-green-700" : "text-blue-700"}`}>
+                {preCheckinCompleted 
+                  ? "✓ Completado. Podés editar tus datos si es necesario." 
+                  : "Completá tus datos antes de llegar para agilizar tu check-in."}
+              </p>
+              <button
+                onClick={handlePreCheckinClick}
+                className={`px-6 py-3 rounded-xl text-white font-semibold transition-all shadow-md hover:shadow-lg ${
+                  preCheckinCompleted ? "bg-green-600 hover:bg-green-700" : "bg-blue-600 hover:bg-blue-700"
+                }`}
+              >
+                {preCheckinCompleted ? "Editar datos" : "Completar Pre Check-in"}
+              </button>
+            </div>
+          </div>
+        </div>
+
         {/* LLEGADA */}
         {arrivalInstructions?.enabled && (
           <ColorTab color="green" icon={Navigation} title="Instrucciones de llegada" subtitle="Cómo llegar al alojamiento" defaultOpen={true}>
@@ -977,72 +1002,20 @@ export default function GuestStayPage({ params }: Props) {
           </ColorTab>
         )}
 
-        {/* RESEÑAS */}
-        {reservation.status === "checked_out" && reviewLink && (
-          <ColorTab color="yellow" icon={Star} title="¿Cómo fue tu estadía?" subtitle="Tu opinión nos ayuda a mejorar" defaultOpen={true}>
-            <div className="text-center py-4">
-              <p className="text-gray-700 mb-4">
-                Tu opinión nos ayuda a mejorar y a otros huéspedes a elegirnos. ¡Dejanos tu reseña!
-              </p>
-              <a
-                href={reviewLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 bg-yellow-600 text-white px-8 py-3 rounded-lg hover:bg-yellow-700 transition-colors font-medium shadow-lg"
-              >
-                <Star className="h-5 w-5" />
-                Dejar reseña
-                <ExternalLink className="h-4 w-4" />
-              </a>
-              {tenant.review_url ? (
-                <p className="text-xs text-yellow-700 mt-3 flex items-center justify-center gap-1">
-                  <CheckCircle className="h-3 w-3" />
-                  Serás dirigido a nuestra página de reseñas
-                </p>
-              ) : settings.googleMapsUrl ? (
-                <p className="text-xs text-yellow-700 mt-3 flex items-center justify-center gap-1">
-                  <MapPin className="h-3 w-3" />
-                  Serás dirigido a Google Maps para dejar tu reseña
-                </p>
-              ) : null}
-            </div>
-          </ColorTab>
-        )}
-
-        {/* CARDS INFERIORES */}
+        {/* CARDS INFERIORES: Wi-Fi, WhatsApp, Guía */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className={`rounded-2xl p-6 border-2 ${preCheckinCompleted ? "border-green-200 bg-green-50" : "border-blue-200 bg-blue-50"}`}>
+          <div className="rounded-2xl p-6 border-2 border-green-200 bg-gradient-to-br from-green-50 to-emerald-50 shadow-sm">
             <div className="flex items-start gap-3">
-              <ClipboardList className={`h-6 w-6 flex-shrink-0 ${preCheckinCompleted ? "text-green-600" : "text-blue-600"}`} />
-              <div className="flex-1">
-                <h3 className={`font-bold ${preCheckinCompleted ? "text-green-900" : "text-blue-900"}`}>
-                  Pre Check-in
-                </h3>
-                <p className={`text-sm mt-1 mb-4 ${preCheckinCompleted ? "text-green-700" : "text-blue-700"}`}>
-                  {preCheckinCompleted ? "Completado ✓" : "Completá tus datos antes de llegar"}
-                </p>
-                <button
-                  onClick={handlePreCheckinClick}
-                  className={`w-full px-4 py-2.5 rounded-lg text-white font-medium transition-colors ${
-                    preCheckinCompleted ? "bg-green-600 hover:bg-green-700" : "bg-blue-600 hover:bg-blue-700"
-                  }`}
-                >
-                  {preCheckinCompleted ? "Editar" : "Completar"}
-                </button>
+              <div className="h-12 w-12 rounded-xl bg-green-600 flex items-center justify-center flex-shrink-0">
+                <Wifi className="h-6 w-6 text-white" />
               </div>
-            </div>
-          </div>
-
-          <div className="rounded-2xl p-6 border-2 border-green-200 bg-green-50">
-            <div className="flex items-start gap-3">
-              <Wifi className="h-6 w-6 text-green-600 flex-shrink-0" />
               <div className="flex-1">
-                <h3 className="font-bold text-gray-900">Wi-Fi</h3>
+                <h3 className="font-bold text-gray-900 text-lg">Wi-Fi</h3>
                 {settings.wifiNetworks && settings.wifiNetworks.length > 0 ? (
                   <div className="mt-3 space-y-2">
                     {settings.wifiNetworks.map((wifi: any, i: number) => (
                       <div key={i} className="text-sm">
-                        <p className="font-medium">Red: {wifi.ssid}</p>
+                        <p className="font-medium text-gray-900">Red: {wifi.ssid}</p>
                         <p className="text-gray-600">Clave: {wifi.password}</p>
                       </div>
                     ))}
@@ -1054,41 +1027,79 @@ export default function GuestStayPage({ params }: Props) {
             </div>
           </div>
 
-          <div className="rounded-2xl p-6 border-2 border-green-200 bg-green-50">
+          <div className="rounded-2xl p-6 border-2 border-green-200 bg-gradient-to-br from-green-50 to-emerald-50 shadow-sm">
             <div className="flex items-start gap-3">
-              <MessageCircle className="h-6 w-6 text-green-600 flex-shrink-0" />
-              <div>
-                <h3 className="font-bold text-gray-900">¿Necesitás ayuda?</h3>
-                <p className="text-sm text-gray-600 mt-1">Contactanos por WhatsApp</p>
+              <div className="h-12 w-12 rounded-xl bg-green-600 flex items-center justify-center flex-shrink-0">
+                <MessageCircle className="h-6 w-6 text-white" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-bold text-gray-900 text-lg">¿Necesitás ayuda?</h3>
+                <p className="text-sm text-gray-600 mt-1 mb-3">Contactanos por WhatsApp</p>
                 {settings.whatsappNumber && (
                   <a
                     href={`https://wa.me/${settings.whatsappNumber.replace(/\D/g, "")}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-block mt-3"
+                    className="inline-flex items-center gap-2 bg-green-600 text-white px-4 py-2.5 rounded-lg hover:bg-green-700 transition-colors font-medium shadow-sm"
                   >
-                    <span className="inline-block bg-green-600 text-white px-4 py-2.5 rounded-lg hover:bg-green-700 transition-colors font-medium">
-                      Enviar mensaje
-                    </span>
+                    <MessageCircle className="h-4 w-4" />
+                    Enviar mensaje
                   </a>
                 )}
               </div>
             </div>
           </div>
-        </div>
 
-        {/* GUÍA */}
-        <Link href={`/${tenantSlug}/guides`} className="block">
-          <div className="rounded-2xl p-6 bg-white border-2 border-gray-200 hover:shadow-lg transition-shadow cursor-pointer">
-            <div className="flex items-start gap-3">
-              <FileText className="h-6 w-6 text-gray-600 flex-shrink-0" />
-              <div>
-                <h3 className="font-bold text-gray-900">Guía del alojamiento</h3>
-                <p className="text-sm text-gray-600 mt-1">Normas, servicios e información útil</p>
+          <Link href={`/${tenantSlug}/guides`} className="block">
+            <div className="rounded-2xl p-6 border-2 border-gray-200 bg-white hover:shadow-lg transition-shadow cursor-pointer h-full">
+              <div className="flex items-start gap-3">
+                <div className="h-12 w-12 rounded-xl bg-gray-600 flex items-center justify-center flex-shrink-0">
+                  <FileText className="h-6 w-6 text-white" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-bold text-gray-900 text-lg">Guía del alojamiento</h3>
+                  <p className="text-sm text-gray-600 mt-1">Normas, servicios e información útil</p>
+                </div>
               </div>
             </div>
-          </div>
-        </Link>
+          </Link>
+        </div>
+
+        {/* RESEÑAS (AL FINAL) */}
+        {reservation.status === "checked_out" && reviewLink && (
+          <ColorTab color="yellow" icon={Star} title="¿Cómo fue tu estadía?" subtitle="Tu opinión nos ayuda a mejorar" defaultOpen={true}>
+            <div className="text-center py-4">
+              <div className="h-16 w-16 rounded-full bg-yellow-100 flex items-center justify-center mx-auto mb-4">
+                <Star className="h-8 w-8 text-yellow-600" />
+              </div>
+              <h4 className="text-xl font-bold text-gray-900 mb-2">¡Gracias por elegirnos!</h4>
+              <p className="text-gray-700 mb-6 max-w-md mx-auto">
+                Tu opinión nos ayuda a mejorar y a otros huéspedes a elegirnos. ¡Dejanos tu reseña!
+              </p>
+              <a
+                href={reviewLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 bg-yellow-600 text-white px-8 py-4 rounded-xl hover:bg-yellow-700 transition-colors font-semibold shadow-lg hover:shadow-xl"
+              >
+                <Star className="h-5 w-5" />
+                Dejar reseña
+                <ExternalLink className="h-4 w-4" />
+              </a>
+              {tenant.review_url ? (
+                <p className="text-xs text-yellow-700 mt-4 flex items-center justify-center gap-1">
+                  <CheckCircle className="h-3 w-3" />
+                  Serás dirigido a nuestra página de reseñas
+                </p>
+              ) : settings.googleMapsUrl ? (
+                <p className="text-xs text-yellow-700 mt-4 flex items-center justify-center gap-1">
+                  <MapPin className="h-3 w-3" />
+                  Serás dirigido a Google Maps para dejar tu reseña
+                </p>
+              ) : null}
+            </div>
+          </ColorTab>
+        )}
       </div>
 
       {/* FOOTER */}
@@ -1112,4 +1123,4 @@ export default function GuestStayPage({ params }: Props) {
       </footer>
     </div>
   );
-} 
+}
