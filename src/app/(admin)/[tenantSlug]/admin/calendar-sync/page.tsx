@@ -513,5 +513,5 @@ export default function CalendarSyncPage() {
         </CardContent>
       </Card>
     </div>
-  );
+  ); 
 }
