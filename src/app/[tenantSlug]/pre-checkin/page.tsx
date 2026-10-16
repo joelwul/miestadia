@@ -5,17 +5,12 @@ import { useParams, useSearchParams } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import {
   AlertCircle,
   CheckCircle,
   Loader2,
   User,
-  Mail,
-  Phone,
-  FileText,
   Calendar,
-  Home,
   ArrowLeft,
   ClipboardList,
 } from "lucide-react";
@@ -172,10 +167,10 @@ export default function PreCheckinPage() {
     }
     setSaving(true);
     try {
-      // Convertir strings vacíos a null para campos opcionales
       const payload = {
         reservation_id: reservation.id,
-        tenant_id: tenant.id, // ← AGREGADO: tenant_id requerido
+        tenant_id: tenant.id,
+        guest_id: reservation.guest_id, // ← AGREGADO: guest_id requerido
         first_name: formData.firstName || null,
         last_name: formData.lastName || null,
         email: formData.email || null,
