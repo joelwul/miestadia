@@ -17,6 +17,7 @@ import {
   Clock,
   Code,
   Home,
+  BarChart3,
 } from 'lucide-react'
 
 interface Props {
@@ -78,6 +79,7 @@ export default async function AdminLayout({ children, params }: Props) {
         { name: 'Reservas', href: `/${tenantSlug}/admin/reservations`, icon: Calendar },
         { name: 'Pre-Checkins', href: `/${tenantSlug}/admin/pre-checkins`, icon: CheckCircle },
         { name: 'Calendario', href: `/${tenantSlug}/admin/calendar`, icon: Calendar },
+        { name: 'Analytics', href: `/${tenantSlug}/admin/analytics`, icon: BarChart3 },
       ],
     },
     {
