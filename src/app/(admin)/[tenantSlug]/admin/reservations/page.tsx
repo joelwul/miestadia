@@ -206,6 +206,7 @@ export default function ReservationsPage() {
           .eq("tenant_id", tenantData.id)
           .order("payment_date", { ascending: false });
 
+        // CARGAR PRE-CHECKINS (esto faltaba)
         const { data: preCheckinsData } = await supabase
           .from("pre_checkins")
           .select("*")
@@ -216,6 +217,7 @@ export default function ReservationsPage() {
         setPayments(paymentsData || []);
         setPreCheckins(preCheckinsData || []);
 
+        // Enriquecer reservas con guest, unit y preCheckin
         const enriched: Reservation[] = (reservationsData || []).map((res: any) => {
           const preCheckin = (preCheckinsData || []).find((pc: any) => pc.reservation_id === res.id);
           return {
@@ -259,7 +261,7 @@ export default function ReservationsPage() {
     return t;
   };
 
-  // Determinar el estado real de la reserva (simplificado a 5 estados)
+  // Determinar el estado real de la reserva (5 estados simplificados)
   const getRealStatus = (res: Reservation): string => {
     if (res.status === "cancelled") return "cancelled";
     if (res.status === "checked_in") return "checked_in";
@@ -270,7 +272,7 @@ export default function ReservationsPage() {
       return "pre_checkin_completed";
     }
     
-    // Si no → Reservada (azul), independientemente de si accedió al panel o no
+    // Si no → Reservada (azul)
     return "booked";
   };
 
@@ -377,7 +379,7 @@ export default function ReservationsPage() {
     const firstName = reservation.guest.first_name;
     switch (type) {
       case "reminder":
-        return `¡Hola ${firstName}! 👋\n\nTe recordamos tu próxima reserva en *${tenant.name}*:\n\n Check-in: ${checkIn}\n Check-out: ${checkOut}\n🏠 Unidad: ${unitName}\n🔑 Código: ${code}\n\nAccedé a tu panel de huésped: ${guestPanelUrl}\n\n¡Te esperamos!\n\n— ${tenant.name}`;
+        return `¡Hola ${firstName}! 👋\n\nTe recordamos tu próxima reserva en *${tenant.name}*:\n\n📅 Check-in: ${checkIn}\n📅 Check-out: ${checkOut}\n🏠 Unidad: ${unitName}\n🔑 Código: ${code}\n\nAccedé a tu panel de huésped: ${guestPanelUrl}\n\n¡Te esperamos!\n\n— ${tenant.name}`;
       case "precheckin":
         return `¡Hola ${firstName}! 📋\n\nTu check-in en *${tenant.name}* se acerca (${checkIn}).\n\nPara agilizar tu llegada, completá el pre check-in digital:\n${guestPanelUrl}\n\nAsí llegás directo a tu unidad sin trámites.\n\n— ${tenant.name}`;
       case "during":
@@ -803,7 +805,7 @@ export default function ReservationsPage() {
     }
   };
 
-  // Contadores por estado (5 estados simplificados)
+  // Contadores por estado
   const statusCounts = {
     all: reservations.length,
     booked: reservations.filter((r) => getRealStatus(r) === "booked").length,
@@ -916,7 +918,7 @@ export default function ReservationsPage() {
           </div>
         </div>
 
-        {/* Filtro por estado (5 estados simplificados) */}
+        {/* Filtro por estado */}
         <div className="flex items-center gap-3 flex-wrap">
           <div className="flex items-center gap-2 text-sm text-gray-600">
             <Filter className="w-4 h-4" />
@@ -996,12 +998,6 @@ export default function ReservationsPage() {
                         {getStatusIcon(realStatus)}
                         {getStatusLabel(realStatus)}
                       </span>
-                      {reservation.preCheckin && (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-50 text-green-700 border border-green-200">
-                          <CheckCircle className="w-3 h-3" />
-                          Pre-checkin completado
-                        </span>
-                      )}
                     </div>
                     <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
                       <div>
@@ -1043,7 +1039,7 @@ export default function ReservationsPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2 ml-4">
-                    {reservation.status === "booked" || reservation.status === "pre_checkin" || realStatus === "pre_checkin_completed" ? (
+                    {reservation.status === "booked" || realStatus === "pre_checkin_completed" ? (
                       <button
                         onClick={() => openCheckInModal(reservation)}
                         className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
@@ -1109,7 +1105,7 @@ export default function ReservationsPage() {
         </div>
       )}
 
-      {/* MODAL: Leyenda de colores (5 estados simplificados) */}
+      {/* MODAL: Leyenda de colores */}
       {activeModal === "legend" && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
