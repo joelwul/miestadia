@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useParams } from "next/navigation";
 import {
@@ -14,7 +14,6 @@ import {
   AlertCircle,
   Clock,
   Globe,
-  X,
   Save,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -205,7 +204,7 @@ export default function CalendarSyncPage() {
   }
 
   function getSourceIcon(source: string) {
-    if (source === "airbnb") return "🏠";
+    if (source === "airbnb") return "";
     if (source === "booking") return "🏨";
     if (source === "vrbo") return "🏡";
     return "📅";
@@ -236,7 +235,7 @@ export default function CalendarSyncPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Sincronización de Calendarios</h1>
+        <h1 className="text-3xl font-bold text-gray-900">Sincro con Booking y Airbnb</h1>
         <p className="text-gray-500 mt-1">
           Sincronizá tus reservas con Airbnb, Booking y otras plataformas
         </p>
@@ -304,7 +303,6 @@ export default function CalendarSyncPage() {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Formulario para agregar */}
           {showAddForm && (
             <Card className="bg-gray-50 border-2 border-gray-200">
               <CardContent className="p-6 space-y-4">
@@ -397,7 +395,6 @@ export default function CalendarSyncPage() {
             </Card>
           )}
 
-          {/* Lista de sincronizaciones */}
           {syncs.length === 0 ? (
             <div className="text-center py-12 bg-gray-50 rounded-lg">
               <Calendar className="w-12 h-12 text-gray-400 mx-auto mb-3" />
@@ -483,7 +480,6 @@ export default function CalendarSyncPage() {
         </CardContent>
       </Card>
 
-      {/* Instrucciones */}
       <Card className="bg-blue-50 border-blue-200">
         <CardContent className="p-6">
           <h3 className="font-bold text-blue-900 mb-3 flex items-center gap-2">
@@ -513,5 +509,5 @@ export default function CalendarSyncPage() {
         </CardContent>
       </Card>
     </div>
-  ); 
+  );
 }
