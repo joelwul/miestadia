@@ -1112,4 +1112,4 @@ export default function GuestStayPage({ params }: Props) {
       </footer>
     </div>
   );
-}
+} 
