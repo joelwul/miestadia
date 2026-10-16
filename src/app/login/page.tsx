@@ -25,12 +25,15 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  
+  // Estados para validación de duplicados
   const [emailExists, setEmailExists] = useState(false);
   const [checkingEmail, setCheckingEmail] = useState(false);
+  
   const router = useRouter();
   const supabase = createClient();
 
-  // Verificar si el email ya está registrado (debounce)
+  // Verificar si el email ya está registrado (con debounce)
   async function checkEmailExists(emailToCheck: string) {
     if (!emailToCheck || !emailToCheck.includes("@")) {
       setEmailExists(false);
@@ -99,15 +102,15 @@ export default function LoginPage() {
     setLoading(true);
     setError("");
 
-    // Validación de email duplicado
+    // 1. Validación de email duplicado antes de intentar registrar
     if (emailExists) {
-      setError("Este email ya está registrado. ¿Olvidaste tu contraseña?");
+      setError("Este email ya está registrado. Por favor, usá otro o recuperá tu contraseña.");
       setLoading(false);
       return;
     }
 
     try {
-      // 1. Crear usuario en Supabase Auth
+      // 2. Crear usuario en Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
@@ -133,7 +136,7 @@ export default function LoginPage() {
         return;
       }
 
-      // 2. Generar slug único
+      // 3. Generar slug único para la propiedad
       const baseSlug = propertyName
         ?.toLowerCase()
         .replace(/\s+/g, "-")
@@ -151,11 +154,11 @@ export default function LoginPage() {
         counter++;
       }
 
-      // 3. Calcular fecha de fin de trial (30 días)
+      // 4. Calcular fecha de fin de trial (30 días)
       const trialEndsAt = new Date();
       trialEndsAt.setDate(trialEndsAt.getDate() + 30);
 
-      // 4. Crear tenant
+      // 5. Crear tenant
       const { data: newTenant, error: tenantError } = await supabase
         .from("tenants")
         .insert({
@@ -190,7 +193,7 @@ export default function LoginPage() {
         return;
       }
 
-      // 5. Crear relación en tenant_users
+      // 6. Crear relación en tenant_users
       if (newTenant?.id) {
         await supabase
           .from("tenant_users")
@@ -201,7 +204,7 @@ export default function LoginPage() {
           });
       }
 
-      // 6. Éxito
+      // 7. Éxito
       setSuccessMessage(
         "¡Cuenta creada exitosamente! Revisá tu email para verificar tu cuenta. Luego podrás ingresar."
       );
@@ -346,6 +349,7 @@ export default function LoginPage() {
                 <p className="text-xs text-center text-gray-500">30 días de prueba gratis • Sin tarjeta de crédito</p>
               </motion.div>
             )}
+            
             {view === "register" && (
               <motion.div key="register" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
                 <div>
@@ -374,7 +378,7 @@ export default function LoginPage() {
                     </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Email (Nombre de usuario)</label>
                     <div className="relative">
                       <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                       <input
@@ -386,7 +390,7 @@ export default function LoginPage() {
                         }}
                         onBlur={() => checkEmailExists(email)}
                         required
-                        className={`w-full pl-10 pr-10 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E] ${
+                        className={`w-full pl-10 pr-10 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E] transition-colors ${
                           emailExists ? "border-red-300 bg-red-50" : "border-gray-300"
                         }`}
                         placeholder="tu@email.com"
@@ -421,13 +425,18 @@ export default function LoginPage() {
                       <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]" placeholder="Mínimo 6 caracteres" />
                     </div>
                   </div>
-                  <button type="submit" disabled={loading || emailExists} className="w-full bg-[#0F766E] text-white py-3 rounded-lg font-semibold hover:bg-[#0F766E]/90 transition-colors flex items-center justify-center gap-2 disabled:opacity-50">
+                  <button 
+                    type="submit" 
+                    disabled={loading || emailExists} 
+                    className="w-full bg-[#0F766E] text-white py-3 rounded-lg font-semibold hover:bg-[#0F766E]/90 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
                     {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <><span>Crear cuenta</span><ArrowRight className="w-5 h-5" /></>}
                   </button>
                 </form>
                 <button onClick={() => setView("login")} className="w-full text-center text-sm text-gray-600 hover:text-[#0F766E]">¿Ya tenés cuenta? Ingresá aquí</button>
               </motion.div>
             )}
+
             {view === "forgot" && (
               <motion.div key="forgot" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
                 <div>
