@@ -59,4 +59,4 @@ export async function GET() {
     console.error("Error en cron sync:", error);
     return NextResponse.json({ error: "Error interno" }, { status: 500 });
   }
-}
+} 
