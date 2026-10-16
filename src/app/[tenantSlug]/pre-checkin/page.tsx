@@ -1,312 +1,534 @@
-'use client'
+"use client";
+import { useState, useEffect } from "react";
+import { createClient } from "@/lib/supabase/client";
+import { useParams, useSearchParams } from "next/navigation";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import {
+  AlertCircle,
+  CheckCircle,
+  Loader2,
+  User,
+  Mail,
+  Phone,
+  FileText,
+  Calendar,
+  Home,
+  ArrowLeft,
+} from "lucide-react";
 
-import { useState, useEffect } from 'react'
-import { createClient } from '@/lib/supabase/client'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { MapPin, Wifi, MessageCircle, FileText, CheckCircle, ClipboardList, AlertCircle } from 'lucide-react'
+export default function PreCheckinPage() {
+  const params = useParams();
+  const searchParams = useSearchParams();
+  const tenantSlug = params.tenantSlug as string;
+  const [reservation, setReservation] = useState<any>(null);
+  const [tenant, setTenant] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
+  const supabase = createClient();
 
-interface Props {
-  params: Promise<{ tenantSlug: string }>
-}
-
-export default function GuestStayPage({ params }: Props) {
-  const [tenantSlug, setTenantSlug] = useState('')
-  const [reservation, setReservation] = useState<any>(null)
-  const [tenant, setTenant] = useState<any>(null)
-  const [preCheckinCompleted, setPreCheckinCompleted] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const supabase = createClient()
+  const [formData, setFormData] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    phone: "",
+    documentNumber: "",
+    documentType: "DNI",
+    nationality: "Argentina",
+    birthDate: "",
+    emergencyContactName: "",
+    emergencyContactPhone: "",
+    specialRequests: "",
+    arrivalTime: "",
+    vehiclePlate: "",
+    agreeToRules: false,
+  });
 
   useEffect(() => {
     const init = async () => {
-      const resolvedParams = await params
-      setTenantSlug(resolvedParams.tenantSlug)
+      // 1. Intentar obtener parámetros de URL
+      const code = searchParams.get("code");
+      const lastNameParam = searchParams.get("lastName");
 
-      const sessionStr = localStorage.getItem('guest_session')
-      
-      if (!sessionStr) {
-        setError('No hay sesión activa. Por favor, iniciá sesión nuevamente.')
-        setLoading(false)
-        return
-      }
+      let reservationId: string | null = null;
 
-      try {
-        const session = JSON.parse(sessionStr)
-        
-        if (session.expiresAt && Date.now() > session.expiresAt) {
-          localStorage.removeItem('guest_session')
-          setError('La sesión expiró. Por favor, iniciá sesión nuevamente.')
-          setLoading(false)
-          return
+      // 2. Si hay parámetros en URL, validar y crear sesión
+      if (code && lastNameParam) {
+        const { data: res } = await supabase
+          .from("reservations")
+          .select(`id, reservation_code, guests(last_name)`)
+          .eq("reservation_code", code)
+          .ilike("guests.last_name", `%${lastNameParam}%`)
+          .single();
+
+        if (res) {
+          reservationId = res.id;
+          sessionStorage.setItem(
+            "guest_session",
+            JSON.stringify({
+              reservationId: res.id,
+              code,
+              lastName: lastNameParam,
+              expiresAt: Date.now() + 24 * 60 * 60 * 1000,
+            })
+          );
         }
-        
-        await loadStay(session.reservationId, resolvedParams.tenantSlug)
-      } catch (e) {
-        setError('Sesión inválida. Por favor, iniciá sesión nuevamente.')
-        setLoading(false)
       }
+
+      // 3. Si no hay parámetros, intentar con sessionStorage
+      if (!reservationId) {
+        const sessionStr = sessionStorage.getItem("guest_session");
+        if (sessionStr) {
+          try {
+            const session = JSON.parse(sessionStr);
+            if (session.expiresAt && Date.now() < session.expiresAt) {
+              reservationId = session.reservationId;
+            }
+          } catch {
+            sessionStorage.removeItem("guest_session");
+          }
+        }
+      }
+
+      // 4. Si aún no hay, intentar con localStorage
+      if (!reservationId) {
+        const sessionStr = localStorage.getItem("guest_session");
+        if (sessionStr) {
+          try {
+            const session = JSON.parse(sessionStr);
+            if (session.expiresAt && Date.now() < session.expiresAt) {
+              reservationId = session.reservationId;
+            }
+          } catch {
+            localStorage.removeItem("guest_session");
+          }
+        }
+      }
+
+      if (!reservationId) {
+        setError("No hay sesión activa. Por favor, iniciá sesión nuevamente.");
+        setLoading(false);
+        return;
+      }
+
+      // 5. Cargar datos de la reserva
+      const { data: res, error: resError } = await supabase
+        .from("reservations")
+        .select(
+          `*, guests (first_name, last_name, email, phone, document_number), units (name, type, description)`
+        )
+        .eq("id", reservationId)
+        .single();
+
+      if (resError || !res) {
+        setError("No se pudo cargar la reserva");
+        setLoading(false);
+        return;
+      }
+
+      setReservation(res);
+
+      const { data: tenantData } = await supabase
+        .from("tenants")
+        .select("*")
+        .eq("slug", tenantSlug)
+        .single();
+      setTenant(tenantData);
+
+      // 6. Cargar datos existentes del pre-checkin si los hay
+      const { data: existingPreCheckin } = await supabase
+        .from("pre_checkins")
+        .select("*")
+        .eq("reservation_id", reservationId)
+        .maybeSingle();
+
+      // 7. Pre-llenar formulario con datos del huésped
+      const guest = res.guests;
+      setFormData({
+        firstName: existingPreCheckin?.first_name || guest?.first_name || "",
+        lastName: existingPreCheckin?.last_name || guest?.last_name || "",
+        email: existingPreCheckin?.email || guest?.email || "",
+        phone: existingPreCheckin?.phone || guest?.phone || "",
+        documentNumber: existingPreCheckin?.document_number || guest?.document_number || "",
+        documentType: existingPreCheckin?.document_type || "DNI",
+        nationality: existingPreCheckin?.nationality || "Argentina",
+        birthDate: existingPreCheckin?.birth_date || "",
+        emergencyContactName: existingPreCheckin?.emergency_contact_name || "",
+        emergencyContactPhone: existingPreCheckin?.emergency_contact_phone || "",
+        specialRequests: existingPreCheckin?.special_requests || "",
+        arrivalTime: existingPreCheckin?.arrival_time || "",
+        vehiclePlate: existingPreCheckin?.vehicle_plate || "",
+        agreeToRules: existingPreCheckin?.agree_to_rules || false,
+      });
+
+      setLoading(false);
+    };
+    init();
+  }, [tenantSlug, searchParams]);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!formData.agreeToRules) {
+      alert("Debés aceptar las reglas del alojamiento para continuar.");
+      return;
     }
-    init()
-  }, [params])
+    setSaving(true);
+    try {
+      const { data: preCheckin, error: preCheckinError } = await supabase
+        .from("pre_checkins")
+        .upsert(
+          {
+            reservation_id: reservation.id,
+            first_name: formData.firstName,
+            last_name: formData.lastName,
+            email: formData.email,
+            phone: formData.phone,
+            document_number: formData.documentNumber,
+            document_type: formData.documentType,
+            nationality: formData.nationality,
+            birth_date: formData.birthDate,
+            emergency_contact_name: formData.emergencyContactName,
+            emergency_contact_phone: formData.emergencyContactPhone,
+            special_requests: formData.specialRequests,
+            arrival_time: formData.arrivalTime,
+            vehicle_plate: formData.vehiclePlate,
+            agree_to_rules: formData.agreeToRules,
+            status: "completed",
+            completed_at: new Date().toISOString(),
+          },
+          { onConflict: "reservation_id" }
+        )
+        .select()
+        .single();
 
-  async function loadStay(reservationId: string, slug: string) {
-    const { data: res, error: resError } = await supabase
-      .from('reservations')
-      .select(`*, guests (first_name, last_name, email, phone), units (name, type, description)`)
-      .eq('id', reservationId)
-      .single()
+      if (preCheckinError) throw preCheckinError;
 
-    if (resError || !res) {
-      setError('No se pudo cargar la reserva')
-      setLoading(false)
-      return
-    }
-
-    setReservation(res)
-
-    const { data: tenantData } = await supabase
-      .from('tenants')
-      .select('*')
-      .eq('slug', slug)
-      .single()
-
-    setTenant(tenantData)
-
-    if (res.status === 'booked') {
+      // Actualizar estado de la reserva a pre_checkin
       await supabase
-        .from('reservations')
-        .update({ status: 'pre_checkin' })
-        .eq('id', reservationId)
+        .from("reservations")
+        .update({ status: "pre_checkin" })
+        .eq("id", reservation.id);
+
+      setSuccess(true);
+    } catch (err: any) {
+      alert("Error al guardar: " + err.message);
+    } finally {
+      setSaving(false);
     }
-
-    // Verificar si ya completó el pre-checkin
-    const { data: existingPreCheckin } = await supabase
-      .from('pre_checkins')
-      .select('id, status')
-      .eq('reservation_id', reservationId)
-      .eq('status', 'completed')
-      .maybeSingle()
-
-    if (existingPreCheckin) {
-      setPreCheckinCompleted(true)
-    }
-
-    setLoading(false)
   }
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-emerald-100">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
           <p className="mt-4 text-gray-600">Cargando...</p>
         </div>
       </div>
-    )
+    );
   }
 
   if (error || !reservation || !tenant) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-50 flex items-center justify-center p-4">
         <Card className="max-w-md w-full">
           <CardContent className="p-6 text-center">
             <AlertCircle className="h-12 w-12 mx-auto mb-4 text-red-500" />
             <h2 className="text-xl font-bold text-gray-900 mb-2">Error</h2>
-            <p className="text-gray-600 mb-6">{error || 'No se encontró la reserva'}</p>
-            <Button onClick={() => {
-              localStorage.removeItem('guest_session')
-              window.location.href = `/${tenantSlug}`
-            }}>
+            <p className="text-gray-600 mb-6">{error || "No se encontró la reserva"}</p>
+            <Button
+              onClick={() => {
+                sessionStorage.removeItem("guest_session");
+                localStorage.removeItem("guest_session");
+                window.location.href = `/${tenantSlug}`;
+              }}
+              className="bg-green-600 hover:bg-green-700"
+            >
               Volver al inicio
             </Button>
           </CardContent>
         </Card>
       </div>
-    )
+    );
   }
 
-  const settings = tenant.settings || {}
-  const checkInDate = new Date(reservation.check_in)
-  const checkOutDate = new Date(reservation.check_out)
-
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-green-700 text-white p-6">
-        <div className="max-w-4xl mx-auto">
-          <h1 className="text-2xl font-bold">¡Hola, {reservation.guests?.first_name}!</h1>
-          <p className="text-green-100 mt-1">{tenant.name}</p>
-          <Badge className="mt-2 bg-white/20 text-white border-0">
-            {reservation.status === 'pre_checkin' ? 'Pre Check-in' : reservation.status === 'checked_in' ? 'Alojado' : reservation.status}
-          </Badge>
-        </div>
-      </header>
-
-      <div className="max-w-4xl mx-auto p-6 space-y-6">
-        <Card>
-          <CardContent className="p-6">
-            <h2 className="text-lg font-semibold mb-4">Tu reserva</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-gray-500">Unidad</p>
-                <p className="font-medium">{reservation.units?.name}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">Check-in</p>
-                <p className="font-medium">{checkInDate.toLocaleDateString('es-AR')} - {settings.checkInTime || '15:00'}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">Check-out</p>
-                <p className="font-medium">{checkOutDate.toLocaleDateString('es-AR')} - {settings.checkOutTime || '10:00'}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">Código</p>
-                <p className="font-medium font-mono">{reservation.reservation_code}</p>
-              </div>
+  if (success) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 flex items-center justify-center p-4">
+        <Card className="max-w-md w-full">
+          <CardContent className="p-8 text-center">
+            <div className="h-16 w-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
+              <CheckCircle className="h-8 w-8 text-green-600" />
             </div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">¡Pre Check-in completado!</h2>
+            <p className="text-gray-600 mb-6">
+              Tus datos fueron guardados correctamente. Te esperamos el {new Date(reservation.check_in).toLocaleDateString("es-AR")}.
+            </p>
+            <Button
+              onClick={() => {
+                window.location.href = `/${tenantSlug}?code=${reservation.reservation_code}&lastName=${encodeURIComponent(formData.lastName)}`;
+              }}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              Volver al panel
+            </Button>
           </CardContent>
         </Card>
+      </div>
+    );
+  }
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Pre Check-in */}
-          <Card className={preCheckinCompleted ? 'border-2 border-green-200 bg-green-50' : 'border-2 border-blue-200 bg-blue-50'}>
+  const checkInDate = new Date(reservation.check_in);
+  const checkOutDate = new Date(reservation.check_out);
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 py-8 px-4">
+      <div className="max-w-3xl mx-auto">
+        {/* Header */}
+        <div className="mb-6">
+          <Button
+            variant="ghost"
+            onClick={() => {
+              window.location.href = `/${tenantSlug}?code=${reservation.reservation_code}&lastName=${encodeURIComponent(formData.lastName)}`;
+            }}
+            className="mb-4 text-green-700"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Volver al panel
+          </Button>
+          <div className="bg-white rounded-2xl p-6 shadow-lg border border-green-200">
+            <div className="flex items-center gap-4">
+              <div className="h-14 w-14 rounded-xl bg-green-600 flex items-center justify-center">
+                <ClipboardList className="h-7 w-7 text-white" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">Pre Check-in</h1>
+                <p className="text-gray-600">
+                  {tenant.name} • {reservation.units?.name}
+                </p>
+                <div className="flex items-center gap-3 mt-2 text-sm text-gray-500">
+                  <span className="flex items-center gap-1">
+                    <Calendar className="h-4 w-4" />
+                    {checkInDate.toLocaleDateString("es-AR")} → {checkOutDate.toLocaleDateString("es-AR")}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Formulario */}
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Datos personales */}
+          <Card>
             <CardContent className="p-6">
-              <div className="flex items-start gap-3">
-                <ClipboardList className={`h-6 w-6 flex-shrink-0 ${preCheckinCompleted ? 'text-green-600' : 'text-blue-600'}`} />
+              <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <User className="h-5 w-5 text-green-600" />
+                Datos personales
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <h3 className={`font-semibold ${preCheckinCompleted ? 'text-green-900' : 'text-blue-900'}`}>Pre Check-in</h3>
-                  <p className={`text-sm mt-1 ${preCheckinCompleted ? 'text-green-700' : 'text-blue-700'}`}>
-                    {preCheckinCompleted ? 'Completado ✓' : 'Completá tus datos antes de llegar'}
+                  <label className="text-sm font-medium text-gray-700 mb-1 block">Nombre *</label>
+                  <Input
+                    value={formData.firstName}
+                    onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                    required
+                    placeholder="Juan"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700 mb-1 block">Apellido *</label>
+                  <Input
+                    value={formData.lastName}
+                    onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                    required
+                    placeholder="Pérez"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700 mb-1 block">Email *</label>
+                  <Input
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    required
+                    placeholder="juan@email.com"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700 mb-1 block">Teléfono *</label>
+                  <Input
+                    value={formData.phone}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    required
+                    placeholder="+54 9 11 1234-5678"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700 mb-1 block">Tipo de documento</label>
+                  <select
+                    value={formData.documentType}
+                    onChange={(e) => setFormData({ ...formData, documentType: e.target.value })}
+                    className="w-full h-10 px-3 border border-gray-300 rounded-lg bg-white"
+                  >
+                    <option value="DNI">DNI</option>
+                    <option value="Pasaporte">Pasaporte</option>
+                    <option value="Cédula">Cédula</option>
+                    <option value="Otro">Otro</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700 mb-1 block">Número de documento *</label>
+                  <Input
+                    value={formData.documentNumber}
+                    onChange={(e) => setFormData({ ...formData, documentNumber: e.target.value })}
+                    required
+                    placeholder="12345678"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700 mb-1 block">Nacionalidad</label>
+                  <Input
+                    value={formData.nationality}
+                    onChange={(e) => setFormData({ ...formData, nationality: e.target.value })}
+                    placeholder="Argentina"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700 mb-1 block">Fecha de nacimiento</label>
+                  <Input
+                    type="date"
+                    value={formData.birthDate}
+                    onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })}
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Contacto de emergencia */}
+          <Card>
+            <CardContent className="p-6">
+              <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <AlertCircle className="h-5 w-5 text-orange-600" />
+                Contacto de emergencia
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-gray-700 mb-1 block">Nombre completo</label>
+                  <Input
+                    value={formData.emergencyContactName}
+                    onChange={(e) => setFormData({ ...formData, emergencyContactName: e.target.value })}
+                    placeholder="María Pérez"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700 mb-1 block">Teléfono</label>
+                  <Input
+                    value={formData.emergencyContactPhone}
+                    onChange={(e) => setFormData({ ...formData, emergencyContactPhone: e.target.value })}
+                    placeholder="+54 9 11 1234-5678"
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Detalles de llegada */}
+          <Card>
+            <CardContent className="p-6">
+              <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-blue-600" />
+                Detalles de llegada
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-gray-700 mb-1 block">Hora estimada de llegada</label>
+                  <Input
+                    type="time"
+                    value={formData.arrivalTime}
+                    onChange={(e) => setFormData({ ...formData, arrivalTime: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700 mb-1 block">Patente del vehículo (opcional)</label>
+                  <Input
+                    value={formData.vehiclePlate}
+                    onChange={(e) => setFormData({ ...formData, vehiclePlate: e.target.value })}
+                    placeholder="AB 123 CD"
+                  />
+                </div>
+              </div>
+              <div className="mt-4">
+                <label className="text-sm font-medium text-gray-700 mb-1 block">Solicitudes especiales</label>
+                <textarea
+                  value={formData.specialRequests}
+                  onChange={(e) => setFormData({ ...formData, specialRequests: e.target.value })}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  placeholder="Alergias, necesidades especiales, etc."
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Aceptación de reglas */}
+          <Card className="border-2 border-amber-200 bg-amber-50">
+            <CardContent className="p-6">
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.agreeToRules}
+                  onChange={(e) => setFormData({ ...formData, agreeToRules: e.target.checked })}
+                  className="h-5 w-5 mt-0.5 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                  required
+                />
+                <div>
+                  <p className="font-medium text-gray-900">Acepto las reglas del alojamiento</p>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Confirmo que he leído y acepto las normas de convivencia, horarios de check-in/check-out, y políticas de cancelación del alojamiento.
                   </p>
-                  <a href={`/${tenantSlug}/pre-checkin?code=${reservation.reservation_code}&lastName=${encodeURIComponent(reservation.guests?.last_name || '')}`}>
-                    <Button className={`mt-3 ${preCheckinCompleted ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'}`}>
-                      {preCheckinCompleted ? 'Editar' : 'Completar'}
-                    </Button>
-                  </a>
                 </div>
-              </div>
+              </label>
             </CardContent>
           </Card>
 
-          {/* Wi-Fi */}
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-start gap-3">
-                <Wifi className="h-6 w-6 text-green-600 flex-shrink-0" />
-                <div className="flex-1">
-                  <h3 className="font-semibold text-gray-900">Wi-Fi</h3>
-                  {settings.wifiNetworks && settings.wifiNetworks.length > 0 ? (
-                    <div className="mt-2 space-y-2">
-                      {settings.wifiNetworks.map((wifi: any, i: number) => (
-                        <div key={i} className="text-sm">
-                          <p className="font-medium">Red: {wifi.ssid}</p>
-                          <p className="text-gray-600">Clave: {wifi.password}</p>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-gray-600 mt-1">No configurada</p>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* WhatsApp */}
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-start gap-3">
-                <MessageCircle className="h-6 w-6 text-green-600 flex-shrink-0" />
-                <div>
-                  <h3 className="font-semibold text-gray-900">¿Necesitás ayuda?</h3>
-                  <p className="text-sm text-gray-600 mt-1">Contactanos por WhatsApp</p>
-                  {settings.whatsappNumber && (
-                    <a
-                      href={`https://wa.me/${settings.whatsappNumber.replace(/\D/g, '')}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-block mt-3"
-                    >
-                      <Button className="bg-green-600 hover:bg-green-700">Enviar mensaje</Button>
-                    </a>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {settings.googleMapsUrl && (
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-start gap-3">
-                <MapPin className="h-6 w-6 text-red-600 flex-shrink-0" />
-                <div>
-                  <h3 className="font-semibold text-gray-900">Ubicación</h3>
-                  <a
-                    href={settings.googleMapsUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm text-blue-600 hover:underline mt-1 inline-block"
-                  >
-                    Ver en Google Maps
-                  </a>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {reservation.status === 'checked_out' && settings.reviewUrl && (
-          <Card className="border-2 border-yellow-200 bg-yellow-50">
-            <CardContent className="p-6">
-              <div className="flex items-start gap-3">
-                <CheckCircle className="h-6 w-6 text-yellow-600 flex-shrink-0" />
-                <div>
-                  <h3 className="font-semibold text-yellow-900">¿Cómo fue tu estadía?</h3>
-                  <p className="text-sm text-yellow-700 mt-1">Dejanos tu reseña en Google</p>
-                  <a
-                    href={settings.reviewUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-block mt-3"
-                  >
-                    <Button className="bg-yellow-600 hover:bg-yellow-700 text-white">Dejar reseña</Button>
-                  </a>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-start gap-3">
-                <FileText className="h-6 w-6 text-gray-600 flex-shrink-0" />
-                <div>
-                  <h3 className="font-semibold text-gray-900">Guía del alojamiento</h3>
-                  <p className="text-sm text-gray-600 mt-1">Normas, servicios e información útil</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-start gap-3">
-                <MapPin className="h-6 w-6 text-purple-600 flex-shrink-0" />
-                <div>
-                  <h3 className="font-semibold text-gray-900">Descubrí el destino</h3>
-                  <p className="text-sm text-gray-600 mt-1">Recomendaciones y secretos del anfitrión</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+          {/* Botón enviar */}
+          <div className="flex gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                window.location.href = `/${tenantSlug}?code=${reservation.reservation_code}&lastName=${encodeURIComponent(formData.lastName)}`;
+              }}
+              className="flex-1"
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="submit"
+              disabled={saving || !formData.agreeToRules}
+              className="flex-1 bg-green-600 hover:bg-green-700"
+            >
+              {saving ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Guardando...
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Completar Pre Check-in
+                </>
+              )}
+            </Button>
+          </div>
+        </form>
       </div>
     </div>
-  )
+  );
 }

@@ -1066,7 +1066,7 @@ export default function GuestStayPage({ params }: Props) {
         </div>
 
         {/* RESEÑAS (AL FINAL) */}
-        {reservation.status === "checked_out" && reviewLink && (
+        {reviewLink && (
           <ColorTab color="yellow" icon={Star} title="¿Cómo fue tu estadía?" subtitle="Tu opinión nos ayuda a mejorar" defaultOpen={true}>
             <div className="text-center py-4">
               <div className="h-16 w-16 rounded-full bg-yellow-100 flex items-center justify-center mx-auto mb-4">
