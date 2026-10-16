@@ -175,6 +175,7 @@ export default function PreCheckinPage() {
       // Convertir strings vacíos a null para campos opcionales
       const payload = {
         reservation_id: reservation.id,
+        tenant_id: tenant.id, // ← AGREGADO: tenant_id requerido
         first_name: formData.firstName || null,
         last_name: formData.lastName || null,
         email: formData.email || null,
