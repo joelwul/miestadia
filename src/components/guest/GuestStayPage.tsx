@@ -44,6 +44,7 @@ import {
   Hash,
 } from "lucide-react";
 import Link from "next/link";
+import LanguageSelector from "@/components/LanguageSelector";
 
 interface Props {
   params: Promise<{ tenantSlug: string }>;
@@ -77,33 +78,23 @@ function getWeatherInfo(code: number): { emoji: string; icon: any; description: 
     0: { emoji: "☀️", icon: Sun, description: "Despejado", color: "text-yellow-500" },
     1: { emoji: "🌤️", icon: Sun, description: "Mayormente despejado", color: "text-yellow-400" },
     2: { emoji: "⛅", icon: Cloud, description: "Parcialmente nublado", color: "text-gray-400" },
-    3: { emoji: "☁️", icon: Cloud, description: "Nublado", color: "text-gray-500" },
-    45: { emoji: "🌫️", icon: Cloud, description: "Niebla", color: "text-gray-400" },
-    48: { emoji: "🌫️", icon: Cloud, description: "Niebla con escarcha", color: "text-gray-400" },
-    51: { emoji: "️", icon: CloudRain, description: "Llovizna ligera", color: "text-blue-400" },
+    3: { emoji: "️", icon: Cloud, description: "Nublado", color: "text-gray-500" },
+    45: { emoji: "️", icon: Cloud, description: "Niebla", color: "text-gray-400" },
+    48: { emoji: "️", icon: Cloud, description: "Niebla con escarcha", color: "text-gray-400" },
+    51: { emoji: "🌦️", icon: CloudRain, description: "Llovizna ligera", color: "text-blue-400" },
     53: { emoji: "🌦️", icon: CloudRain, description: "Llovizna moderada", color: "text-blue-400" },
     55: { emoji: "🌧️", icon: CloudRain, description: "Llovizna densa", color: "text-blue-500" },
-    56: { emoji: "🌧️", icon: CloudRain, description: "Llovizna helada", color: "text-blue-600" },
-    57: { emoji: "🌧️", icon: CloudRain, description: "Llovizna helada densa", color: "text-blue-600" },
-    61: { emoji: "🌧️", icon: CloudRain, description: "Lluvia ligera", color: "text-blue-500" },
+    61: { emoji: "️", icon: CloudRain, description: "Lluvia ligera", color: "text-blue-500" },
     63: { emoji: "🌧️", icon: CloudRain, description: "Lluvia moderada", color: "text-blue-600" },
     65: { emoji: "🌧️", icon: CloudRain, description: "Lluvia intensa", color: "text-blue-700" },
-    66: { emoji: "🌧️", icon: CloudRain, description: "Lluvia helada", color: "text-blue-700" },
-    67: { emoji: "🌧️", icon: CloudRain, description: "Lluvia helada intensa", color: "text-blue-700" },
     71: { emoji: "🌨️", icon: CloudSnow, description: "Nevada ligera", color: "text-blue-300" },
     73: { emoji: "🌨️", icon: CloudSnow, description: "Nevada moderada", color: "text-blue-400" },
     75: { emoji: "❄️", icon: CloudSnow, description: "Nevada intensa", color: "text-blue-500" },
-    77: { emoji: "❄️", icon: CloudSnow, description: "Granizo", color: "text-blue-400" },
-    80: { emoji: "🌦️", icon: CloudRain, description: "Chubascos ligeros", color: "text-blue-400" },
-    81: { emoji: "🌧️", icon: CloudRain, description: "Chubascos moderados", color: "text-blue-500" },
-    82: { emoji: "🌧️", icon: CloudRain, description: "Chubascos violentos", color: "text-blue-600" },
-    85: { emoji: "🌨️", icon: CloudSnow, description: "Chubascos de nieve", color: "text-blue-300" },
-    86: { emoji: "❄️", icon: CloudSnow, description: "Chubascos de nieve intensos", color: "text-blue-400" },
-    95: { emoji: "️", icon: CloudLightning, description: "Tormenta", color: "text-purple-600" },
+    95: { emoji: "⛈️", icon: CloudLightning, description: "Tormenta", color: "text-purple-600" },
     96: { emoji: "⛈️", icon: CloudLightning, description: "Tormenta con granizo", color: "text-purple-700" },
     99: { emoji: "⛈️", icon: CloudLightning, description: "Tormenta con granizo intenso", color: "text-purple-800" },
   };
-  return weatherMap[code] || { emoji: "🌡️", icon: Wind, description: "Desconocido", color: "text-gray-500" };
+  return weatherMap[code] || { emoji: "️", icon: Wind, description: "Desconocido", color: "text-gray-500" };
 }
 
 function getGoogleMapsEmbedUrl(mapsUrl: string): string | null {
@@ -136,14 +127,14 @@ function formatCurrency(amount: number): string {
   }).format(amount || 0);
 }
 
-function ColorTab({ 
-  color, 
-  icon: Icon, 
-  title, 
-  subtitle, 
-  children, 
-  defaultOpen = false 
-}: { 
+function ColorTab({
+  color,
+  icon: Icon,
+  title,
+  subtitle,
+  children,
+  defaultOpen = false,
+}: {
   color: "green" | "orange" | "red" | "purple" | "blue" | "yellow" | "emerald";
   icon: any;
   title: string;
@@ -154,13 +145,13 @@ function ColorTab({
   const [isOpen, setIsOpen] = useState(defaultOpen);
 
   const colorConfig = {
-    green: { bg: "bg-green-600", light: "bg-green-50", border: "border-green-200", text: "text-green-900", icon: "text-green-700" },
-    orange: { bg: "bg-orange-600", light: "bg-orange-50", border: "border-orange-200", text: "text-orange-900", icon: "text-orange-700" },
-    red: { bg: "bg-red-600", light: "bg-red-50", border: "border-red-200", text: "text-red-900", icon: "text-red-700" },
-    purple: { bg: "bg-purple-600", light: "bg-purple-50", border: "border-purple-200", text: "text-purple-900", icon: "text-purple-700" },
-    blue: { bg: "bg-blue-600", light: "bg-blue-50", border: "border-blue-200", text: "text-blue-900", icon: "text-blue-700" },
-    yellow: { bg: "bg-yellow-600", light: "bg-yellow-50", border: "border-yellow-200", text: "text-yellow-900", icon: "text-yellow-700" },
-    emerald: { bg: "bg-emerald-600", light: "bg-emerald-50", border: "border-emerald-200", text: "text-emerald-900", icon: "text-emerald-700" },
+    green: { bg: "bg-green-600", border: "border-green-200" },
+    orange: { bg: "bg-orange-600", border: "border-orange-200" },
+    red: { bg: "bg-red-600", border: "border-red-200" },
+    purple: { bg: "bg-purple-600", border: "border-purple-200" },
+    blue: { bg: "bg-blue-600", border: "border-blue-200" },
+    yellow: { bg: "bg-yellow-600", border: "border-yellow-200" },
+    emerald: { bg: "bg-emerald-600", border: "border-emerald-200" },
   };
 
   const config = colorConfig[color];
@@ -180,11 +171,7 @@ function ColorTab({
             {subtitle && <p className="text-sm text-white/90 mt-0.5">{subtitle}</p>}
           </div>
         </div>
-        {isOpen ? (
-          <ChevronUp className="h-5 w-5" />
-        ) : (
-          <ChevronDown className="h-5 w-5" />
-        )}
+        {isOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
       </button>
       {isOpen && <div className="p-6">{children}</div>}
     </div>
@@ -213,18 +200,18 @@ export default function GuestStayPage({ params }: Props) {
     const init = async () => {
       const resolvedParams = await params;
       setTenantSlug(resolvedParams.tenantSlug);
-      
+
       let sessionStr = sessionStorage.getItem("guest_session");
       if (!sessionStr) {
         sessionStr = localStorage.getItem("guest_session");
       }
-      
+
       if (!sessionStr) {
         setError("No hay sesión activa.");
         setLoading(false);
         return;
       }
-      
+
       try {
         const session = JSON.parse(sessionStr);
         if (session.expiresAt && Date.now() > session.expiresAt) {
@@ -301,11 +288,6 @@ export default function GuestStayPage({ params }: Props) {
           precipitationProbability: data.daily.precipitation_probability_max[index] || 0,
         }));
         setWeatherData(days);
-        if (endDate !== endDateObj.toISOString().split("T")[0]) {
-          setWeatherMessage(
-            `Pronóstico disponible hasta el ${new Date(endDate).toLocaleDateString("es-AR")}. El resto se actualizará más cerca de la fecha.`
-          );
-        }
       } else {
         setWeatherMessage("No hay datos de pronóstico disponibles para estas fechas.");
       }
@@ -507,13 +489,17 @@ export default function GuestStayPage({ params }: Props) {
                 </div>
               </div>
             </div>
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-2 px-5 py-2.5 bg-white/15 hover:bg-white/25 backdrop-blur text-white rounded-xl transition-all text-sm font-medium border border-white/20"
-            >
-              <LogOut className="h-4 w-4" />
-              <span className="hidden sm:inline">Salir</span>
-            </button>
+            <div className="flex items-center gap-3">
+              {/* SELECTOR DE IDIOMA */}
+              <LanguageSelector variant="dropdown" />
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-2 px-5 py-2.5 bg-white/15 hover:bg-white/25 backdrop-blur text-white rounded-xl transition-all text-sm font-medium border border-white/20"
+              >
+                <LogOut className="h-4 w-4" />
+                <span className="hidden sm:inline">Salir</span>
+              </button>
+            </div>
           </div>
 
           {/* CLIMA */}
@@ -535,48 +521,39 @@ export default function GuestStayPage({ params }: Props) {
                 <div className="animate-spin rounded-full h-8 w-8 border-2 border-white border-t-transparent"></div>
               </div>
             ) : weatherData.length > 0 ? (
-              <>
-                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
-                  {weatherData.map((day, index) => {
-                    const weatherInfo = getWeatherInfo(day.weatherCode);
-                    const WeatherIcon = weatherInfo.icon;
-                    return (
-                      <div
-                        key={index}
-                        className={`rounded-xl p-3 text-center transition-all ${
-                          isToday(day.date) 
-                            ? "bg-white text-gray-900 shadow-lg scale-105" 
-                            : "bg-white/10 text-white"
-                        }`}
-                      >
-                        <p className={`text-xs font-semibold mb-2 ${isToday(day.date) ? "text-green-600" : "text-white/80"}`}>
-                          {isToday(day.date) ? "Hoy" : formatDate(day.date)}
-                        </p>
-                        <div className="flex justify-center mb-2">
-                          <WeatherIcon className={`h-8 w-8 ${isToday(day.date) ? weatherInfo.color : "text-white"}`} />
-                        </div>
-                        <p className={`text-xs mb-2 line-clamp-1 ${isToday(day.date) ? "text-gray-600" : "text-white/80"}`}>
-                          {weatherInfo.description}
-                        </p>
-                        <div className="flex justify-center gap-2 text-sm font-bold">
-                          <span className={isToday(day.date) ? "text-red-500" : "text-red-300"}>{day.tempMax}°</span>
-                          <span className={isToday(day.date) ? "text-blue-500" : "text-blue-300"}>{day.tempMin}°</span>
-                        </div>
-                        {day.precipitationProbability > 0 && (
-                          <p className={`text-xs mt-1.5 flex items-center justify-center gap-1 ${isToday(day.date) ? "text-blue-500" : "text-blue-300"}`}>
-                            💧 {day.precipitationProbability}%
-                          </p>
-                        )}
+              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+                {weatherData.map((day, index) => {
+                  const weatherInfo = getWeatherInfo(day.weatherCode);
+                  const WeatherIcon = weatherInfo.icon;
+                  return (
+                    <div
+                      key={index}
+                      className={`rounded-xl p-3 text-center transition-all ${
+                        isToday(day.date) ? "bg-white text-gray-900 shadow-lg scale-105" : "bg-white/10 text-white"
+                      }`}
+                    >
+                      <p className={`text-xs font-semibold mb-2 ${isToday(day.date) ? "text-green-600" : "text-white/80"}`}>
+                        {isToday(day.date) ? "Hoy" : formatDate(day.date)}
+                      </p>
+                      <div className="flex justify-center mb-2">
+                        <WeatherIcon className={`h-8 w-8 ${isToday(day.date) ? weatherInfo.color : "text-white"}`} />
                       </div>
-                    );
-                  })}
-                </div>
-                {weatherMessage && (
-                  <p className="text-xs text-yellow-200 mt-3 bg-yellow-500/20 border border-yellow-400/30 rounded-lg px-3 py-2">
-                    {weatherMessage}
-                  </p>
-                )}
-              </>
+                      <p className={`text-xs mb-2 line-clamp-1 ${isToday(day.date) ? "text-gray-600" : "text-white/80"}`}>
+                        {weatherInfo.description}
+                      </p>
+                      <div className="flex justify-center gap-2 text-sm font-bold">
+                        <span className={isToday(day.date) ? "text-red-500" : "text-red-300"}>{day.tempMax}°</span>
+                        <span className={isToday(day.date) ? "text-blue-500" : "text-blue-300"}>{day.tempMin}°</span>
+                      </div>
+                      {day.precipitationProbability > 0 && (
+                        <p className={`text-xs mt-1.5 flex items-center justify-center gap-1 ${isToday(day.date) ? "text-blue-500" : "text-blue-300"}`}>
+                          💧 {day.precipitationProbability}%
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             ) : (
               <div className="text-center py-6">
                 <Cloud className="h-12 w-12 mx-auto mb-3 text-white/40" />
@@ -591,7 +568,6 @@ export default function GuestStayPage({ params }: Props) {
 
       {/* CONTENIDO PRINCIPAL */}
       <div className="max-w-5xl mx-auto px-6 py-8 space-y-6">
-        
         {/* INFO DE RESERVA */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
@@ -623,6 +599,33 @@ export default function GuestStayPage({ params }: Props) {
               Código
             </div>
             <p className="font-bold text-gray-900 font-mono text-lg">{reservation.reservation_code}</p>
+          </div>
+        </div>
+
+        {/* PRE CHECK-IN (MOVIDO ARRIBA) */}
+        <div className={`rounded-2xl p-6 border-2 shadow-lg ${preCheckinCompleted ? "border-green-200 bg-gradient-to-br from-green-50 to-emerald-50" : "border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50"}`}>
+          <div className="flex items-start gap-4">
+            <div className={`h-14 w-14 rounded-xl flex items-center justify-center flex-shrink-0 ${preCheckinCompleted ? "bg-green-600" : "bg-blue-600"}`}>
+              <ClipboardList className="h-7 w-7 text-white" />
+            </div>
+            <div className="flex-1">
+              <h3 className={`font-bold text-xl ${preCheckinCompleted ? "text-green-900" : "text-blue-900"}`}>
+                Pre Check-in
+              </h3>
+              <p className={`text-sm mt-1 mb-4 ${preCheckinCompleted ? "text-green-700" : "text-blue-700"}`}>
+                {preCheckinCompleted
+                  ? "✓ Completado. Podés editar tus datos si es necesario."
+                  : "Completá tus datos antes de llegar para agilizar tu check-in."}
+              </p>
+              <button
+                onClick={handlePreCheckinClick}
+                className={`px-6 py-3 rounded-xl text-white font-semibold transition-all shadow-md hover:shadow-lg ${
+                  preCheckinCompleted ? "bg-green-600 hover:bg-green-700" : "bg-blue-600 hover:bg-blue-700"
+                }`}
+              >
+                {preCheckinCompleted ? "Editar datos" : "Completar Pre Check-in"}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -661,14 +664,6 @@ export default function GuestStayPage({ params }: Props) {
                   <p className="text-xs text-green-600 font-medium">Ya pagado</p>
                 </div>
                 <p className="text-2xl font-bold text-green-700">{formatCurrency(paidAmount)}</p>
-                {paidAmount > 0 && (
-                  <p className="text-xs text-gray-500 mt-2">
-                    {reservation.payment_method === "cash" && "💵 Efectivo"}
-                    {reservation.payment_method === "transfer" && " Transferencia"}
-                    {reservation.payment_method === "card" && "💳 Tarjeta"}
-                    {reservation.payment_method === "mercadopago" && "📱 Mercado Pago"}
-                  </p>
-                )}
               </div>
               <div className="bg-red-50 rounded-xl p-5 border border-red-200">
                 <div className="flex items-center gap-2 mb-2">
@@ -681,13 +676,6 @@ export default function GuestStayPage({ params }: Props) {
                 {pendingAmount > 0 && <p className="text-xs text-gray-500 mt-2">A pagar al llegar</p>}
               </div>
             </div>
-            {pendingAmount > 0 && (
-              <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-xl">
-                <p className="text-sm text-amber-800">
-                  💡 <strong>Recordá:</strong> El saldo pendiente de {formatCurrency(pendingAmount)} se abona al momento del check-in.
-                </p>
-              </div>
-            )}
           </ColorTab>
         )}
 
@@ -711,10 +699,6 @@ export default function GuestStayPage({ params }: Props) {
               </button>
               {showInventory && (
                 <div className="space-y-3">
-                  <h4 className="font-semibold text-gray-900 flex items-center gap-2">
-                    <Package className="h-5 w-5 text-blue-600" />
-                    Inventario de la unidad
-                  </h4>
                   {Object.entries(groupedInventory).map(([category, items]) => (
                     <div key={category} className="border border-gray-200 rounded-lg p-4">
                       <h5 className="font-medium text-gray-900 mb-3 text-sm">{category}</h5>
@@ -733,33 +717,6 @@ export default function GuestStayPage({ params }: Props) {
             </div>
           )}
         </ColorTab>
-
-        {/* PRE CHECK-IN (MOVIDO ARRIBA) */}
-        <div className={`rounded-2xl p-6 border-2 shadow-lg ${preCheckinCompleted ? "border-green-200 bg-gradient-to-br from-green-50 to-emerald-50" : "border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50"}`}>
-          <div className="flex items-start gap-4">
-            <div className={`h-14 w-14 rounded-xl flex items-center justify-center flex-shrink-0 ${preCheckinCompleted ? "bg-green-600" : "bg-blue-600"}`}>
-              <ClipboardList className="h-7 w-7 text-white" />
-            </div>
-            <div className="flex-1">
-              <h3 className={`font-bold text-xl ${preCheckinCompleted ? "text-green-900" : "text-blue-900"}`}>
-                Pre Check-in
-              </h3>
-              <p className={`text-sm mt-1 mb-4 ${preCheckinCompleted ? "text-green-700" : "text-blue-700"}`}>
-                {preCheckinCompleted 
-                  ? "✓ Completado. Podés editar tus datos si es necesario." 
-                  : "Completá tus datos antes de llegar para agilizar tu check-in."}
-              </p>
-              <button
-                onClick={handlePreCheckinClick}
-                className={`px-6 py-3 rounded-xl text-white font-semibold transition-all shadow-md hover:shadow-lg ${
-                  preCheckinCompleted ? "bg-green-600 hover:bg-green-700" : "bg-blue-600 hover:bg-blue-700"
-                }`}
-              >
-                {preCheckinCompleted ? "Editar datos" : "Completar Pre Check-in"}
-              </button>
-            </div>
-          </div>
-        </div>
 
         {/* LLEGADA */}
         {arrivalInstructions?.enabled && (
@@ -831,29 +788,24 @@ export default function GuestStayPage({ params }: Props) {
         {destinationPlaces.length > 0 && (
           <ColorTab color="purple" icon={MapPin} title="Descubrí el destino" subtitle="Lugares recomendados por el anfitrión">
             <div className="space-y-4">
-              <div>
-                <label className="text-sm font-medium text-gray-700 mb-2 block">
-                  Elegí un lugar para ver más información:
-                </label>
-                <select
-                  value={selectedPlace?.id || ""}
-                  onChange={(e) => {
-                    const place = destinationPlaces.find((p) => p.id === e.target.value);
-                    setSelectedPlace(place || null);
-                  }}
-                  className="w-full h-12 px-4 border border-gray-300 rounded-lg bg-white text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                >
-                  <option value="">-- Seleccioná un lugar --</option>
-                  {destinationPlaces.map((place) => {
-                    const catConfig = CATEGORY_CONFIG[place.category] || CATEGORY_CONFIG.landmark;
-                    return (
-                      <option key={place.id} value={place.id}>
-                        {place.name} ({catConfig.label})
-                      </option>
-                    );
-                  })}
-                </select>
-              </div>
+              <select
+                value={selectedPlace?.id || ""}
+                onChange={(e) => {
+                  const place = destinationPlaces.find((p) => p.id === e.target.value);
+                  setSelectedPlace(place || null);
+                }}
+                className="w-full h-12 px-4 border border-gray-300 rounded-lg bg-white text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              >
+                <option value="">-- Seleccioná un lugar --</option>
+                {destinationPlaces.map((place) => {
+                  const catConfig = CATEGORY_CONFIG[place.category] || CATEGORY_CONFIG.landmark;
+                  return (
+                    <option key={place.id} value={place.id}>
+                      {place.name} ({catConfig.label})
+                    </option>
+                  );
+                })}
+              </select>
               {selectedPlace && (
                 <div className="border border-purple-200 rounded-xl overflow-hidden bg-purple-50/30">
                   {selectedPlace.image_url && (
@@ -889,61 +841,7 @@ export default function GuestStayPage({ params }: Props) {
                     {selectedPlace.description && (
                       <p className="text-gray-700 text-sm leading-relaxed">{selectedPlace.description}</p>
                     )}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                      {selectedPlace.address && (
-                        <div className="flex items-start gap-2 p-3 bg-white rounded-lg">
-                          <MapPin className="h-4 w-4 text-gray-500 flex-shrink-0 mt-0.5" />
-                          <div>
-                            <p className="text-xs text-gray-500">Dirección</p>
-                            <p className="text-gray-800">{selectedPlace.address}</p>
-                          </div>
-                        </div>
-                      )}
-                      {selectedPlace.hours && (
-                        <div className="flex items-start gap-2 p-3 bg-white rounded-lg">
-                          <Clock className="h-4 w-4 text-gray-500 flex-shrink-0 mt-0.5" />
-                          <div>
-                            <p className="text-xs text-gray-500">Horarios</p>
-                            <p className="text-gray-800">{selectedPlace.hours}</p>
-                          </div>
-                        </div>
-                      )}
-                      {selectedPlace.phone && (
-                        <div className="flex items-start gap-2 p-3 bg-white rounded-lg">
-                          <Phone className="h-4 w-4 text-gray-500 flex-shrink-0 mt-0.5" />
-                          <div>
-                            <p className="text-xs text-gray-500">Teléfono</p>
-                            <a href={`tel:${selectedPlace.phone}`} className="text-blue-600 hover:underline">
-                              {selectedPlace.phone}
-                            </a>
-                          </div>
-                        </div>
-                      )}
-                      {selectedPlace.website && (
-                        <div className="flex items-start gap-2 p-3 bg-white rounded-lg">
-                          <Globe className="h-4 w-4 text-gray-500 flex-shrink-0 mt-0.5" />
-                          <div>
-                            <p className="text-xs text-gray-500">Sitio web</p>
-                            <a href={selectedPlace.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                              {selectedPlace.website}
-                            </a>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                    {selectedPlace.tips && (
-                      <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
-                        <p className="text-xs text-amber-800 font-medium mb-1">💡 Recomendación del anfitrión</p>
-                        <p className="text-sm text-amber-900">{selectedPlace.tips}</p>
-                      </div>
-                    )}
                   </div>
-                </div>
-              )}
-              {!selectedPlace && (
-                <div className="text-center py-8">
-                  <MapPin className="h-12 w-12 mx-auto mb-3 text-purple-300" />
-                  <p className="text-sm text-gray-500">Seleccioná un lugar del menú desplegable para ver los detalles</p>
                 </div>
               )}
             </div>
@@ -966,7 +864,7 @@ export default function GuestStayPage({ params }: Props) {
                 className="w-full"
               />
             </div>
-            {settings.address && <p className="text-sm text-gray-600 mt-3 flex items-center gap-2">📍 {settings.address}</p>}
+            {settings.address && <p className="text-sm text-gray-600 mt-3 flex items-center gap-2"> {settings.address}</p>}
             <a
               href={settings.googleMapsUrl}
               target="_blank"
@@ -1086,17 +984,6 @@ export default function GuestStayPage({ params }: Props) {
                 Dejar reseña
                 <ExternalLink className="h-4 w-4" />
               </a>
-              {tenant.review_url ? (
-                <p className="text-xs text-yellow-700 mt-4 flex items-center justify-center gap-1">
-                  <CheckCircle className="h-3 w-3" />
-                  Serás dirigido a nuestra página de reseñas
-                </p>
-              ) : settings.googleMapsUrl ? (
-                <p className="text-xs text-yellow-700 mt-4 flex items-center justify-center gap-1">
-                  <MapPin className="h-3 w-3" />
-                  Serás dirigido a Google Maps para dejar tu reseña
-                </p>
-              ) : null}
             </div>
           </ColorTab>
         )}

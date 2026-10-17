@@ -1,10 +1,11 @@
 "use client";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { useParams, useSearchParams, useRouter } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import GuestStayPage from "@/components/guest/GuestStayPage";
 import TenantLanding from "@/components/public/TenantLanding";
+import LanguageSelector from "@/components/LanguageSelector";
 
 interface Unit {
   id: string;
@@ -28,53 +29,44 @@ interface Tenant {
 export default function TenantPage() {
   const params = useParams();
   const searchParams = useSearchParams();
-  const router = useRouter();
   const tenantSlug = params.tenantSlug as string;
   const [tenant, setTenant] = useState<Tenant | null>(null);
   const [units, setUnits] = useState<Unit[]>([]);
   const [loading, setLoading] = useState(true);
-  const [shouldShowGuestPanel, setShouldShowGuestPanel] = useState(false);
+  const [isValidGuest, setIsValidGuest] = useState(false);
   const supabase = createClient();
 
   useEffect(() => {
     async function loadData() {
       try {
-        // 1. Verificar si hay parámetros de acceso en la URL
         const code = searchParams.get("code");
         const lastName = searchParams.get("lastName");
 
         if (code && lastName) {
-          // 2. Validar automáticamente contra la base de datos
           const { data: reservation, error: resError } = await supabase
             .from("reservations")
-            .select(`
-              id,
-              reservation_code,
-              guests (last_name)
-            `)
+            .select(`id, reservation_code, guests(last_name)`)
             .eq("reservation_code", code)
             .ilike("guests.last_name", `%${lastName}%`)
             .single();
 
           if (reservation && !resError) {
-            // 3. Si es válido, crear sesión temporal
-            sessionStorage.setItem("guest_session", JSON.stringify({
-              reservationId: reservation.id,
-              code: code,
-              lastName: lastName,
-              expiresAt: Date.now() + (24 * 60 * 60 * 1000), // 24 horas
-            }));
-            
-            setShouldShowGuestPanel(true);
+            sessionStorage.setItem(
+              "guest_session",
+              JSON.stringify({
+                reservationId: reservation.id,
+                code,
+                lastName,
+                expiresAt: Date.now() + 24 * 60 * 60 * 1000,
+              })
+            );
+            setIsValidGuest(true);
           } else {
-            // Código o apellido inválido
             alert("Código de reserva o apellido incorrecto. Verificá el email de confirmación.");
-            router.push(`/${tenantSlug}`);
             return;
           }
         }
 
-        // 4. Cargar datos del tenant
         const { data: tenantData } = await supabase
           .from("tenants")
           .select("*")
@@ -84,7 +76,6 @@ export default function TenantPage() {
         if (tenantData) {
           setTenant(tenantData);
 
-          // 5. Cargar unidades con fotos
           const { data: unitsData } = await supabase
             .from("units")
             .select("*")
@@ -112,7 +103,7 @@ export default function TenantPage() {
       }
     }
     loadData();
-  }, [tenantSlug, searchParams, router]);
+  }, [tenantSlug, searchParams]);
 
   if (loading) {
     return (
@@ -125,17 +116,22 @@ export default function TenantPage() {
     );
   }
 
-  // Si hay parámetros válidos → Panel del huésped
-  if (shouldShowGuestPanel && tenant) {
+  if (isValidGuest && tenant) {
     return <GuestStayPage params={Promise.resolve({ tenantSlug })} />;
   }
 
-  // Si no hay parámetros → Landing pública
   if (tenant) {
-    return <TenantLanding tenant={tenant} units={units} />;
+    return (
+      <div className="relative">
+        {/* SELECTOR DE IDIOMA FLOTANTE - SIEMPRE VISIBLE */}
+        <div className="fixed top-4 right-4 z-50">
+          <LanguageSelector variant="dropdown" />
+        </div>
+        <TenantLanding tenant={tenant} units={units} />
+      </div>
+    );
   }
 
-  // Si no existe el tenant
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="text-center">
