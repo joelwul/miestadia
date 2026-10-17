@@ -12,6 +12,7 @@ import {
   CheckCircle,
   AlertCircle,
   Loader2,
+  Phone,
 } from "lucide-react";
 
 type View = "login" | "register" | "forgot" | "success";
@@ -22,18 +23,16 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [propertyName, setPropertyName] = useState("");
+  const [whatsappNumber, setWhatsappNumber] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
-  
-  // Estados para validación de duplicados
   const [emailExists, setEmailExists] = useState(false);
   const [checkingEmail, setCheckingEmail] = useState(false);
-  
   const router = useRouter();
   const supabase = createClient();
 
-  // Verificar si el email ya está registrado (con debounce)
+  // Verificar si el email ya está registrado
   async function checkEmailExists(emailToCheck: string) {
     if (!emailToCheck || !emailToCheck.includes("@")) {
       setEmailExists(false);
@@ -46,7 +45,6 @@ export default function LoginPage() {
         .select("id")
         .eq("owner_email", emailToCheck)
         .maybeSingle();
-
       setEmailExists(!!data);
     } catch {
       setEmailExists(false);
@@ -102,15 +100,15 @@ export default function LoginPage() {
     setLoading(true);
     setError("");
 
-    // 1. Validación de email duplicado antes de intentar registrar
+    // Validación de email duplicado
     if (emailExists) {
-      setError("Este email ya está registrado. Por favor, usá otro o recuperá tu contraseña.");
+      setError("Este email ya está registrado. ¿Olvidaste tu contraseña?");
       setLoading(false);
       return;
     }
 
     try {
-      // 2. Crear usuario en Supabase Auth
+      // 1. Crear usuario en Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
@@ -118,6 +116,7 @@ export default function LoginPage() {
           data: {
             full_name: fullName,
             property_name: propertyName,
+            whatsapp_number: whatsappNumber,
           },
         },
       });
@@ -136,7 +135,7 @@ export default function LoginPage() {
         return;
       }
 
-      // 3. Generar slug único para la propiedad
+      // 2. Generar slug único
       const baseSlug = propertyName
         ?.toLowerCase()
         .replace(/\s+/g, "-")
@@ -154,11 +153,11 @@ export default function LoginPage() {
         counter++;
       }
 
-      // 4. Calcular fecha de fin de trial (30 días)
+      // 3. Calcular fecha de fin de trial (30 días)
       const trialEndsAt = new Date();
       trialEndsAt.setDate(trialEndsAt.getDate() + 30);
 
-      // 5. Crear tenant
+      // 4. Crear tenant
       const { data: newTenant, error: tenantError } = await supabase
         .from("tenants")
         .insert({
@@ -166,6 +165,7 @@ export default function LoginPage() {
           slug: slug,
           owner_email: email,
           owner_name: fullName,
+          owner_whatsapp: whatsappNumber,
           subscription_status: "trial",
           trial_ends_at: trialEndsAt.toISOString(),
           settings: {
@@ -174,6 +174,7 @@ export default function LoginPage() {
             language: "es",
             checkInTime: "15:00",
             checkOutTime: "10:00",
+            whatsappNumber: whatsappNumber,
           },
           branding: {
             primaryColor: "#0F766E",
@@ -193,7 +194,7 @@ export default function LoginPage() {
         return;
       }
 
-      // 6. Crear relación en tenant_users
+      // 5. Crear relación en tenant_users
       if (newTenant?.id) {
         await supabase
           .from("tenant_users")
@@ -204,7 +205,7 @@ export default function LoginPage() {
           });
       }
 
-      // 7. Éxito
+      // 6. Éxito
       setSuccessMessage(
         "¡Cuenta creada exitosamente! Revisá tu email para verificar tu cuenta. Luego podrás ingresar."
       );
@@ -349,7 +350,6 @@ export default function LoginPage() {
                 <p className="text-xs text-center text-gray-500">30 días de prueba gratis • Sin tarjeta de crédito</p>
               </motion.div>
             )}
-            
             {view === "register" && (
               <motion.div key="register" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
                 <div>
@@ -378,7 +378,15 @@ export default function LoginPage() {
                     </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Email (Nombre de usuario)</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">WhatsApp (opcional)</label>
+                    <div className="relative">
+                      <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                      <input type="tel" value={whatsappNumber} onChange={(e) => setWhatsappNumber(e.target.value)} className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]" placeholder="5491112345678" />
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">Para que tus huéspedes te contacten</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
                     <div className="relative">
                       <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                       <input
@@ -425,18 +433,13 @@ export default function LoginPage() {
                       <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]" placeholder="Mínimo 6 caracteres" />
                     </div>
                   </div>
-                  <button 
-                    type="submit" 
-                    disabled={loading || emailExists} 
-                    className="w-full bg-[#0F766E] text-white py-3 rounded-lg font-semibold hover:bg-[#0F766E]/90 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
+                  <button type="submit" disabled={loading || emailExists} className="w-full bg-[#0F766E] text-white py-3 rounded-lg font-semibold hover:bg-[#0F766E]/90 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
                     {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <><span>Crear cuenta</span><ArrowRight className="w-5 h-5" /></>}
                   </button>
                 </form>
                 <button onClick={() => setView("login")} className="w-full text-center text-sm text-gray-600 hover:text-[#0F766E]">¿Ya tenés cuenta? Ingresá aquí</button>
               </motion.div>
             )}
-
             {view === "forgot" && (
               <motion.div key="forgot" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
                 <div>
