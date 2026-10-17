@@ -88,5 +88,5 @@ export default function LanguageSelector({ variant = "dropdown", className = "" 
         </div>
       )}
     </div>
-  );
+  ); 
 }
