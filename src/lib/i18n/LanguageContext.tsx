@@ -74,4 +74,4 @@ export function useTranslations() {
   return context;
 }
 
-export type { Language };
+export type { Language }; 
