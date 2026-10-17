@@ -9,7 +9,7 @@ interface LanguageSelectorProps {
 }
 
 const LANGUAGES: { code: Language; flag: string; label: string }[] = [
-  { code: "es", flag: "🇦🇷", label: "Español" },
+  { code: "es", flag: "🇦", label: "Español" },
   { code: "en", flag: "🇺🇸", label: "English" },
   { code: "pt", flag: "🇧🇷", label: "Português" },
 ];
