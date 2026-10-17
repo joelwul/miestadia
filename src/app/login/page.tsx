@@ -108,7 +108,6 @@ export default function LoginPage() {
     }
 
     try {
-      // 1. Crear usuario en Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
@@ -135,7 +134,6 @@ export default function LoginPage() {
         return;
       }
 
-      // 2. Generar slug único
       const baseSlug = propertyName
         ?.toLowerCase()
         .replace(/\s+/g, "-")
@@ -153,11 +151,9 @@ export default function LoginPage() {
         counter++;
       }
 
-      // 3. Calcular fecha de fin de trial (30 días)
       const trialEndsAt = new Date();
       trialEndsAt.setDate(trialEndsAt.getDate() + 30);
 
-      // 4. Crear tenant
       const { data: newTenant, error: tenantError } = await supabase
         .from("tenants")
         .insert({
@@ -194,7 +190,6 @@ export default function LoginPage() {
         return;
       }
 
-      // 5. Crear relación en tenant_users
       if (newTenant?.id) {
         await supabase
           .from("tenant_users")
@@ -205,7 +200,6 @@ export default function LoginPage() {
           });
       }
 
-      // 6. Éxito
       setSuccessMessage(
         "¡Cuenta creada exitosamente! Revisá tu email para verificar tu cuenta. Luego podrás ingresar."
       );
