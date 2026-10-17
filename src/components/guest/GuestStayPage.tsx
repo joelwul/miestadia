@@ -82,9 +82,9 @@ function getWeatherInfo(code: number): { emoji: string; icon: any; description: 
     45: { emoji: "️", icon: Cloud, description: "Niebla", color: "text-gray-400" },
     48: { emoji: "️", icon: Cloud, description: "Niebla con escarcha", color: "text-gray-400" },
     51: { emoji: "🌦️", icon: CloudRain, description: "Llovizna ligera", color: "text-blue-400" },
-    53: { emoji: "🌦️", icon: CloudRain, description: "Llovizna moderada", color: "text-blue-400" },
+    53: { emoji: "️", icon: CloudRain, description: "Llovizna moderada", color: "text-blue-400" },
     55: { emoji: "🌧️", icon: CloudRain, description: "Llovizna densa", color: "text-blue-500" },
-    61: { emoji: "️", icon: CloudRain, description: "Lluvia ligera", color: "text-blue-500" },
+    61: { emoji: "🌧️", icon: CloudRain, description: "Lluvia ligera", color: "text-blue-500" },
     63: { emoji: "🌧️", icon: CloudRain, description: "Lluvia moderada", color: "text-blue-600" },
     65: { emoji: "🌧️", icon: CloudRain, description: "Lluvia intensa", color: "text-blue-700" },
     71: { emoji: "🌨️", icon: CloudSnow, description: "Nevada ligera", color: "text-blue-300" },
@@ -92,9 +92,9 @@ function getWeatherInfo(code: number): { emoji: string; icon: any; description: 
     75: { emoji: "❄️", icon: CloudSnow, description: "Nevada intensa", color: "text-blue-500" },
     95: { emoji: "⛈️", icon: CloudLightning, description: "Tormenta", color: "text-purple-600" },
     96: { emoji: "⛈️", icon: CloudLightning, description: "Tormenta con granizo", color: "text-purple-700" },
-    99: { emoji: "⛈️", icon: CloudLightning, description: "Tormenta con granizo intenso", color: "text-purple-800" },
+    99: { emoji: "️", icon: CloudLightning, description: "Tormenta con granizo intenso", color: "text-purple-800" },
   };
-  return weatherMap[code] || { emoji: "️", icon: Wind, description: "Desconocido", color: "text-gray-500" };
+  return weatherMap[code] || { emoji: "🌡️", icon: Wind, description: "Desconocido", color: "text-gray-500" };
 }
 
 function getGoogleMapsEmbedUrl(mapsUrl: string): string | null {
@@ -160,20 +160,20 @@ function ColorTab({
     <div className={`rounded-2xl overflow-hidden shadow-lg border ${config.border} bg-white`}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className={`w-full ${config.bg} text-white p-5 flex items-center justify-between hover:opacity-95 transition-opacity`}
+        className={`w-full ${config.bg} text-white p-4 lg:p-5 flex items-center justify-between hover:opacity-95 transition-opacity`}
       >
-        <div className="flex items-center gap-4">
-          <div className="h-12 w-12 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center">
-            <Icon className="h-6 w-6" />
+        <div className="flex items-center gap-3 lg:gap-4">
+          <div className="h-10 w-10 lg:h-12 lg:w-12 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center flex-shrink-0">
+            <Icon className="h-5 w-5 lg:h-6 lg:w-6" />
           </div>
-          <div className="text-left">
-            <h3 className="font-bold text-lg">{title}</h3>
-            {subtitle && <p className="text-sm text-white/90 mt-0.5">{subtitle}</p>}
+          <div className="text-left min-w-0">
+            <h3 className="font-bold text-base lg:text-lg truncate">{title}</h3>
+            {subtitle && <p className="text-xs lg:text-sm text-white/90 mt-0.5 truncate">{subtitle}</p>}
           </div>
         </div>
-        {isOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+        {isOpen ? <ChevronUp className="h-5 w-5 flex-shrink-0" /> : <ChevronDown className="h-5 w-5 flex-shrink-0" />}
       </button>
-      {isOpen && <div className="p-6">{children}</div>}
+      {isOpen && <div className="p-4 lg:p-6">{children}</div>}
     </div>
   );
 }
@@ -468,33 +468,38 @@ export default function GuestStayPage({ params }: Props) {
           <div className="absolute top-0 right-0 w-96 h-96 bg-white rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
           <div className="absolute bottom-0 left-0 w-96 h-96 bg-white rounded-full blur-3xl translate-y-1/2 -translate-x-1/2" />
         </div>
-        <div className="relative max-w-6xl mx-auto px-6 py-10 md:py-14">
-          <div className="flex items-center justify-between gap-6 mb-8">
-            <div className="flex items-center gap-5">
+        <div className="relative max-w-6xl mx-auto px-4 lg:px-6 py-6 lg:py-10">
+          <div className="flex items-center justify-between gap-3 lg:gap-6 mb-4 lg:mb-8">
+            <div className="flex items-center gap-3 lg:gap-5 min-w-0 flex-1">
               {branding.logoUrl && (
                 <img
                   src={branding.logoUrl}
                   alt="Logo"
-                  className="h-20 w-auto bg-white rounded-2xl p-3 shadow-xl object-contain"
+                  className="h-12 w-12 lg:h-20 lg:w-auto bg-white rounded-xl lg:rounded-2xl p-2 lg:p-3 shadow-xl object-contain flex-shrink-0"
                 />
               )}
-              <div>
-                <h1 className="text-3xl md:text-4xl font-bold">¡Hola, {reservation.guests?.first_name}! 👋</h1>
-                <p className="text-green-100 text-lg mt-1">{tenant.name}</p>
-                <div className="flex items-center gap-2 mt-3">
-                  <span className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-semibold text-white ${statusColors[reservation.status] || "bg-gray-500"}`}>
+              <div className="min-w-0">
+                <h1 className="text-xl lg:text-3xl lg:text-4xl font-bold truncate">
+                  ¡Hola, {reservation.guests?.first_name}! 👋
+                </h1>
+                <p className="text-green-100 text-sm lg:text-lg mt-1 truncate">{tenant.name}</p>
+                <div className="flex items-center gap-2 mt-2">
+                  <span
+                    className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold text-white ${
+                      statusColors[reservation.status] || "bg-gray-500"
+                    }`}
+                  >
                     <span className="w-2 h-2 rounded-full bg-white animate-pulse"></span>
                     {statusLabels[reservation.status] || reservation.status}
                   </span>
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              {/* SELECTOR DE IDIOMA */}
+            <div className="flex items-center gap-2 flex-shrink-0">
               <LanguageSelector variant="dropdown" />
               <button
                 onClick={handleLogout}
-                className="flex items-center gap-2 px-5 py-2.5 bg-white/15 hover:bg-white/25 backdrop-blur text-white rounded-xl transition-all text-sm font-medium border border-white/20"
+                className="flex items-center gap-1 lg:gap-2 px-3 py-2 bg-white/15 hover:bg-white/25 backdrop-blur text-white rounded-lg lg:rounded-xl text-xs lg:text-sm font-medium border border-white/20"
               >
                 <LogOut className="h-4 w-4" />
                 <span className="hidden sm:inline">Salir</span>
@@ -503,16 +508,17 @@ export default function GuestStayPage({ params }: Props) {
           </div>
 
           {/* CLIMA */}
-          <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 border border-white/20">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-white flex items-center gap-2">
-                <Cloud className="h-5 w-5" />
-                Clima durante tu estadía
+          <div className="bg-white/10 backdrop-blur-lg rounded-xl lg:rounded-2xl p-4 lg:p-6 border border-white/20">
+            <div className="flex items-center justify-between mb-3 lg:mb-4">
+              <h3 className="font-semibold text-white text-sm lg:text-base flex items-center gap-2">
+                <Cloud className="h-4 w-4 lg:h-5 lg:w-5" />
+                <span className="hidden sm:inline">Clima durante tu estadía</span>
+                <span className="sm:hidden">Clima</span>
               </h3>
               {locationLabel && (
-                <span className="flex items-center gap-1.5 text-xs text-white/90 bg-white/10 px-3 py-1.5 rounded-full">
+                <span className="flex items-center gap-1 text-[10px] lg:text-xs text-white/90 bg-white/10 px-2 py-1 rounded-full">
                   <MapPin className="h-3 w-3" />
-                  {locationLabel}
+                  <span className="truncate max-w-[100px]">{locationLabel}</span>
                 </span>
               )}
             </div>
@@ -521,43 +527,41 @@ export default function GuestStayPage({ params }: Props) {
                 <div className="animate-spin rounded-full h-8 w-8 border-2 border-white border-t-transparent"></div>
               </div>
             ) : weatherData.length > 0 ? (
-              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
-                {weatherData.map((day, index) => {
+              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 lg:gap-3">
+                {weatherData.slice(0, 7).map((day, index) => {
                   const weatherInfo = getWeatherInfo(day.weatherCode);
                   const WeatherIcon = weatherInfo.icon;
                   return (
                     <div
                       key={index}
-                      className={`rounded-xl p-3 text-center transition-all ${
+                      className={`rounded-lg lg:rounded-xl p-2 lg:p-3 text-center transition-all ${
                         isToday(day.date) ? "bg-white text-gray-900 shadow-lg scale-105" : "bg-white/10 text-white"
                       }`}
                     >
-                      <p className={`text-xs font-semibold mb-2 ${isToday(day.date) ? "text-green-600" : "text-white/80"}`}>
-                        {isToday(day.date) ? "Hoy" : formatDate(day.date)}
+                      <p
+                        className={`text-[10px] lg:text-xs font-semibold mb-1 ${
+                          isToday(day.date) ? "text-green-600" : "text-white/80"
+                        }`}
+                      >
+                        {isToday(day.date) ? "Hoy" : day.date.split("-")[2]}
                       </p>
-                      <div className="flex justify-center mb-2">
-                        <WeatherIcon className={`h-8 w-8 ${isToday(day.date) ? weatherInfo.color : "text-white"}`} />
+                      <div className="flex justify-center mb-1">
+                        <WeatherIcon
+                          className={`h-6 w-6 lg:h-8 lg:w-8 ${isToday(day.date) ? weatherInfo.color : "text-white"}`}
+                        />
                       </div>
-                      <p className={`text-xs mb-2 line-clamp-1 ${isToday(day.date) ? "text-gray-600" : "text-white/80"}`}>
-                        {weatherInfo.description}
-                      </p>
-                      <div className="flex justify-center gap-2 text-sm font-bold">
+                      <div className="flex justify-center gap-1 lg:gap-2 text-xs lg:text-sm font-bold">
                         <span className={isToday(day.date) ? "text-red-500" : "text-red-300"}>{day.tempMax}°</span>
                         <span className={isToday(day.date) ? "text-blue-500" : "text-blue-300"}>{day.tempMin}°</span>
                       </div>
-                      {day.precipitationProbability > 0 && (
-                        <p className={`text-xs mt-1.5 flex items-center justify-center gap-1 ${isToday(day.date) ? "text-blue-500" : "text-blue-300"}`}>
-                          💧 {day.precipitationProbability}%
-                        </p>
-                      )}
                     </div>
                   );
                 })}
               </div>
             ) : (
-              <div className="text-center py-6">
-                <Cloud className="h-12 w-12 mx-auto mb-3 text-white/40" />
-                <p className="text-sm text-white/80">
+              <div className="text-center py-4">
+                <Cloud className="h-10 w-10 mx-auto mb-2 text-white/40" />
+                <p className="text-xs lg:text-sm text-white/80">
                   {weatherMessage || "El pronóstico estará disponible cuando se acerque la fecha de tu estadía."}
                 </p>
               </div>
@@ -567,59 +571,81 @@ export default function GuestStayPage({ params }: Props) {
       </header>
 
       {/* CONTENIDO PRINCIPAL */}
-      <div className="max-w-5xl mx-auto px-6 py-8 space-y-6">
-        {/* INFO DE RESERVA */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-            <div className="flex items-center gap-2 text-gray-500 text-sm mb-2">
-              <Home className="h-4 w-4" />
+      <div className="max-w-5xl mx-auto px-4 lg:px-6 py-6 lg:py-8 space-y-4 lg:space-y-6">
+        {/* INFO DE RESERVA - 2 cols móvil, 4 desktop */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
+          <div className="bg-white rounded-xl lg:rounded-2xl p-3 lg:p-5 shadow-sm border border-gray-100">
+            <div className="flex items-center gap-2 text-gray-500 text-xs mb-1 lg:mb-2">
+              <Home className="h-3 w-3 lg:h-4 lg:w-4" />
               Unidad
             </div>
-            <p className="font-bold text-gray-900 text-lg">{reservation.units?.name}</p>
+            <p className="font-bold text-gray-900 text-sm lg:text-lg truncate">{reservation.units?.name}</p>
           </div>
-          <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-            <div className="flex items-center gap-2 text-gray-500 text-sm mb-2">
-              <Calendar className="h-4 w-4" />
+          <div className="bg-white rounded-xl lg:rounded-2xl p-3 lg:p-5 shadow-sm border border-gray-100">
+            <div className="flex items-center gap-2 text-gray-500 text-xs mb-1 lg:mb-2">
+              <Calendar className="h-3 w-3 lg:h-4 lg:w-4" />
               Check-in
             </div>
-            <p className="font-bold text-gray-900">{checkInDate.toLocaleDateString("es-AR")}</p>
-            <p className="text-sm text-gray-500">{settings.checkInTime || "15:00"}</p>
+            <p className="font-bold text-gray-900 text-sm lg:text-base">
+              {checkInDate.toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit" })}
+            </p>
+            <p className="text-xs text-gray-500">{settings.checkInTime || "15:00"}</p>
           </div>
-          <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-            <div className="flex items-center gap-2 text-gray-500 text-sm mb-2">
-              <Calendar className="h-4 w-4" />
+          <div className="bg-white rounded-xl lg:rounded-2xl p-3 lg:p-5 shadow-sm border border-gray-100">
+            <div className="flex items-center gap-2 text-gray-500 text-xs mb-1 lg:mb-2">
+              <Calendar className="h-3 w-3 lg:h-4 lg:w-4" />
               Check-out
             </div>
-            <p className="font-bold text-gray-900">{checkOutDate.toLocaleDateString("es-AR")}</p>
-            <p className="text-sm text-gray-500">{settings.checkOutTime || "10:00"}</p>
+            <p className="font-bold text-gray-900 text-sm lg:text-base">
+              {checkOutDate.toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit" })}
+            </p>
+            <p className="text-xs text-gray-500">{settings.checkOutTime || "10:00"}</p>
           </div>
-          <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-            <div className="flex items-center gap-2 text-gray-500 text-sm mb-2">
-              <Hash className="h-4 w-4" />
+          <div className="bg-white rounded-xl lg:rounded-2xl p-3 lg:p-5 shadow-sm border border-gray-100">
+            <div className="flex items-center gap-2 text-gray-500 text-xs mb-1 lg:mb-2">
+              <Hash className="h-3 w-3 lg:h-4 lg:w-4" />
               Código
             </div>
-            <p className="font-bold text-gray-900 font-mono text-lg">{reservation.reservation_code}</p>
+            <p className="font-bold text-gray-900 text-sm lg:text-lg font-mono truncate">{reservation.reservation_code}</p>
           </div>
         </div>
 
-        {/* PRE CHECK-IN (MOVIDO ARRIBA) */}
-        <div className={`rounded-2xl p-6 border-2 shadow-lg ${preCheckinCompleted ? "border-green-200 bg-gradient-to-br from-green-50 to-emerald-50" : "border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50"}`}>
-          <div className="flex items-start gap-4">
-            <div className={`h-14 w-14 rounded-xl flex items-center justify-center flex-shrink-0 ${preCheckinCompleted ? "bg-green-600" : "bg-blue-600"}`}>
-              <ClipboardList className="h-7 w-7 text-white" />
+        {/* PRE CHECK-IN */}
+        <div
+          className={`rounded-xl lg:rounded-2xl p-4 lg:p-6 border-2 shadow-lg ${
+            preCheckinCompleted
+              ? "border-green-200 bg-gradient-to-br from-green-50 to-emerald-50"
+              : "border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50"
+          }`}
+        >
+          <div className="flex items-start gap-3 lg:gap-4">
+            <div
+              className={`h-12 w-12 lg:h-14 lg:w-14 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                preCheckinCompleted ? "bg-green-600" : "bg-blue-600"
+              }`}
+            >
+              <ClipboardList className="h-6 w-6 lg:h-7 lg:w-7 text-white" />
             </div>
-            <div className="flex-1">
-              <h3 className={`font-bold text-xl ${preCheckinCompleted ? "text-green-900" : "text-blue-900"}`}>
+            <div className="flex-1 min-w-0">
+              <h3
+                className={`font-bold text-lg lg:text-xl ${
+                  preCheckinCompleted ? "text-green-900" : "text-blue-900"
+                }`}
+              >
                 Pre Check-in
               </h3>
-              <p className={`text-sm mt-1 mb-4 ${preCheckinCompleted ? "text-green-700" : "text-blue-700"}`}>
+              <p
+                className={`text-xs lg:text-sm mt-1 mb-3 lg:mb-4 ${
+                  preCheckinCompleted ? "text-green-700" : "text-blue-700"
+                }`}
+              >
                 {preCheckinCompleted
                   ? "✓ Completado. Podés editar tus datos si es necesario."
                   : "Completá tus datos antes de llegar para agilizar tu check-in."}
               </p>
               <button
                 onClick={handlePreCheckinClick}
-                className={`px-6 py-3 rounded-xl text-white font-semibold transition-all shadow-md hover:shadow-lg ${
+                className={`px-4 lg:px-6 py-2.5 lg:py-3 rounded-xl text-white font-semibold transition-all shadow-md hover:shadow-lg text-sm lg:text-base ${
                   preCheckinCompleted ? "bg-green-600 hover:bg-green-700" : "bg-blue-600 hover:bg-blue-700"
                 }`}
               >
@@ -632,12 +658,12 @@ export default function GuestStayPage({ params }: Props) {
         {/* PAGO */}
         {totalAmount > 0 && (
           <ColorTab color="emerald" icon={DollarSign} title="Estado de tu pago" subtitle="Seguimiento de tu reserva" defaultOpen={true}>
-            <div className="mb-6">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-sm font-medium text-gray-700">Progreso de pago</span>
-                <span className="text-lg font-bold text-gray-900">{Math.round(paymentPercentage)}%</span>
+            <div className="mb-4 lg:mb-6">
+              <div className="flex items-center justify-between mb-2 lg:mb-3">
+                <span className="text-xs lg:text-sm font-medium text-gray-700">Progreso de pago</span>
+                <span className="text-base lg:text-lg font-bold text-gray-900">{Math.round(paymentPercentage)}%</span>
               </div>
-              <div className="w-full h-4 bg-gray-200 rounded-full overflow-hidden">
+              <div className="w-full h-3 lg:h-4 bg-gray-200 rounded-full overflow-hidden">
                 <div
                   className={`h-full rounded-full transition-all duration-700 ${
                     paymentPercentage === 100
@@ -650,37 +676,43 @@ export default function GuestStayPage({ params }: Props) {
                 />
               </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-gray-50 rounded-xl p-5 border border-gray-200">
-                <div className="flex items-center gap-2 mb-2">
-                  <TrendingUp className="h-4 w-4 text-gray-500" />
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 lg:gap-4">
+              <div className="bg-gray-50 rounded-xl p-4 lg:p-5 border border-gray-200">
+                <div className="flex items-center gap-2 mb-1 lg:mb-2">
+                  <TrendingUp className="h-3 w-3 lg:h-4 lg:w-4 text-gray-500" />
                   <p className="text-xs text-gray-500 font-medium">Total</p>
                 </div>
-                <p className="text-2xl font-bold text-gray-900">{formatCurrency(totalAmount)}</p>
+                <p className="text-xl lg:text-2xl font-bold text-gray-900">{formatCurrency(totalAmount)}</p>
               </div>
-              <div className="bg-green-50 rounded-xl p-5 border border-green-200">
-                <div className="flex items-center gap-2 mb-2">
-                  <CheckCircle className="h-4 w-4 text-green-600" />
+              <div className="bg-green-50 rounded-xl p-4 lg:p-5 border border-green-200">
+                <div className="flex items-center gap-2 mb-1 lg:mb-2">
+                  <CheckCircle className="h-3 w-3 lg:h-4 lg:w-4 text-green-600" />
                   <p className="text-xs text-green-600 font-medium">Ya pagado</p>
                 </div>
-                <p className="text-2xl font-bold text-green-700">{formatCurrency(paidAmount)}</p>
+                <p className="text-xl lg:text-2xl font-bold text-green-700">{formatCurrency(paidAmount)}</p>
               </div>
-              <div className="bg-red-50 rounded-xl p-5 border border-red-200">
-                <div className="flex items-center gap-2 mb-2">
-                  <AlertCircle className="h-4 w-4 text-red-600" />
+              <div className="bg-red-50 rounded-xl p-4 lg:p-5 border border-red-200">
+                <div className="flex items-center gap-2 mb-1 lg:mb-2">
+                  <AlertCircle className="h-3 w-3 lg:h-4 lg:w-4 text-red-600" />
                   <p className="text-xs text-red-600 font-medium">Pendiente</p>
                 </div>
-                <p className={`text-2xl font-bold ${pendingAmount > 0 ? "text-red-700" : "text-green-700"}`}>
+                <p className={`text-xl lg:text-2xl font-bold ${pendingAmount > 0 ? "text-red-700" : "text-green-700"}`}>
                   {formatCurrency(pendingAmount)}
                 </p>
-                {pendingAmount > 0 && <p className="text-xs text-gray-500 mt-2">A pagar al llegar</p>}
+                {pendingAmount > 0 && <p className="text-xs text-gray-500 mt-1 lg:mt-2">A pagar al llegar</p>}
               </div>
             </div>
           </ColorTab>
         )}
 
         {/* UNIDAD + INVENTARIO */}
-        <ColorTab color="blue" icon={Home} title={`Tu unidad: ${reservation.units?.name}`} subtitle={reservation.units?.description || ""} defaultOpen={true}>
+        <ColorTab
+          color="blue"
+          icon={Home}
+          title={`Tu unidad: ${reservation.units?.name}`}
+          subtitle={reservation.units?.description || ""}
+          defaultOpen={true}
+        >
           {reservation.units?.capacity && (
             <p className="text-sm text-gray-600 mb-4 flex items-center gap-2">
               <Users className="h-4 w-4" />
@@ -704,9 +736,14 @@ export default function GuestStayPage({ params }: Props) {
                       <h5 className="font-medium text-gray-900 mb-3 text-sm">{category}</h5>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                         {items.map((item: any, index: number) => (
-                          <div key={index} className="flex items-center justify-between text-sm bg-gray-50 rounded-lg px-3 py-2">
+                          <div
+                            key={index}
+                            className="flex items-center justify-between text-sm bg-gray-50 rounded-lg px-3 py-2"
+                          >
                             <span className="text-gray-700">{item.name}</span>
-                            <Badge variant="secondary" className="text-xs">x{item.quantity}</Badge>
+                            <Badge variant="secondary" className="text-xs">
+                              x{item.quantity}
+                            </Badge>
                           </div>
                         ))}
                       </div>
@@ -720,7 +757,13 @@ export default function GuestStayPage({ params }: Props) {
 
         {/* LLEGADA */}
         {arrivalInstructions?.enabled && (
-          <ColorTab color="green" icon={Navigation} title="Instrucciones de llegada" subtitle="Cómo llegar al alojamiento" defaultOpen={true}>
+          <ColorTab
+            color="green"
+            icon={Navigation}
+            title="Instrucciones de llegada"
+            subtitle="Cómo llegar al alojamiento"
+            defaultOpen={true}
+          >
             {arrivalInstructions.steps && arrivalInstructions.steps.length > 0 && (
               <div className="mb-4">
                 <h4 className="font-medium text-gray-900 mb-3">Pasos para llegar:</h4>
@@ -759,7 +802,12 @@ export default function GuestStayPage({ params }: Props) {
 
         {/* CHECKOUT */}
         {checkoutInstructions?.enabled && (
-          <ColorTab color="orange" icon={Key} title="Instrucciones de check-out" subtitle="Qué hacer al momento de salir">
+          <ColorTab
+            color="orange"
+            icon={Key}
+            title="Instrucciones de check-out"
+            subtitle="Qué hacer al momento de salir"
+          >
             {checkoutInstructions.steps && checkoutInstructions.steps.length > 0 && (
               <ol className="space-y-3 mb-4">
                 {checkoutInstructions.steps.map((step: any, index: number) => (
@@ -786,7 +834,12 @@ export default function GuestStayPage({ params }: Props) {
 
         {/* DESTINO */}
         {destinationPlaces.length > 0 && (
-          <ColorTab color="purple" icon={MapPin} title="Descubrí el destino" subtitle="Lugares recomendados por el anfitrión">
+          <ColorTab
+            color="purple"
+            icon={MapPin}
+            title="Descubrí el destino"
+            subtitle="Lugares recomendados por el anfitrión"
+          >
             <div className="space-y-4">
               <select
                 value={selectedPlace?.id || ""}
@@ -821,7 +874,9 @@ export default function GuestStayPage({ params }: Props) {
                           const catConfig = CATEGORY_CONFIG[selectedPlace.category] || CATEGORY_CONFIG.landmark;
                           const Icon = catConfig.icon;
                           return (
-                            <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium mt-2 ${catConfig.bgColor} ${catConfig.color}`}>
+                            <span
+                              className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium mt-2 ${catConfig.bgColor} ${catConfig.color}`}
+                            >
                               <Icon className="h-3 w-3" /> {catConfig.label}
                             </span>
                           );
@@ -832,7 +887,7 @@ export default function GuestStayPage({ params }: Props) {
                           href={selectedPlace.google_maps_url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex items-center gap-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                          className="flex items-center gap-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium flex-shrink-0"
                         >
                           <ExternalLink className="h-4 w-4" /> Ver en Maps
                         </a>
@@ -855,7 +910,7 @@ export default function GuestStayPage({ params }: Props) {
               <iframe
                 src={mapsEmbedUrl}
                 width="100%"
-                height="400"
+                height="300"
                 style={{ border: 0 }}
                 allowFullScreen
                 loading="lazy"
@@ -879,17 +934,25 @@ export default function GuestStayPage({ params }: Props) {
 
         {/* CONTACTOS */}
         {emergencyContacts.length > 0 && (
-          <ColorTab color="red" icon={AlertCircle} title="Contactos importantes" subtitle="Números útiles durante tu estadía">
+          <ColorTab
+            color="red"
+            icon={AlertCircle}
+            title="Contactos importantes"
+            subtitle="Números útiles durante tu estadía"
+          >
             <div className="space-y-3">
               {emergencyContacts.map((contact: any, index: number) => (
-                <div key={index} className="flex items-center justify-between p-4 bg-red-50 rounded-lg border border-red-200">
-                  <div>
-                    <p className="font-medium text-gray-900">{contact.name}</p>
+                <div
+                  key={index}
+                  className="flex items-center justify-between p-4 bg-red-50 rounded-lg border border-red-200"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-gray-900 truncate">{contact.name}</p>
                     <p className="text-xs text-gray-500">{contact.role}</p>
                   </div>
                   <a
                     href={`tel:${contact.phone}`}
-                    className="flex items-center gap-2 text-sm bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors font-medium"
+                    className="flex items-center gap-2 text-sm bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors font-medium flex-shrink-0 ml-3"
                   >
                     <Phone className="h-4 w-4" />
                     {contact.phone}
@@ -900,47 +963,49 @@ export default function GuestStayPage({ params }: Props) {
           </ColorTab>
         )}
 
-        {/* CARDS INFERIORES: Wi-Fi, WhatsApp, Guía */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="rounded-2xl p-6 border-2 border-green-200 bg-gradient-to-br from-green-50 to-emerald-50 shadow-sm">
+        {/* CARDS INFERIORES: Wi-Fi, WhatsApp, Guía - 1 col móvil, 3 desktop */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 lg:gap-4">
+          {/* Wi-Fi */}
+          <div className="rounded-xl lg:rounded-2xl p-4 lg:p-6 border-2 border-green-200 bg-gradient-to-br from-green-50 to-emerald-50 shadow-sm">
             <div className="flex items-start gap-3">
-              <div className="h-12 w-12 rounded-xl bg-green-600 flex items-center justify-center flex-shrink-0">
-                <Wifi className="h-6 w-6 text-white" />
+              <div className="h-10 w-10 lg:h-12 lg:w-12 rounded-lg lg:rounded-xl bg-green-600 flex items-center justify-center flex-shrink-0">
+                <Wifi className="h-5 w-5 lg:h-6 lg:w-6 text-white" />
               </div>
-              <div className="flex-1">
-                <h3 className="font-bold text-gray-900 text-lg">Wi-Fi</h3>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-bold text-gray-900 text-base lg:text-lg">Wi-Fi</h3>
                 {settings.wifiNetworks && settings.wifiNetworks.length > 0 ? (
-                  <div className="mt-3 space-y-2">
+                  <div className="mt-2 space-y-1">
                     {settings.wifiNetworks.map((wifi: any, i: number) => (
-                      <div key={i} className="text-sm">
-                        <p className="font-medium text-gray-900">Red: {wifi.ssid}</p>
+                      <div key={i} className="text-xs lg:text-sm">
+                        <p className="font-medium text-gray-900 truncate">Red: {wifi.ssid}</p>
                         <p className="text-gray-600">Clave: {wifi.password}</p>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-sm text-gray-600 mt-2">No configurada</p>
+                  <p className="text-xs lg:text-sm text-gray-600 mt-2">No configurada</p>
                 )}
               </div>
             </div>
           </div>
 
-          <div className="rounded-2xl p-6 border-2 border-green-200 bg-gradient-to-br from-green-50 to-emerald-50 shadow-sm">
+          {/* WhatsApp */}
+          <div className="rounded-xl lg:rounded-2xl p-4 lg:p-6 border-2 border-green-200 bg-gradient-to-br from-green-50 to-emerald-50 shadow-sm">
             <div className="flex items-start gap-3">
-              <div className="h-12 w-12 rounded-xl bg-green-600 flex items-center justify-center flex-shrink-0">
-                <MessageCircle className="h-6 w-6 text-white" />
+              <div className="h-10 w-10 lg:h-12 lg:w-12 rounded-lg lg:rounded-xl bg-green-600 flex items-center justify-center flex-shrink-0">
+                <MessageCircle className="h-5 w-5 lg:h-6 lg:w-6 text-white" />
               </div>
               <div className="flex-1">
-                <h3 className="font-bold text-gray-900 text-lg">¿Necesitás ayuda?</h3>
-                <p className="text-sm text-gray-600 mt-1 mb-3">Contactanos por WhatsApp</p>
+                <h3 className="font-bold text-gray-900 text-base lg:text-lg">¿Ayuda?</h3>
+                <p className="text-xs text-gray-600 mt-1 mb-2">Contactanos por WhatsApp</p>
                 {settings.whatsappNumber && (
                   <a
                     href={`https://wa.me/${settings.whatsappNumber.replace(/\D/g, "")}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 bg-green-600 text-white px-4 py-2.5 rounded-lg hover:bg-green-700 transition-colors font-medium shadow-sm"
+                    className="inline-flex items-center gap-1 lg:gap-2 bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700 transition-colors text-xs lg:text-sm font-medium shadow-sm"
                   >
-                    <MessageCircle className="h-4 w-4" />
+                    <MessageCircle className="h-3 w-3 lg:h-4 lg:w-4" />
                     Enviar mensaje
                   </a>
                 )}
@@ -948,15 +1013,16 @@ export default function GuestStayPage({ params }: Props) {
             </div>
           </div>
 
+          {/* Guía */}
           <Link href={`/${tenantSlug}/guides`} className="block">
-            <div className="rounded-2xl p-6 border-2 border-gray-200 bg-white hover:shadow-lg transition-shadow cursor-pointer h-full">
+            <div className="rounded-xl lg:rounded-2xl p-4 lg:p-6 border-2 border-gray-200 bg-white hover:shadow-lg transition-shadow cursor-pointer h-full">
               <div className="flex items-start gap-3">
-                <div className="h-12 w-12 rounded-xl bg-gray-600 flex items-center justify-center flex-shrink-0">
-                  <FileText className="h-6 w-6 text-white" />
+                <div className="h-10 w-10 lg:h-12 lg:w-12 rounded-lg lg:rounded-xl bg-gray-600 flex items-center justify-center flex-shrink-0">
+                  <FileText className="h-5 w-5 lg:h-6 lg:w-6 text-white" />
                 </div>
                 <div className="flex-1">
-                  <h3 className="font-bold text-gray-900 text-lg">Guía del alojamiento</h3>
-                  <p className="text-sm text-gray-600 mt-1">Normas, servicios e información útil</p>
+                  <h3 className="font-bold text-gray-900 text-base lg:text-lg">Guía</h3>
+                  <p className="text-xs text-gray-600 mt-1">Normas e info útil</p>
                 </div>
               </div>
             </div>
@@ -965,20 +1031,26 @@ export default function GuestStayPage({ params }: Props) {
 
         {/* RESEÑAS (AL FINAL) */}
         {reviewLink && (
-          <ColorTab color="yellow" icon={Star} title="¿Cómo fue tu estadía?" subtitle="Tu opinión nos ayuda a mejorar" defaultOpen={true}>
+          <ColorTab
+            color="yellow"
+            icon={Star}
+            title="¿Cómo fue tu estadía?"
+            subtitle="Tu opinión nos ayuda a mejorar"
+            defaultOpen={true}
+          >
             <div className="text-center py-4">
               <div className="h-16 w-16 rounded-full bg-yellow-100 flex items-center justify-center mx-auto mb-4">
                 <Star className="h-8 w-8 text-yellow-600" />
               </div>
               <h4 className="text-xl font-bold text-gray-900 mb-2">¡Gracias por elegirnos!</h4>
-              <p className="text-gray-700 mb-6 max-w-md mx-auto">
+              <p className="text-gray-700 mb-6 max-w-md mx-auto text-sm">
                 Tu opinión nos ayuda a mejorar y a otros huéspedes a elegirnos. ¡Dejanos tu reseña!
               </p>
               <a
                 href={reviewLink}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 bg-yellow-600 text-white px-8 py-4 rounded-xl hover:bg-yellow-700 transition-colors font-semibold shadow-lg hover:shadow-xl"
+                className="inline-flex items-center gap-2 bg-yellow-600 text-white px-6 py-3 lg:px-8 lg:py-4 rounded-xl hover:bg-yellow-700 transition-colors font-semibold shadow-lg hover:shadow-xl text-sm lg:text-base"
               >
                 <Star className="h-5 w-5" />
                 Dejar reseña
@@ -990,8 +1062,8 @@ export default function GuestStayPage({ params }: Props) {
       </div>
 
       {/* FOOTER */}
-      <footer className="border-t border-gray-200 bg-white py-6 mt-12">
-        <div className="max-w-5xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <footer className="border-t border-gray-200 bg-white py-6 mt-8 lg:mt-12">
+        <div className="max-w-5xl mx-auto px-4 lg:px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <img src="/mi-estadia-logo.png" alt="Mi Estadía" className="h-8 w-auto" />
             <span className="text-sm text-gray-600">© 2026 Mi Estadía</span>
