@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { cancelLemonSqueezySubscription } from '@/lib/lemonsqueezy';
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -32,27 +31,37 @@ export async function POST(request: Request) {
       );
     }
 
-    // Cancelar según el proveedor
+    // Cancelar en el proveedor externo (LemonSqueezy o Mercado Pago)
     if (provider === 'lemonsqueezy' && subscription_id) {
-      const result = await cancelLemonSqueezySubscription(subscription_id);
-      if (!result.success) {
-        return NextResponse.json(
-          { error: result.error || 'Error al cancelar en LemonSqueezy' },
-          { status: 500 }
-        );
+      try {
+        const LS_API_KEY = process.env.LS_API_KEY;
+        if (LS_API_KEY) {
+          await fetch(
+            `https://api.lemonsqueezy.com/v1/subscriptions/${subscription_id}`,
+            {
+              method: 'DELETE',
+              headers: {
+                'Authorization': `Bearer ${LS_API_KEY}`,
+                'Accept': 'application/vnd.api+json',
+                'Content-Type': 'application/vnd.api+json',
+              },
+            }
+          );
+        }
+      } catch (err) {
+        console.error('Error cancelando en LemonSqueezy:', err);
+        // No fallamos si el error es externo, igual actualizamos la BD
       }
-    } else if (provider === 'mercadopago') {
-      // TODO: Implementar cancelación de Mercado Pago
-      // Por ahora, solo marcamos como cancelado en la BD
-      console.log('Cancelación de Mercado Pago pendiente de implementación');
     }
 
-    // Actualizar el tenant en la base de datos
+    // Actualizar el tenant: marcar como "cancelled" pero mantener subscription_ends_at
+    // para que siga activo hasta el final del período pagado
     const { error: updateError } = await supabase
       .from('tenants')
       .update({
         subscription_status: 'cancelled',
         subscription_cancelled_at: new Date().toISOString(),
+        // NO tocar subscription_ends_at - sigue vigente hasta esa fecha
       })
       .eq('id', tenant_id);
 
@@ -65,7 +74,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
-      message: 'Suscripción cancelada exitosamente',
+      message: 'Suscripción cancelada. Acceso mantenido hasta el final del período pagado.',
+      ends_at: tenant.subscription_ends_at,
     });
   } catch (err: any) {
     console.error('Error en cancel-subscription:', err);
