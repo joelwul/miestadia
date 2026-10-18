@@ -6,7 +6,7 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-// Precios (deberían venir de tu config)
+// Precios
 const PRICES = {
   monthly: 40,
   yearly: 360,
@@ -57,12 +57,15 @@ export async function POST(request: Request) {
         );
       }
 
-      // Calcular fecha de inicio: MAÑANA a las 10:00 AM (evita problemas de zona horaria)
+      // Calcular fecha de inicio: MAÑANA a las 10:00 AM
       const tomorrow = new Date();
       tomorrow.setDate(tomorrow.getDate() + 1);
       tomorrow.setHours(10, 0, 0, 0);
 
       const backUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://miestadia.online'}/${tenant.slug}/admin/billing`;
+
+      // Obtener email del owner o usar uno por defecto
+      const payerEmail = tenant.owner_email || tenant.settings?.email || '';
 
       const preference = {
         reason: `Mi Estadía - Plan ${plan === 'monthly' ? 'Mensual' : 'Anual'}`,
@@ -72,11 +75,16 @@ export async function POST(request: Request) {
           frequency_type: plan === 'monthly' ? 'month' : 'year',
           transaction_amount: amountARS,
           currency_id: 'ARS',
-          start_date: tomorrow.toISOString(), // ← FECHA FUTURA
-          end_date: null, // Sin fecha de fin
+          start_date: tomorrow.toISOString(),
+          end_date: null,
         },
         back_url: backUrl,
         notification_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://miestadia.online'}/api/webhooks/mercadopago`,
+        // AGREGADO: payer es requerido por Mercado Pago
+        payer: {
+          email: payerEmail,
+          name: tenant.owner_name || tenant.name || '',
+        },
       };
 
       const response = await fetch(
@@ -145,7 +153,7 @@ export async function POST(request: Request) {
         data: {
           type: 'checkouts',
           attributes: {
-            custom_price: amount * 100, // En centavos
+            custom_price: amount * 100,
             product_options: {
               redirect_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://miestadia.online'}/${tenant.slug}/admin/billing?success=true`,
               receipt_button_text: 'Volver a Mi Estadía',
@@ -153,8 +161,8 @@ export async function POST(request: Request) {
               receipt_thank_you_note: '¡Gracias por suscribirte a Mi Estadía!',
             },
             checkout_data: {
-              email: tenant.owner_email,
-              name: tenant.owner_name,
+              email: tenant.owner_email || tenant.settings?.email || '',
+              name: tenant.owner_name || tenant.name || '',
               custom: [
                 {
                   key: 'tenant_id',
