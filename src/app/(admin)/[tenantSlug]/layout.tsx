@@ -17,9 +17,8 @@ import {
   Code,
   Home,
   BarChart3,
-  Menu,
-  X,
   MoreHorizontal,
+  X,
 } from 'lucide-react'
 
 interface Props {
@@ -72,7 +71,12 @@ export default async function AdminLayout({ children, params }: Props) {
       label: 'OPERACIONES DIARIAS',
       items: [
         { name: 'Dashboard', href: `/${tenantSlug}/admin`, icon: LayoutDashboard },
-        { name: 'Solicitudes', href: `/${tenantSlug}/admin/requests`, icon: Clock, badge: pendingRequests > 0 ? pendingRequests : null },
+        {
+          name: 'Solicitudes',
+          href: `/${tenantSlug}/admin/requests`,
+          icon: Clock,
+          badge: pendingRequests > 0 ? pendingRequests : null,
+        },
         { name: 'Reservas', href: `/${tenantSlug}/admin/reservations`, icon: Calendar },
         { name: 'Calendario', href: `/${tenantSlug}/admin/calendar`, icon: Calendar },
         { name: 'Analytics', href: `/${tenantSlug}/admin/analytics`, icon: BarChart3 },
@@ -101,28 +105,27 @@ export default async function AdminLayout({ children, params }: Props) {
     },
   ]
 
-  // Todos los items planos para el drawer móvil
-  const allMobileItems = navigationGroups.flatMap(group => 
-    group.items.map(item => ({ ...item, groupLabel: group.label }))
-  )
-
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* SIDEBAR DESKTOP */}
+      {/* SIDEBAR DESKTOP - Solo visible en lg+ */}
       <aside className="hidden lg:block fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-200">
         <div className="flex h-full flex-col">
           <div className="flex h-16 items-center border-b border-gray-200 px-6">
             <h1 className="text-xl font-bold text-green-700">Mi Estadía</h1>
           </div>
           <div className="border-b border-gray-200 px-6 py-4">
-            <p className="text-sm font-medium text-gray-900">{tenantUser.tenants?.name}</p>
+            <p className="text-sm font-medium text-gray-900">
+              {tenantUser.tenants?.name}
+            </p>
             <p className="text-xs text-gray-500">Panel de administración</p>
           </div>
           <nav className="flex-1 space-y-4 px-3 py-4 overflow-y-auto">
             {navigationGroups.map((group) => (
               <div key={group.label}>
                 <div className="px-3 py-2">
-                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">{group.label}</p>
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
+                    {group.label}
+                  </p>
                   <div className="mt-1 border-b border-gray-100" />
                 </div>
                 <div className="space-y-1">
@@ -151,7 +154,10 @@ export default async function AdminLayout({ children, params }: Props) {
             ))}
           </nav>
           <div className="border-t border-gray-200 p-3">
-            <Link href="/login" className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors">
+            <Link
+              href="/login"
+              className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors"
+            >
               <LogOut className="h-5 w-5" />
               Cerrar sesión
             </Link>
@@ -171,7 +177,7 @@ export default async function AdminLayout({ children, params }: Props) {
         </div>
       </header>
 
-      {/* BOTTOM NAV MÓVIL - 5 principales + Más */}
+      {/* BOTTOM NAV MÓVIL */}
       <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 flex justify-around py-1.5 px-1">
         {[
           { href: `/${tenantSlug}/admin`, icon: LayoutDashboard, label: 'Inicio' },
@@ -214,15 +220,13 @@ export default async function AdminLayout({ children, params }: Props) {
 
       {/* DRAWER MÓVIL - Menú completo */}
       <div id="mobile-menu-drawer" className="lg:hidden fixed inset-0 z-50 translate-x-full transition-transform duration-300">
-        {/* Overlay */}
-        <div 
+        <div
           className="absolute inset-0 bg-black/50"
           onClick={() => {
             const drawer = document.getElementById('mobile-menu-drawer')
             if (drawer) drawer.classList.add('translate-x-full')
           }}
         />
-        {/* Panel */}
         <div className="absolute right-0 top-0 bottom-0 w-80 max-w-[85vw] bg-white shadow-2xl overflow-y-auto">
           <div className="sticky top-0 bg-white border-b border-gray-200 p-4 flex items-center justify-between">
             <h2 className="text-lg font-bold text-gray-900">Menú</h2>
