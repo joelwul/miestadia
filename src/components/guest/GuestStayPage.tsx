@@ -9,7 +9,7 @@ import {
   Package, Cloud, Sun, CloudRain, CloudSnow, CloudLightning, Wind, Home, Car, Key,
   Navigation, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, LogOut, Utensils,
   TreePalm, Landmark, ShoppingBag, Coffee, Waves, ExternalLink, DollarSign, TrendingUp,
-  Star, Phone, Globe, Clock, Users, Calendar, Hash,
+  Star, Phone, Globe, Clock, Users, Calendar, Hash, Send,
 } from "lucide-react";
 import Link from "next/link";
 import LanguageSelector from "@/components/LanguageSelector";
@@ -36,7 +36,7 @@ function getWeatherInfo(code: number) {
     3: { emoji: "️", icon: Cloud, description: "Nublado", color: "text-gray-500" },
     61: { emoji: "🌧️", icon: CloudRain, description: "Lluvia", color: "text-blue-500" },
     71: { emoji: "🌨️", icon: CloudSnow, description: "Nieve", color: "text-blue-300" },
-    95: { emoji: "⛈️", icon: CloudLightning, description: "Tormenta", color: "text-purple-600" },
+    95: { emoji: "️", icon: CloudLightning, description: "Tormenta", color: "text-purple-600" },
   };
   return map[code] || { emoji: "🌡️", icon: Wind, description: "Desconocido", color: "text-gray-500" };
 }
@@ -254,16 +254,6 @@ export default function GuestStayPage({ params }: Props) {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-      {/* ANIMACIÓN DE BIENVENIDA */}
-      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
-        <div className="absolute top-20 left-10 animate-bounce-slow opacity-20">
-          <svg className="w-16 h-16 text-green-600" fill="currentColor" viewBox="0 0 24 24"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></svg>
-        </div>
-        <div className="absolute bottom-20 right-10 animate-bounce-slow opacity-20" style={{ animationDelay: '1s' }}>
-          <svg className="w-12 h-12 text-green-600" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
-        </div>
-      </div>
-
       {/* HEADER */}
       <header className="relative bg-gradient-to-br from-green-700 via-green-600 to-emerald-700 text-white overflow-hidden">
         <div className="absolute inset-0 opacity-10">
@@ -471,35 +461,6 @@ export default function GuestStayPage({ params }: Props) {
           </ColorTab>
         )}
 
-        {/* SERVICIOS - Scroll horizontal tipo ecommerce */}
-        {services.length > 0 && (
-          <ColorTab color="purple" icon={Star} title="Servicios disponibles" subtitle="Experiencias y servicios del alojamiento" defaultOpen={true}>
-            <div className="flex gap-4 overflow-x-auto pb-4 -mx-2 px-2 snap-x snap-mandatory">
-              {services.map((service, index) => (
-                <div key={index} className="flex-shrink-0 w-64 snap-start">
-                  <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
-                    {service.photos && service.photos.length > 0 && (
-                      <div className="w-full h-32 bg-gray-100 overflow-hidden">
-                        <img src={service.photos[0].image_url} alt={service.name} className="w-full h-full object-cover" />
-                      </div>
-                    )}
-                    <div className="p-4">
-                      <h4 className="font-bold text-gray-900 mb-1">{service.name}</h4>
-                      {service.description && (<p className="text-sm text-gray-600 mb-2 line-clamp-2">{service.description}</p>)}
-                      {service.price && (<p className="text-lg font-bold text-green-700 mb-2">{formatCurrency(service.price)}</p>)}
-                      {service.whatsapp && (
-                        <a href={`https://wa.me/${service.whatsapp.replace(/\D/g, "")}`} target="_blank" rel="noopener noreferrer" className="mt-2 w-full inline-flex items-center justify-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors text-sm font-medium">
-                          <MessageCircle className="h-4 w-4" />Reservar
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </ColorTab>
-        )}
-
         {/* LLEGADA */}
         {arrivalInstructions?.enabled && (
           <ColorTab color="green" icon={Navigation} title="Instrucciones de llegada" subtitle="Cómo llegar al alojamiento" defaultOpen={true}>
@@ -610,6 +571,48 @@ export default function GuestStayPage({ params }: Props) {
           </ColorTab>
         )}
 
+        {/* SERVICIOS - Scroll horizontal tipo ecommerce (CASI AL FINAL) */}
+        {services.length > 0 && (
+          <ColorTab color="purple" icon={Star} title="Servicios disponibles" subtitle="Experiencias y servicios del alojamiento" defaultOpen={true}>
+            <div className="flex gap-4 overflow-x-auto pb-4 -mx-2 px-2 snap-x snap-mandatory">
+              {services.map((service, index) => {
+                // Construir mensaje precargado para WhatsApp
+                const whatsappMessage = encodeURIComponent(`¡Hola! Me interesa el servicio: *${service.name}*${service.price ? ` (${formatCurrency(service.price)})` : ''}. ¿Podrían darme más información?`);
+                const whatsappNumber = service.whatsapp || whatsappHelpNumber || settings.whatsappNumber;
+                const whatsappUrl = whatsappNumber ? `https://wa.me/${whatsappNumber.replace(/\D/g, "")}?text=${whatsappMessage}` : null;
+
+                return (
+                  <div key={index} className="flex-shrink-0 w-64 snap-start">
+                    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow h-full flex flex-col">
+                      {service.photos && service.photos.length > 0 && (
+                        <div className="w-full h-32 bg-gray-100 overflow-hidden">
+                          <img src={service.photos[0].image_url} alt={service.name} className="w-full h-full object-cover" />
+                        </div>
+                      )}
+                      <div className="p-4 flex-1 flex flex-col">
+                        <h4 className="font-bold text-gray-900 mb-1">{service.name}</h4>
+                        {service.description && (<p className="text-sm text-gray-600 mb-2 line-clamp-2 flex-1">{service.description}</p>)}
+                        {service.price && (<p className="text-lg font-bold text-green-700 mb-2">{formatCurrency(service.price)}</p>)}
+                        {whatsappUrl && (
+                          <a
+                            href={whatsappUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mt-2 w-full inline-flex items-center justify-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
+                          >
+                            <MessageCircle className="h-4 w-4" />
+                            Consultar
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </ColorTab>
+        )}
+
         {/* CARDS INFERIORES: Wi-Fi, WhatsApp Ayuda, Guía */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 lg:gap-4">
           {/* Wi-Fi */}
@@ -697,16 +700,6 @@ export default function GuestStayPage({ params }: Props) {
           </a>
         </div>
       </footer>
-
-      <style jsx>{`
-        @keyframes bounce-slow {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-20px); }
-        }
-        .animate-bounce-slow {
-          animation: bounce-slow 3s ease-in-out infinite;
-        }
-      `}</style>
     </div>
   );
 }
