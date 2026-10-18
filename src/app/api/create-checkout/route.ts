@@ -6,7 +6,6 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-// Precios
 const PRICES = {
   monthly: 40,
   yearly: 360,
@@ -42,6 +41,20 @@ export async function POST(request: Request) {
       );
     }
 
+    // Obtener email del tenant (prioridad: owner_email > settings.email > email)
+    const payerEmail = 
+      tenant.owner_email || 
+      tenant.settings?.email || 
+      tenant.email ||
+      null;
+
+    if (!payerEmail) {
+      return NextResponse.json(
+        { error: 'No hay email configurado para este tenant. Contactá a soporte.' },
+        { status: 400 }
+      );
+    }
+
     const amount = plan === 'monthly' ? PRICES.monthly : PRICES.yearly;
     const amountARS = plan === 'monthly' ? PRICES_ARS.monthly : PRICES_ARS.yearly;
 
@@ -64,9 +77,6 @@ export async function POST(request: Request) {
 
       const backUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://miestadia.online'}/${tenant.slug}/admin/billing`;
 
-      // Obtener email del owner o usar uno por defecto
-      const payerEmail = tenant.owner_email || tenant.settings?.email || '';
-
       const preference = {
         reason: `Mi Estadía - Plan ${plan === 'monthly' ? 'Mensual' : 'Anual'}`,
         external_reference: tenant_id,
@@ -80,12 +90,13 @@ export async function POST(request: Request) {
         },
         back_url: backUrl,
         notification_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://miestadia.online'}/api/webhooks/mercadopago`,
-        // AGREGADO: payer es requerido por Mercado Pago
         payer: {
           email: payerEmail,
-          name: tenant.owner_name || tenant.name || '',
+          name: tenant.owner_name || tenant.name || 'Usuario',
         },
       };
+
+      console.log('Creando suscripción MP con email:', payerEmail);
 
       const response = await fetch(
         'https://api.mercadopago.com/preapproval',
@@ -161,8 +172,8 @@ export async function POST(request: Request) {
               receipt_thank_you_note: '¡Gracias por suscribirte a Mi Estadía!',
             },
             checkout_data: {
-              email: tenant.owner_email || tenant.settings?.email || '',
-              name: tenant.owner_name || tenant.name || '',
+              email: payerEmail,
+              name: tenant.owner_name || tenant.name || 'Usuario',
               custom: [
                 {
                   key: 'tenant_id',
