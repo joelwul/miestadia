@@ -1,8 +1,8 @@
 'use client'
-import { useEffect, useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
-import { useParams } from 'next/navigation'
-import { motion } from 'framer-motion'
+import { useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
+import { useParams } from "next/navigation";
+import { motion } from "framer-motion";
 import {
   Crown,
   CreditCard,
@@ -16,150 +16,152 @@ import {
   XCircle,
   DollarSign,
   TrendingUp,
-} from 'lucide-react'
-import { PRICES, PRICES_ARS, USD_TO_ARS } from '@/lib/config'
+} from "lucide-react";
+import { PRICES, PRICES_ARS, USD_TO_ARS } from "@/lib/config";
 
 interface Invoice {
-  id: string
-  date: string
-  amount: number
-  status: 'paid' | 'pending' | 'failed'
-  plan: string
-  period: string
+  id: string;
+  date: string;
+  amount: number;
+  status: "paid" | "pending" | "failed";
+  plan: string;
+  period: string;
 }
 
 interface Tenant {
-  id: string
-  name: string
-  slug: string
-  subscription_status: string
-  subscription_plan: string
-  trial_ends_at: string
-  subscription_ends_at: string
-  subscription_cancelled_at: string | null
-  payment_method: string
-  owner_email: string
-  owner_name: string
+  id: string;
+  name: string;
+  slug: string;
+  subscription_status: string;
+  subscription_plan: string;
+  trial_ends_at: string;
+  subscription_ends_at: string;
+  subscription_cancelled_at: string | null;
+  payment_method: string;
+  owner_email: string;
+  owner_name: string;
 }
 
 export default function BillingPage() {
-  const params = useParams()
-  const tenantSlug = params.tenantSlug as string
-  const [tenant, setTenant] = useState<Tenant | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null)
-  const [invoices, setInvoices] = useState<Invoice[]>([])
-  const [daysLeft, setDaysLeft] = useState(0)
-  const supabase = createClient()
+  const params = useParams();
+  const tenantSlug = params.tenantSlug as string;
+  const [tenant, setTenant] = useState<Tenant | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [daysLeft, setDaysLeft] = useState(0);
+  const supabase = createClient();
 
   useEffect(() => {
     async function load() {
       try {
         const { data: tenantData, error: tenantError } = await supabase
-          .from('tenants')
-          .select('*')
-          .eq('slug', tenantSlug)
-          .single()
+          .from("tenants")
+          .select("*")
+          .eq("slug", tenantSlug)
+          .single();
 
         if (tenantError || !tenantData) {
-          setLoading(false)
-          return
+          setLoading(false);
+          return;
         }
-        setTenant(tenantData)
+        setTenant(tenantData);
 
-        const now = new Date()
-        now.setHours(0, 0, 0, 0)
+        const now = new Date();
+        now.setHours(0, 0, 0, 0);
 
-        const trialEnd = tenantData.trial_ends_at ? new Date(tenantData.trial_ends_at) : null
-        const subEnd = tenantData.subscription_ends_at ? new Date(tenantData.subscription_ends_at) : null
-
-        // Calcular días restantes según el estado
-        if (tenantData.subscription_status === 'active' && subEnd) {
-          setDaysLeft(Math.ceil((subEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)))
-        } else if (tenantData.subscription_status === 'cancelled' && subEnd) {
-          // Si canceló, mostrar días hasta que expire el período pagado
-          setDaysLeft(Math.ceil((subEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)))
+        const trialEnd = tenantData.trial_ends_at ? new Date(tenantData.trial_ends_at) : null;
+        const subEnd = tenantData.subscription_ends_at ? new Date(tenantData.subscription_ends_at) : null;
+        
+        // Calcular días restantes
+        let daysRemaining = 0;
+        if (tenantData.subscription_status === "active" && subEnd) {
+          daysRemaining = Math.ceil((subEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+        } else if (tenantData.subscription_status === "cancelled" && subEnd) {
+          // Si canceló, calcular hasta la fecha de fin del período pagado
+          daysRemaining = Math.ceil((subEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
         } else if (trialEnd) {
-          // Si está en trial
-          setDaysLeft(Math.ceil((trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)))
+          daysRemaining = Math.ceil((trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
         }
+        
+        setDaysLeft(daysRemaining);
 
         const { data: invoicesData } = await supabase
-          .from('invoices')
-          .select('*')
-          .eq('tenant_id', tenantData.id)
-          .order('date', { ascending: false })
+          .from("invoices")
+          .select("*")
+          .eq("tenant_id", tenantData.id)
+          .order("date", { ascending: false });
 
         if (invoicesData) {
-          setInvoices(invoicesData)
+          setInvoices(invoicesData);
         }
       } catch (err) {
-        console.error('Error loading billing:', err)
+        console.error("Error loading billing:", err);
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
     }
-    load()
-  }, [tenantSlug])
+    load();
+  }, [tenantSlug]);
 
-  async function handleCheckout(plan: 'monthly' | 'yearly', provider: 'lemonsqueezy' | 'mercadopago') {
-    if (!tenant) return
-    setCheckoutLoading(`${plan}-${provider}`)
+  async function handleCheckout(plan: "monthly" | "yearly", provider: "lemonsqueezy" | "mercadopago") {
+    if (!tenant) return;
+    setCheckoutLoading(`${plan}-${provider}`);
     try {
-      const response = await fetch('/api/create-checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/create-checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           tenant_id: tenant.id,
           plan,
           provider,
         }),
-      })
-      const data = await response.json()
+      });
+      const data = await response.json();
       if (!response.ok) {
-        throw new Error(data.error || 'Error creando checkout')
+        throw new Error(data.error || "Error creando checkout");
       }
       if (data.url) {
-        window.location.href = data.url
+        window.location.href = data.url;
       }
     } catch (err: any) {
-      alert('Error al crear el checkout: ' + err.message)
+      alert("Error al crear el checkout: " + err.message);
     } finally {
-      setCheckoutLoading(null)
+      setCheckoutLoading(null);
     }
   }
 
   async function handleCancelSubscription() {
-    if (!tenant) return
-    if (!confirm('¿Estás seguro que querés cancelar tu suscripción? Tu acceso continuará hasta el final del período pagado.')) {
-      return
+    if (!tenant) return;
+    if (!confirm("¿Estás seguro que querés cancelar tu suscripción? Tu acceso continuará hasta el final del período pagado.")) {
+      return;
     }
     try {
-      const response = await fetch('/api/cancel-subscription', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const response = await fetch("/api/cancel-subscription", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
           tenant_id: tenant.id,
           subscription_id: tenant.subscription_id || null,
-          provider: 'lemonsqueezy', // o el que corresponda
+          provider: tenant.subscription_provider || 'lemonsqueezy',
         }),
-      })
+      });
 
-      const contentType = response.headers.get('content-type')
-      if (!contentType || !contentType.includes('application/json')) {
-        throw new Error('El servidor no respondió con JSON. Verificá que el endpoint /api/cancel-subscription exista.')
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        throw new Error("El servidor no respondió con JSON. Verificá que el endpoint /api/cancel-subscription exista.");
       }
 
-      const data = await response.json()
+      const data = await response.json();
       if (!response.ok) {
-        throw new Error(data.error || 'Error al cancelar')
+        throw new Error(data.error || "Error al cancelar");
       }
       
-      const endDate = tenant.subscription_ends_at ? new Date(tenant.subscription_ends_at).toLocaleDateString('es-AR') : 'el final del período'
-      alert(`Suscripción cancelada. Tu acceso continuará hasta el ${endDate}.`)
-      window.location.reload()
+      const endDate = tenant.subscription_ends_at ? new Date(tenant.subscription_ends_at).toLocaleDateString("es-AR") : "el final del período";
+      alert(`Suscripción cancelada. Tu acceso continuará hasta el ${endDate}.`);
+      window.location.reload();
     } catch (err: any) {
-      alert('Error al cancelar: ' + err.message)
+      alert("Error al cancelar: " + err.message);
     }
   }
 
@@ -168,7 +170,7 @@ export default function BillingPage() {
       <div className="flex items-center justify-center py-20">
         <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
       </div>
-    )
+    );
   }
 
   if (!tenant) {
@@ -177,13 +179,13 @@ export default function BillingPage() {
         <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
         <p className="text-gray-600">No se encontró el alojamiento.</p>
       </div>
-    )
+    );
   }
 
-  const isTrial = tenant.subscription_status === 'trial'
-  const isActive = tenant.subscription_status === 'active'
-  const isCancelled = tenant.subscription_status === 'cancelled'
-  const isExpired = tenant.subscription_status === 'expired' || daysLeft <= 0
+  const isTrial = tenant.subscription_status === "trial";
+  const isActive = tenant.subscription_status === "active";
+  const isCancelled = tenant.subscription_status === "cancelled";
+  const isExpired = tenant.subscription_status === "expired" || daysLeft <= 0;
 
   return (
     <div className="space-y-6">
@@ -199,12 +201,12 @@ export default function BillingPage() {
           animate={{ opacity: 1, y: 0 }}
           className={`rounded-lg p-4 border ${
             daysLeft <= 0
-              ? 'bg-red-50 border-red-200'
+              ? "bg-red-50 border-red-200"
               : daysLeft <= 3
-              ? 'bg-orange-50 border-orange-200'
+              ? "bg-orange-50 border-orange-200"
               : daysLeft <= 7
-              ? 'bg-yellow-50 border-yellow-200'
-              : 'bg-blue-50 border-blue-200'
+              ? "bg-yellow-50 border-yellow-200"
+              : "bg-blue-50 border-blue-200"
           }`}
         >
           <div className="flex items-center gap-3">
@@ -212,25 +214,25 @@ export default function BillingPage() {
               <XCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
             ) : (
               <Clock className={`w-5 h-5 flex-shrink-0 ${
-                daysLeft <= 3 ? 'text-orange-600' : daysLeft <= 7 ? 'text-yellow-600' : 'text-blue-600'
+                daysLeft <= 3 ? "text-orange-600" : daysLeft <= 7 ? "text-yellow-600" : "text-blue-600"
               }`} />
             )}
             <div className="flex-1">
               <p className={`font-semibold ${
-                daysLeft <= 0 ? 'text-red-900' : daysLeft <= 3 ? 'text-orange-900' : daysLeft <= 7 ? 'text-yellow-900' : 'text-blue-900'
+                daysLeft <= 0 ? "text-red-900" : daysLeft <= 3 ? "text-orange-900" : daysLeft <= 7 ? "text-yellow-900" : "text-blue-900"
               }`}>
                 {daysLeft <= 0
-                  ? 'Tu período de prueba ha finalizado'
-                  : `${daysLeft} ${daysLeft === 1 ? 'día' : 'días'} de prueba restantes`}
+                  ? "Tu período de prueba ha finalizado"
+                  : `${daysLeft} ${daysLeft === 1 ? "día" : "días"} de prueba restantes`}
               </p>
               <p className={`text-sm ${
-                daysLeft <= 0 ? 'text-red-700' : daysLeft <= 3 ? 'text-orange-700' : daysLeft <= 7 ? 'text-yellow-700' : 'text-blue-700'
+                daysLeft <= 0 ? "text-red-700" : daysLeft <= 3 ? "text-orange-700" : daysLeft <= 7 ? "text-yellow-700" : "text-blue-700"
               }`}>
                 {daysLeft <= 0
-                  ? 'Suscribite para reactivar tu cuenta y continuar usando Mi Estadía.'
+                  ? "Suscribite para reactivar tu cuenta y continuar usando Mi Estadía."
                   : daysLeft <= 3
-                  ? '¡Últimos días! Suscribite ahora para no perder acceso.'
-                  : 'Disfrutá de todas las funcionalidades durante tu prueba gratuita de 30 días.'}
+                  ? "¡Últimos días! Suscribite ahora para no perder acceso."
+                  : "Disfrutá de todas las funcionalidades durante tu prueba gratuita de 30 días."}
               </p>
             </div>
           </div>
@@ -248,7 +250,7 @@ export default function BillingPage() {
             <div>
               <p className="font-semibold text-green-900">Plan activo</p>
               <p className="text-sm text-green-700">
-                Tu suscripción está activa. Próximo cobro en {daysLeft} {daysLeft === 1 ? 'día' : 'días'}.
+                Tu suscripción está activa. Próximo cobro en {daysLeft} {daysLeft === 1 ? "día" : "días"}.
               </p>
             </div>
           </div>
@@ -267,7 +269,7 @@ export default function BillingPage() {
             <div className="flex-1">
               <p className="font-semibold text-amber-900">Suscripción cancelada</p>
               <p className="text-sm text-amber-700">
-                Tu acceso continúa hasta el <strong>{tenant.subscription_ends_at ? new Date(tenant.subscription_ends_at).toLocaleDateString('es-AR') : 'fecha desconocida'}</strong> ({daysLeft} {daysLeft === 1 ? 'día' : 'días'} restantes). Después de esa fecha, tu cuenta quedará sin plan.
+                Tu acceso continúa hasta el <strong>{tenant.subscription_ends_at ? new Date(tenant.subscription_ends_at).toLocaleDateString("es-AR") : "fecha desconocida"}</strong> ({daysLeft} {daysLeft === 1 ? "día" : "días"} restantes). Después de esa fecha, tu cuenta quedará sin plan.
               </p>
             </div>
           </div>
@@ -286,8 +288,8 @@ export default function BillingPage() {
               <p className="font-semibold text-red-900">Cuenta bloqueada</p>
               <p className="text-sm text-red-700">
                 {isCancelled
-                  ? 'Tu período pagado ha finalizado. Suscribite para reactivar tu cuenta.'
-                  : 'Tu período de prueba ha finalizado. Suscribite para reactivar tu cuenta.'}
+                  ? "Tu período pagado ha finalizado. Suscribite para reactivar tu cuenta."
+                  : "Tu período de prueba ha finalizado. Suscribite para reactivar tu cuenta."}
               </p>
             </div>
           </div>
@@ -303,15 +305,15 @@ export default function BillingPage() {
               <h2 className="text-2xl font-bold text-gray-900">
                 {isActive
                   ? isCancelled
-                    ? 'Cancelado (activo hasta ' + (tenant.subscription_ends_at ? new Date(tenant.subscription_ends_at).toLocaleDateString('es-AR') : 'fecha desconocida') + ')'
-                    : tenant.subscription_plan === 'yearly'
-                    ? 'Anual'
-                    : 'Mensual'
+                    ? "Cancelado (activo hasta " + (tenant.subscription_ends_at ? new Date(tenant.subscription_ends_at).toLocaleDateString("es-AR") : "fecha desconocida") + ")"
+                    : tenant.subscription_plan === "yearly"
+                    ? "Anual"
+                    : "Mensual"
                   : isTrial
-                  ? 'Prueba Gratuita'
+                  ? "Prueba Gratuita"
                   : isExpired
-                  ? 'Sin plan'
-                  : 'Sin plan'}
+                  ? "Sin plan"
+                  : "Sin plan"}
               </h2>
             </div>
             <div className="bg-[#0F766E]/10 p-3 rounded-lg">
@@ -323,13 +325,13 @@ export default function BillingPage() {
               <div className="flex items-center gap-2 text-sm text-gray-600">
                 <Calendar className="w-4 h-4" />
                 <span>
-                  Próximo cobro: {tenant.subscription_ends_at ? new Date(tenant.subscription_ends_at).toLocaleDateString('es-AR') : 'N/A'}
+                  Próximo cobro: {tenant.subscription_ends_at ? new Date(tenant.subscription_ends_at).toLocaleDateString("es-AR") : "N/A"}
                 </span>
               </div>
               <div className="flex items-center gap-2 text-sm text-gray-600">
                 <CreditCard className="w-4 h-4" />
                 <span>
-                  Método: {tenant.payment_method || 'Tarjeta'}
+                  Método: {tenant.payment_method || "Tarjeta"}
                 </span>
               </div>
             </div>
@@ -337,14 +339,14 @@ export default function BillingPage() {
           {isTrial && (
             <p className="text-sm text-gray-600">
               {daysLeft > 0
-                ? `Te quedan ${daysLeft} ${daysLeft === 1 ? 'día' : 'días'} de prueba gratuita`
-                : 'Tu prueba ha finalizado'}
+                ? `Te quedan ${daysLeft} ${daysLeft === 1 ? "día" : "días"} de prueba gratuita`
+                : "Tu prueba ha finalizado"}
             </p>
           )}
           {isCancelled && daysLeft > 0 && (
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mt-3">
               <p className="text-sm text-amber-800">
-                <strong>Acceso vigente hasta:</strong> {tenant.subscription_ends_at ? new Date(tenant.subscription_ends_at).toLocaleDateString('es-AR') : 'Fecha desconocida'}
+                <strong>Acceso vigente hasta:</strong> {tenant.subscription_ends_at ? new Date(tenant.subscription_ends_at).toLocaleDateString("es-AR") : "Fecha desconocida"}
               </p>
               <p className="text-xs text-amber-700 mt-1">
                 Después de esta fecha, todas las funcionalidades quedarán bloqueadas hasta que renueves tu suscripción.
@@ -395,7 +397,7 @@ export default function BillingPage() {
             <h2 className="text-2xl font-bold text-gray-900">Elegí tu plan</h2>
             <div className="flex items-center gap-2 text-sm text-gray-500">
               <TrendingUp className="w-4 h-4" />
-              <span>Tipo de cambio: 1 USD = ${USD_TO_ARS.toLocaleString('es-AR')} ARS</span>
+              <span>Tipo de cambio: 1 USD = ${USD_TO_ARS.toLocaleString("es-AR")} ARS</span>
             </div>
           </div>
           <div className="grid md:grid-cols-2 gap-6">
@@ -411,19 +413,19 @@ export default function BillingPage() {
                   <span className="text-gray-500">/ mes</span>
                 </div>
                 <p className="text-sm text-gray-500 mt-2">
-                  ≈ ${PRICES_ARS.monthly.toLocaleString('es-AR')} ARS/mes
+                  ≈ ${PRICES_ARS.monthly.toLocaleString("es-AR")} ARS/mes
                 </p>
                 <p className="text-xs text-gray-400 mt-1">Pago mes a mes, cancelás cuando quieras</p>
               </div>
               <ul className="space-y-3 mb-6">
                 {[
-                  'Todas las funcionalidades',
-                  'Unidades ilimitadas',
-                  'Reservas ilimitadas',
-                  'Panel de huésped premium',
-                  'Mensajería WhatsApp',
-                  'Emails automáticos',
-                  'Soporte prioritario',
+                  "Todas las funcionalidades",
+                  "Unidades ilimitadas",
+                  "Reservas ilimitadas",
+                  "Panel de huésped premium",
+                  "Mensajería WhatsApp",
+                  "Emails automáticos",
+                  "Soporte prioritario",
                 ].map((feature, i) => (
                   <li key={i} className="flex items-center gap-2 text-sm text-gray-700">
                     <CheckCircle className="w-4 h-4 text-[#0F766E] flex-shrink-0" />
@@ -433,25 +435,25 @@ export default function BillingPage() {
               </ul>
               <div className="space-y-3">
                 <button
-                  onClick={() => handleCheckout('monthly', 'mercadopago')}
+                  onClick={() => handleCheckout("monthly", "mercadopago")}
                   disabled={checkoutLoading !== null}
                   className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-[#00B1EA] text-white rounded-lg font-semibold hover:bg-[#009EE3] transition-colors disabled:opacity-50"
                 >
-                  {checkoutLoading === 'monthly-mercadopago' ? (
+                  {checkoutLoading === "monthly-mercadopago" ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
                     <>
                       <CreditCard className="w-4 h-4" />
-                      Mercado Pago (${PRICES_ARS.monthly.toLocaleString('es-AR')} ARS)
+                      Mercado Pago (${PRICES_ARS.monthly.toLocaleString("es-AR")} ARS)
                     </>
                   )}
                 </button>
                 <button
-                  onClick={() => handleCheckout('monthly', 'lemonsqueezy')}
+                  onClick={() => handleCheckout("monthly", "lemonsqueezy")}
                   disabled={checkoutLoading !== null}
                   className="w-full flex items-center justify-center gap-2 px-4 py-3 border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition-colors disabled:opacity-50"
                 >
-                  {checkoutLoading === 'monthly-lemonsqueezy' ? (
+                  {checkoutLoading === "monthly-lemonsqueezy" ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
                     <>
@@ -478,7 +480,7 @@ export default function BillingPage() {
                   <span className="text-gray-500">/ año</span>
                 </div>
                 <p className="text-sm text-gray-500 mt-2">
-                  ≈ ${PRICES_ARS.yearly.toLocaleString('es-AR')} ARS/año
+                  ≈ ${PRICES_ARS.yearly.toLocaleString("es-AR")} ARS/año
                 </p>
                 <p className="text-xs text-gray-400 mt-1">Pago único anual, 2 meses gratis</p>
                 <div className="bg-[#EA580C]/10 rounded-lg p-2 mt-3">
@@ -489,14 +491,14 @@ export default function BillingPage() {
               </div>
               <ul className="space-y-3 mb-6">
                 {[
-                  'Todas las funcionalidades',
-                  'Unidades ilimitadas',
-                  'Reservas ilimitadas',
-                  'Panel de huésped premium',
-                  'Mensajería WhatsApp',
-                  'Emails automáticos',
-                  'Soporte prioritario',
-                  '2 meses gratis',
+                  "Todas las funcionalidades",
+                  "Unidades ilimitadas",
+                  "Reservas ilimitadas",
+                  "Panel de huésped premium",
+                  "Mensajería WhatsApp",
+                  "Emails automáticos",
+                  "Soporte prioritario",
+                  "2 meses gratis",
                 ].map((feature, i) => (
                   <li key={i} className="flex items-center gap-2 text-sm text-gray-700">
                     <CheckCircle className="w-4 h-4 text-[#0F766E] flex-shrink-0" />
@@ -506,25 +508,25 @@ export default function BillingPage() {
               </ul>
               <div className="space-y-3">
                 <button
-                  onClick={() => handleCheckout('yearly', 'mercadopago')}
+                  onClick={() => handleCheckout("yearly", "mercadopago")}
                   disabled={checkoutLoading !== null}
                   className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-[#00B1EA] text-white rounded-lg font-semibold hover:bg-[#009EE3] transition-colors disabled:opacity-50"
                 >
-                  {checkoutLoading === 'yearly-mercadopago' ? (
+                  {checkoutLoading === "yearly-mercadopago" ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
                     <>
                       <CreditCard className="w-4 h-4" />
-                      Mercado Pago (${PRICES_ARS.yearly.toLocaleString('es-AR')} ARS)
+                      Mercado Pago (${PRICES_ARS.yearly.toLocaleString("es-AR")} ARS)
                     </>
                   )}
                 </button>
                 <button
-                  onClick={() => handleCheckout('yearly', 'lemonsqueezy')}
+                  onClick={() => handleCheckout("yearly", "lemonsqueezy")}
                   disabled={checkoutLoading !== null}
                   className="w-full flex items-center justify-center gap-2 px-4 py-3 border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition-colors disabled:opacity-50"
                 >
-                  {checkoutLoading === 'yearly-lemonsqueezy' ? (
+                  {checkoutLoading === "yearly-lemonsqueezy" ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
                     <>
@@ -550,7 +552,7 @@ export default function BillingPage() {
             <CreditCard className="w-12 h-12 text-gray-300 mx-auto mb-3" />
             <p className="text-gray-500">Aún no tenés facturas</p>
             <p className="text-sm text-gray-400 mt-1">
-              {isTrial ? 'Tus facturas aparecerán aquí cuando te suscribas.' : 'No hay pagos registrados.'}
+              {isTrial ? "Tus facturas aparecerán aquí cuando te suscribas." : "No hay pagos registrados."}
             </p>
           </div>
         ) : (
@@ -563,16 +565,16 @@ export default function BillingPage() {
                 <div className="flex items-center gap-4">
                   <div
                     className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                      invoice.status === 'paid'
-                        ? 'bg-green-100'
-                        : invoice.status === 'pending'
-                        ? 'bg-yellow-100'
-                        : 'bg-red-100'
+                      invoice.status === "paid"
+                        ? "bg-green-100"
+                        : invoice.status === "pending"
+                        ? "bg-yellow-100"
+                        : "bg-red-100"
                     }`}
                   >
-                    {invoice.status === 'paid' ? (
+                    {invoice.status === "paid" ? (
                       <CheckCircle className="w-5 h-5 text-green-600" />
-                    ) : invoice.status === 'pending' ? (
+                    ) : invoice.status === "pending" ? (
                       <Clock className="w-5 h-5 text-yellow-600" />
                     ) : (
                       <AlertCircle className="w-5 h-5 text-red-600" />
@@ -580,32 +582,32 @@ export default function BillingPage() {
                   </div>
                   <div>
                     <p className="font-medium text-gray-900">
-                      {invoice.plan === 'yearly' ? 'Plan Anual' : 'Plan Mensual'}
+                      {invoice.plan === "yearly" ? "Plan Anual" : "Plan Mensual"}
                     </p>
                     <p className="text-sm text-gray-500">
-                      {new Date(invoice.date).toLocaleDateString('es-AR')} • {invoice.period}
+                      {new Date(invoice.date).toLocaleDateString("es-AR")} • {invoice.period}
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
                   <div className="text-right">
                     <p className="font-semibold text-gray-900">
-                      ${invoice.amount.toLocaleString('es-AR')}
+                      ${invoice.amount.toLocaleString("es-AR")}
                     </p>
                     <p
                       className={`text-xs font-medium ${
-                        invoice.status === 'paid'
-                          ? 'text-green-600'
-                          : invoice.status === 'pending'
-                          ? 'text-yellow-600'
-                          : 'text-red-600'
+                        invoice.status === "paid"
+                          ? "text-green-600"
+                          : invoice.status === "pending"
+                          ? "text-yellow-600"
+                          : "text-red-600"
                       }`}
                     >
-                      {invoice.status === 'paid'
-                        ? 'Pagado'
-                        : invoice.status === 'pending'
-                        ? 'Pendiente'
-                        : 'Fallido'}
+                      {invoice.status === "paid"
+                        ? "Pagado"
+                        : invoice.status === "pending"
+                        ? "Pendiente"
+                        : "Fallido"}
                     </p>
                   </div>
                   <button className="p-2 text-gray-400 hover:text-gray-600">
@@ -618,5 +620,5 @@ export default function BillingPage() {
         )}
       </div>
     </div>
-  )
-} 
+  );
+}
