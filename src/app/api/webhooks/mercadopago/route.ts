@@ -1,88 +1,147 @@
-import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+import crypto from 'crypto';
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+const MP_ACCESS_TOKEN = process.env.MP_ACCESS_TOKEN || '';
+const MP_WEBHOOK_SECRET = process.env.MP_WEBHOOK_SECRET || '';
+
+function verifyWebhookSignature(request: Request, body: string): boolean {
+  if (!MP_WEBHOOK_SECRET) return true;
+  
+  const xSignature = request.headers.get('x-signature');
+  const xRequestId = request.headers.get('x-request-id');
+  
+  if (!xSignature || !xRequestId) return false;
+  
+  const hmac = crypto.createHmac('sha256', MP_WEBHOOK_SECRET);
+  hmac.update(xRequestId);
+  const expectedSignature = hmac.digest('hex');
+  
+  return xSignature === expectedSignature;
+}
+
 export async function POST(request: Request) {
   try {
-    const payload = await request.json();
+    const body = await request.text();
     
-    console.log("Webhook MP recibido:", payload);
-
-    // MP envía notificaciones con query params: type y data.id
-    const url = new URL(request.url);
-    const type = url.searchParams.get("type") || payload.type;
-    const dataId = url.searchParams.get("data.id") || payload.data?.id;
-
-    if (type === "preapproval") {
-      // Obtener detalles del preapproval
-      const response = await fetch(`https://api.mercadopago.com/preapproval/${dataId}`, {
-        headers: {
-          "Authorization": `Bearer ${process.env.MP_ACCESS_TOKEN}`,
-        },
-      });
-
-      const preapproval = await response.json();
-
-      if (preapproval.status === "authorized") {
-        const externalRef = preapproval.external_reference; // "tenant_id-plan"
-        const [tenantId, plan] = externalRef.split("-");
-
-        if (tenantId && plan) {
-          // Calcular fecha de fin
-          const subscriptionEndsAt = new Date();
-          if (plan === "monthly") {
-            subscriptionEndsAt.setMonth(subscriptionEndsAt.getMonth() + 1);
-          } else if (plan === "yearly") {
-            subscriptionEndsAt.setFullYear(subscriptionEndsAt.getFullYear() + 1);
-          }
-
-          // Actualizar tenant
-          await supabase
-            .from("tenants")
-            .update({
-              subscription_status: "active",
-              subscription_plan: plan,
-              subscription_ends_at: subscriptionEndsAt.toISOString(),
-              payment_provider: "mercadopago",
-              payment_method: "mercadopago",
-            })
-            .eq("id", tenantId);
-
-          // Registrar pago inicial
-          await supabase
-            .from("payments")
-            .insert({
-              tenant_id: tenantId,
-              amount: preapproval.auto_recurring.transaction_amount,
-              method: "mercadopago",
-              date: new Date().toISOString(),
-              notes: `Suscripción ${plan} activada - Preapproval ID: ${dataId}`,
-            });
-
-          console.log(`✅ Suscripción activada para tenant ${tenantId}`);
+    // Verificar firma del webhook
+    if (MP_WEBHOOK_SECRET && !verifyWebhookSignature(request, body)) {
+      console.error('Webhook signature verification failed');
+      return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
+    }
+    
+    const data = JSON.parse(body);
+    const { type, data: eventData } = data;
+    
+    console.log('MercadoPago webhook received:', type, eventData);
+    
+    if (type === 'payment') {
+      const paymentId = eventData?.id;
+      
+      // Obtener detalles del pago desde MP
+      const response = await fetch(
+        `https://api.mercadopago.com/v1/payments/${paymentId}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${MP_ACCESS_TOKEN}`,
+          },
         }
-      } else if (preapproval.status === "cancelled" || preapproval.status === "paused") {
-        const externalRef = preapproval.external_reference;
-        const [tenantId] = externalRef.split("-");
+      );
+      
+      const payment = await response.json();
+      const status = payment?.status;
+      const externalReference = payment?.external_reference;
+      
+      console.log('Payment status:', status, 'External ref:', externalReference);
+      
+      if (externalReference && status === 'approved') {
+        // external_reference contiene el tenant_id
+        const { data: tenant } = await supabase
+          .from('tenants')
+          .select('id')
+          .eq('id', externalReference)
+          .single();
         
-        if (tenantId) {
+        if (tenant?.id) {
           await supabase
-            .from("tenants")
-            .update({ subscription_status: "cancelled" })
-            .eq("id", tenantId);
+            .from('tenants')
+            .update({
+              subscription_status: 'active',
+              subscription_provider: 'mercadopago',
+              payment_method: 'card',
+              subscription_ends_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+            })
+            .eq('id', tenant.id);
           
-          console.log(`⚠️ Suscripción cancelada/pausada para tenant ${tenantId}`);
+          await supabase
+            .from('invoices')
+            .insert({
+              tenant_id: tenant.id,
+              mercadopago_payment_id: paymentId,
+              amount: payment?.transaction_amount || 0,
+              status: 'paid',
+              plan: 'monthly',
+              period: new Date().toLocaleDateString('es-AR'),
+              date: new Date().toISOString(),
+            });
+          
+          console.log('Tenant updated:', tenant.id);
         }
       }
     }
-
-    return NextResponse.json({ received: true });
-  } catch (error: any) {
-    console.error("Error en webhook MP:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    
+    if (type === 'subscription') {
+      const subscriptionId = eventData?.id;
+      
+      const response = await fetch(
+        `https://api.mercadopago.com/preapproval/${subscriptionId}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${MP_ACCESS_TOKEN}`,
+          },
+        }
+      );
+      
+      const subscription = await response.json();
+      const status = subscription?.status;
+      const externalReference = subscription?.external_reference;
+      
+      console.log('Subscription status:', status, 'External ref:', externalReference);
+      
+      if (externalReference) {
+        const { data: tenant } = await supabase
+          .from('tenants')
+          .select('id')
+          .eq('id', externalReference)
+          .single();
+        
+        if (tenant?.id) {
+          const subStatus = status === 'authorized' ? 'active' : 
+                           status === 'cancelled' ? 'cancelled' : 
+                           status === 'paused' ? 'paused' : 'active';
+          
+          await supabase
+            .from('tenants')
+            .update({
+              subscription_status: subStatus,
+              subscription_provider: 'mercadopago',
+              subscription_id: subscriptionId,
+            })
+            .eq('id', tenant.id);
+          
+          console.log('Subscription updated:', tenant.id);
+        }
+      }
+    }
+    
+    return NextResponse.json({ success: true });
+  } catch (err: any) {
+    console.error('Error processing MercadoPago webhook:', err);
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
