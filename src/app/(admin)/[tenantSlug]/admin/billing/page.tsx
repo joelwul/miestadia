@@ -128,30 +128,37 @@ export default function BillingPage() {
   }
 
   async function handleCancelSubscription() {
-    if (!tenant) return;
-    if (!confirm("¿Estás seguro que querés cancelar tu suscripción? Tu acceso continuará hasta el final del período pagado.")) {
-      return;
-    }
-
-    try {
-      const response = await fetch("/api/cancel-subscription", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tenant_id: tenant.id }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Error al cancelar");
-      }
-
-      alert("Suscripción cancelada. Tu acceso continuará hasta el final del período pagado.");
-      window.location.reload();
-    } catch (err: any) {
-      alert("Error al cancelar: " + err.message);
-    }
+  if (!tenant) return;
+  if (!confirm("¿Estás seguro que querés cancelar tu suscripción? Tu acceso continuará hasta el final del período pagado.")) {
+    return;
   }
+  try {
+    const response = await fetch("/api/cancel-subscription", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ 
+        tenant_id: tenant.id,
+        subscription_id: tenant.subscription_id || null,
+        provider: tenant.subscription_provider || 'lemonsqueezy',
+      }),
+    });
+    
+    // Verificar que la respuesta sea JSON válido
+    const contentType = response.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
+      throw new Error("El servidor no respondió con JSON. Verificá que el endpoint /api/cancel-subscription exista.");
+    }
+    
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || "Error al cancelar");
+    }
+    alert("Suscripción cancelada. Tu acceso continuará hasta el final del período pagado.");
+    window.location.reload();
+  } catch (err: any) {
+    alert("Error al cancelar: " + err.message);
+  }
+}
 
   if (loading) {
     return (
