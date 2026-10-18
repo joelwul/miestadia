@@ -50,7 +50,6 @@ export default function BillingPage() {
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null)
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [daysLeft, setDaysLeft] = useState(0)
-  const [isCancelled, setIsCancelled] = useState(false)
   const supabase = createClient()
 
   useEffect(() => {
@@ -73,13 +72,9 @@ export default function BillingPage() {
 
         const trialEnd = tenantData.trial_ends_at ? new Date(tenantData.trial_ends_at) : null
         const subEnd = tenantData.subscription_ends_at ? new Date(tenantData.subscription_ends_at) : null
-        const cancelledAt = tenantData.subscription_cancelled_at ? new Date(tenantData.subscription_cancelled_at) : null
-
-        setIsCancelled(!!cancelledAt)
 
         // Calcular días restantes según el estado
         if (tenantData.subscription_status === 'active' && subEnd) {
-          // Si está activo, calcular días hasta el fin de suscripción
           setDaysLeft(Math.ceil((subEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)))
         } else if (tenantData.subscription_status === 'cancelled' && subEnd) {
           // Si canceló, mostrar días hasta que expire el período pagado
@@ -146,11 +141,10 @@ export default function BillingPage() {
         body: JSON.stringify({
           tenant_id: tenant.id,
           subscription_id: tenant.subscription_id || null,
-          provider: tenant.subscription_provider || 'lemonsqueezy',
+          provider: 'lemonsqueezy', // o el que corresponda
         }),
       })
 
-      // Verificar que la respuesta sea JSON válido
       const contentType = response.headers.get('content-type')
       if (!contentType || !contentType.includes('application/json')) {
         throw new Error('El servidor no respondió con JSON. Verificá que el endpoint /api/cancel-subscription exista.')
@@ -160,8 +154,9 @@ export default function BillingPage() {
       if (!response.ok) {
         throw new Error(data.error || 'Error al cancelar')
       }
-
-      alert('Suscripción cancelada. Tu acceso continuará hasta el ' + new Date(tenant.subscription_ends_at).toLocaleDateString('es-AR') + '.')
+      
+      const endDate = tenant.subscription_ends_at ? new Date(tenant.subscription_ends_at).toLocaleDateString('es-AR') : 'el final del período'
+      alert(`Suscripción cancelada. Tu acceso continuará hasta el ${endDate}.`)
       window.location.reload()
     } catch (err: any) {
       alert('Error al cancelar: ' + err.message)
@@ -197,7 +192,7 @@ export default function BillingPage() {
         <p className="text-gray-500 mt-1">Gestioná tu plan de pago y facturación</p>
       </div>
 
-      {/* Banner de estado - LÓGICA CORREGIDA */}
+      {/* Banner de estado */}
       {isTrial && !isActive && (
         <motion.div
           initial={{ opacity: 0, y: -10 }}
@@ -260,7 +255,7 @@ export default function BillingPage() {
         </motion.div>
       )}
 
-      {/* NUEVO: Banner cuando canceló pero aún tiene acceso */}
+      {/* Banner cuando canceló pero aún tiene acceso */}
       {isCancelled && daysLeft > 0 && (
         <motion.div
           initial={{ opacity: 0, y: -10 }}
@@ -272,7 +267,7 @@ export default function BillingPage() {
             <div className="flex-1">
               <p className="font-semibold text-amber-900">Suscripción cancelada</p>
               <p className="text-sm text-amber-700">
-                Tu acceso continúa hasta el <strong>{new Date(tenant.subscription_ends_at).toLocaleDateString('es-AR')}</strong> ({daysLeft} {daysLeft === 1 ? 'día' : 'días'} restantes). Después de esa fecha, tu cuenta quedará sin plan.
+                Tu acceso continúa hasta el <strong>{tenant.subscription_ends_at ? new Date(tenant.subscription_ends_at).toLocaleDateString('es-AR') : 'fecha desconocida'}</strong> ({daysLeft} {daysLeft === 1 ? 'día' : 'días'} restantes). Después de esa fecha, tu cuenta quedará sin plan.
               </p>
             </div>
           </div>
@@ -308,7 +303,7 @@ export default function BillingPage() {
               <h2 className="text-2xl font-bold text-gray-900">
                 {isActive
                   ? isCancelled
-                    ? 'Cancelado (activo hasta ' + new Date(tenant.subscription_ends_at).toLocaleDateString('es-AR') + ')'
+                    ? 'Cancelado (activo hasta ' + (tenant.subscription_ends_at ? new Date(tenant.subscription_ends_at).toLocaleDateString('es-AR') : 'fecha desconocida') + ')'
                     : tenant.subscription_plan === 'yearly'
                     ? 'Anual'
                     : 'Mensual'
@@ -349,7 +344,7 @@ export default function BillingPage() {
           {isCancelled && daysLeft > 0 && (
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mt-3">
               <p className="text-sm text-amber-800">
-                <strong>Acceso vigente hasta:</strong> {new Date(tenant.subscription_ends_at).toLocaleDateString('es-AR')}
+                <strong>Acceso vigente hasta:</strong> {tenant.subscription_ends_at ? new Date(tenant.subscription_ends_at).toLocaleDateString('es-AR') : 'Fecha desconocida'}
               </p>
               <p className="text-xs text-amber-700 mt-1">
                 Después de esta fecha, todas las funcionalidades quedarán bloqueadas hasta que renueves tu suscripción.

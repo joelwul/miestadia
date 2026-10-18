@@ -31,7 +31,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // Cancelar en el proveedor externo (LemonSqueezy o Mercado Pago)
+    // Cancelar en el proveedor externo si es necesario (ej: LemonSqueezy)
     if (provider === 'lemonsqueezy' && subscription_id) {
       try {
         const LS_API_KEY = process.env.LS_API_KEY;
