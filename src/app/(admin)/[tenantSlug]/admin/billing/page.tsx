@@ -1,4 +1,4 @@
-'use client'
+"use client";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useParams } from "next/navigation";
@@ -36,7 +36,6 @@ interface Tenant {
   subscription_plan: string;
   trial_ends_at: string;
   subscription_ends_at: string;
-  subscription_cancelled_at: string | null;
   payment_method: string;
   owner_email: string;
   owner_name: string;
@@ -50,11 +49,20 @@ export default function BillingPage() {
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [daysLeft, setDaysLeft] = useState(0);
+  const [userEmail, setUserEmail] = useState("");
+  const [userName, setUserName] = useState("");
   const supabase = createClient();
 
   useEffect(() => {
     async function load() {
       try {
+        // Obtener usuario autenticado
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          setUserEmail(user.email || "");
+          setUserName(user.user_metadata?.full_name || user.email || "");
+        }
+
         const { data: tenantData, error: tenantError } = await supabase
           .from("tenants")
           .select("*")
@@ -72,18 +80,16 @@ export default function BillingPage() {
 
         const trialEnd = tenantData.trial_ends_at ? new Date(tenantData.trial_ends_at) : null;
         const subEnd = tenantData.subscription_ends_at ? new Date(tenantData.subscription_ends_at) : null;
-        
-        // Calcular días restantes
+
         let daysRemaining = 0;
         if (tenantData.subscription_status === "active" && subEnd) {
           daysRemaining = Math.ceil((subEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
         } else if (tenantData.subscription_status === "cancelled" && subEnd) {
-          // Si canceló, calcular hasta la fecha de fin del período pagado
           daysRemaining = Math.ceil((subEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
         } else if (trialEnd) {
           daysRemaining = Math.ceil((trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
         }
-        
+
         setDaysLeft(daysRemaining);
 
         const { data: invoicesData } = await supabase
@@ -106,6 +112,16 @@ export default function BillingPage() {
 
   async function handleCheckout(plan: "monthly" | "yearly", provider: "lemonsqueezy" | "mercadopago") {
     if (!tenant) return;
+
+    // Usar el email del usuario autenticado como fallback
+    const payerEmail = tenant.owner_email || userEmail;
+    const payerName = tenant.owner_name || userName;
+
+    if (!payerEmail) {
+      alert("No se encontró un email asociado a tu cuenta. Contactá a soporte.");
+      return;
+    }
+
     setCheckoutLoading(`${plan}-${provider}`);
     try {
       const response = await fetch("/api/create-checkout", {
@@ -115,6 +131,8 @@ export default function BillingPage() {
           tenant_id: tenant.id,
           plan,
           provider,
+          payer_email: payerEmail,
+          payer_name: payerName,
         }),
       });
       const data = await response.json();
@@ -140,10 +158,10 @@ export default function BillingPage() {
       const response = await fetch("/api/cancel-subscription", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           tenant_id: tenant.id,
           subscription_id: tenant.subscription_id || null,
-          provider: tenant.subscription_provider || 'lemonsqueezy',
+          provider: tenant.subscription_provider || "lemonsqueezy",
         }),
       });
 
@@ -156,7 +174,7 @@ export default function BillingPage() {
       if (!response.ok) {
         throw new Error(data.error || "Error al cancelar");
       }
-      
+
       const endDate = tenant.subscription_ends_at ? new Date(tenant.subscription_ends_at).toLocaleDateString("es-AR") : "el final del período";
       alert(`Suscripción cancelada. Tu acceso continuará hasta el ${endDate}.`);
       window.location.reload();
@@ -257,7 +275,6 @@ export default function BillingPage() {
         </motion.div>
       )}
 
-      {/* Banner cuando canceló pero aún tiene acceso */}
       {isCancelled && daysLeft > 0 && (
         <motion.div
           initial={{ opacity: 0, y: -10 }}

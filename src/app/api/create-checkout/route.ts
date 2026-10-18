@@ -18,12 +18,14 @@ const PRICES_ARS = {
 
 export async function POST(request: Request) {
   try {
-    const { tenant_id, plan, provider } = await request.json();
+    const { tenant_id, plan, provider, payer_email, payer_name } = await request.json();
 
     console.log('=== CREATE CHECKOUT ===');
     console.log('tenant_id:', tenant_id);
     console.log('plan:', plan);
     console.log('provider:', provider);
+    console.log('payer_email:', payer_email);
+    console.log('payer_name:', payer_name);
 
     if (!tenant_id || !plan || !provider) {
       return NextResponse.json(
@@ -48,21 +50,21 @@ export async function POST(request: Request) {
     }
 
     console.log('Tenant encontrado:', tenant.name);
-    console.log('owner_email:', tenant.owner_email);
-    console.log('settings:', tenant.settings);
 
-    // Obtener email del tenant (prioridad: owner_email > settings.email)
-    const payerEmail = tenant.owner_email || tenant.settings?.email || null;
+    // Obtener email: prioridad al que viene del frontend, luego owner_email, luego settings.email
+    const finalEmail = payer_email || tenant.owner_email || tenant.settings?.email;
+    const finalName = payer_name || tenant.owner_name || tenant.name || 'Usuario';
 
-    if (!payerEmail) {
-      console.error('No hay email configurado para el tenant');
+    if (!finalEmail) {
+      console.error('No hay email disponible');
       return NextResponse.json(
         { error: 'No hay email configurado para este tenant. Contactá a soporte.' },
         { status: 400 }
       );
     }
 
-    console.log('Email a usar:', payerEmail);
+    console.log('Email final:', finalEmail);
+    console.log('Nombre final:', finalName);
 
     const amount = plan === 'monthly' ? PRICES.monthly : PRICES.yearly;
     const amountARS = plan === 'monthly' ? PRICES_ARS.monthly : PRICES_ARS.yearly;
@@ -101,8 +103,8 @@ export async function POST(request: Request) {
         back_url: backUrl,
         notification_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://miestadia.online'}/api/webhooks/mercadopago`,
         payer: {
-          email: payerEmail,
-          name: tenant.owner_name || tenant.name || 'Usuario',
+          email: finalEmail,
+          name: finalName,
         },
       };
 
@@ -187,8 +189,8 @@ export async function POST(request: Request) {
               receipt_thank_you_note: '¡Gracias por suscribirte a Mi Estadía!',
             },
             checkout_data: {
-              email: payerEmail,
-              name: tenant.owner_name || tenant.name || 'Usuario',
+              email: finalEmail,
+              name: finalName,
               custom: [
                 {
                   key: 'tenant_id',
