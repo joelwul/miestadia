@@ -7,9 +7,9 @@ import { Badge } from "@/components/ui/badge";
 import {
   MapPin, Wifi, MessageCircle, FileText, CheckCircle, ClipboardList, AlertCircle,
   Package, Cloud, Sun, CloudRain, CloudSnow, CloudLightning, Wind, Home, Car, Key,
-  Navigation, ChevronDown, ChevronUp, LogOut, Utensils, TreePalm, Landmark,
-  ShoppingBag, Coffee, Waves, ExternalLink, DollarSign, TrendingUp, Star, Phone,
-  Globe, Clock, Users, Calendar, Hash,
+  Navigation, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, LogOut, Utensils,
+  TreePalm, Landmark, ShoppingBag, Coffee, Waves, ExternalLink, DollarSign, TrendingUp,
+  Star, Phone, Globe, Clock, Users, Calendar, Hash,
 } from "lucide-react";
 import Link from "next/link";
 import LanguageSelector from "@/components/LanguageSelector";
@@ -17,6 +17,7 @@ import LanguageSelector from "@/components/LanguageSelector";
 interface Props { params: Promise<{ tenantSlug: string }>; }
 interface WeatherDay { date: string; weatherCode: number; tempMax: number; tempMin: number; precipitationProbability: number; }
 interface LocationInfo { city: string; region: string; country: string; }
+interface Service { id: string; name: string; description: string; price?: number; whatsapp?: string; photos?: { image_url: string }[]; }
 
 const CATEGORY_CONFIG: Record<string, { label: string; icon: any; color: string; bgColor: string }> = {
   restaurant: { label: "Restaurante", icon: Utensils, color: "text-orange-700", bgColor: "bg-orange-100" },
@@ -29,8 +30,8 @@ const CATEGORY_CONFIG: Record<string, { label: string; icon: any; color: string;
 
 function getWeatherInfo(code: number) {
   const map: Record<number, { emoji: string; icon: any; description: string; color: string }> = {
-    0: { emoji: "️", icon: Sun, description: "Despejado", color: "text-yellow-500" },
-    1: { emoji: "️", icon: Sun, description: "Mayormente despejado", color: "text-yellow-400" },
+    0: { emoji: "☀️", icon: Sun, description: "Despejado", color: "text-yellow-500" },
+    1: { emoji: "🌤️", icon: Sun, description: "Mayormente despejado", color: "text-yellow-400" },
     2: { emoji: "⛅", icon: Cloud, description: "Parcialmente nublado", color: "text-gray-400" },
     3: { emoji: "️", icon: Cloud, description: "Nublado", color: "text-gray-500" },
     61: { emoji: "🌧️", icon: CloudRain, description: "Lluvia", color: "text-blue-500" },
@@ -112,6 +113,9 @@ export default function GuestStayPage({ params }: Props) {
   const [showInventory, setShowInventory] = useState(false);
   const [destinationPlaces, setDestinationPlaces] = useState<any[]>([]);
   const [selectedPlace, setSelectedPlace] = useState<any>(null);
+  const [services, setServices] = useState<Service[]>([]);
+  const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
+  const [unitPhotos, setUnitPhotos] = useState<{ image_url: string }[]>([]);
   const supabase = createClient();
 
   useEffect(() => {
@@ -184,11 +188,28 @@ export default function GuestStayPage({ params }: Props) {
       }
       const { data: placesData } = await supabase.from("destination_places").select("*").eq("tenant_id", tenantData.id).order("order");
       if (placesData) setDestinationPlaces(placesData);
+      
+      // Cargar servicios
+      const { data: servicesData } = await supabase.from("services").select("*").eq("tenant_id", tenantData.id).eq("active", true).order("order");
+      if (servicesData) {
+        const servicesWithPhotos = await Promise.all(
+          servicesData.map(async (service: any) => {
+            const { data: photos } = await supabase.from("service_photos").select("image_url").eq("service_id", service.id).order("order_index");
+            return { ...service, photos: photos || [] };
+          })
+        );
+        setServices(servicesWithPhotos);
+      }
     }
     if (res.status === "booked") await supabase.from("reservations").update({ status: "pre_checkin" }).eq("id", reservationId);
     const { data: existingPreCheckin } = await supabase.from("pre_checkins").select("id, status").eq("reservation_id", reservationId).eq("status", "completed").maybeSingle();
     if (existingPreCheckin) setPreCheckinCompleted(true);
+    
+    // Cargar fotos de la unidad
     if (res.unit_id) {
+      const { data: photos } = await supabase.from("unit_photos").select("image_url").eq("unit_id", res.unit_id).order("order_index");
+      if (photos) setUnitPhotos(photos);
+      
       const { data: inventoryData } = await supabase.from("unit_inventory_items").select("*").eq("unit_id", res.unit_id).order("category").order("order");
       if (inventoryData && inventoryData.length > 0) {
         setUnitInventory(inventoryData);
@@ -226,17 +247,28 @@ export default function GuestStayPage({ params }: Props) {
   const pendingAmount = Math.max(0, totalAmount - paidAmount);
   const paymentPercentage = totalAmount > 0 ? Math.min(100, (paidAmount / totalAmount) * 100) : 0;
   const reviewLink = tenant.review_url || settings.googleMapsUrl;
+  const whatsappHelpNumber = settings.whatsappHelpNumber || settings.whatsappNumber;
 
   const statusColors: Record<string, string> = { pre_checkin: "bg-blue-500", checked_in: "bg-green-500", checked_out: "bg-gray-500", booked: "bg-purple-500" };
   const statusLabels: Record<string, string> = { pre_checkin: "Pre Check-in", checked_in: "Alojado", checked_out: "Check-out", booked: "Reservado" };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+      {/* ANIMACIÓN DE BIENVENIDA */}
+      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+        <div className="absolute top-20 left-10 animate-bounce-slow opacity-20">
+          <svg className="w-16 h-16 text-green-600" fill="currentColor" viewBox="0 0 24 24"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></svg>
+        </div>
+        <div className="absolute bottom-20 right-10 animate-bounce-slow opacity-20" style={{ animationDelay: '1s' }}>
+          <svg className="w-12 h-12 text-green-600" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+        </div>
+      </div>
+
       {/* HEADER */}
       <header className="relative bg-gradient-to-br from-green-700 via-green-600 to-emerald-700 text-white overflow-hidden">
         <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-0 right-0 w-96 h-96 bg-white rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-          <div className="absolute bottom-0 left-0 w-96 h-96 bg-white rounded-full blur-3xl translate-y-1/2 -translate-x-1/2" />
+          <div className="absolute top-0 right-0 w-96 h-96 bg-white rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 animate-pulse" />
+          <div className="absolute bottom-0 left-0 w-96 h-96 bg-white rounded-full blur-3xl translate-y-1/2 -translate-x-1/2 animate-pulse" style={{ animationDelay: '1s' }} />
         </div>
         <div className="relative max-w-6xl mx-auto px-4 lg:px-6 py-4 lg:py-10">
           <div className="flex items-center justify-between gap-2 lg:gap-6 mb-3 lg:mb-8">
@@ -306,36 +338,59 @@ export default function GuestStayPage({ params }: Props) {
       </header>
 
       {/* CONTENIDO PRINCIPAL */}
-      <div className="max-w-5xl mx-auto px-3 lg:px-6 py-4 lg:py-8 space-y-3 lg:space-y-6">
-        {/* INFO DE RESERVA - 2 cols móvil, 4 desktop */}
+      <div className="relative z-10 max-w-5xl mx-auto px-3 lg:px-6 py-4 lg:py-8 space-y-3 lg:space-y-6">
+        {/* INFO DE RESERVA */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 lg:gap-4">
           <div className="bg-white rounded-xl lg:rounded-2xl p-3 lg:p-5 shadow-sm border border-gray-100">
-            <div className="flex items-center gap-2 text-gray-500 text-[10px] lg:text-sm mb-1 lg:mb-2">
-              <Home className="h-3 w-3 lg:h-4 lg:w-4" />Unidad
-            </div>
+            <div className="flex items-center gap-2 text-gray-500 text-[10px] lg:text-sm mb-1 lg:mb-2"><Home className="h-3 w-3 lg:h-4 lg:w-4" />Unidad</div>
             <p className="font-bold text-gray-900 text-sm lg:text-lg truncate">{reservation.units?.name}</p>
           </div>
           <div className="bg-white rounded-xl lg:rounded-2xl p-3 lg:p-5 shadow-sm border border-gray-100">
-            <div className="flex items-center gap-2 text-gray-500 text-[10px] lg:text-sm mb-1 lg:mb-2">
-              <Calendar className="h-3 w-3 lg:h-4 lg:w-4" />Check-in
-            </div>
+            <div className="flex items-center gap-2 text-gray-500 text-[10px] lg:text-sm mb-1 lg:mb-2"><Calendar className="h-3 w-3 lg:h-4 lg:w-4" />Check-in</div>
             <p className="font-bold text-gray-900 text-sm lg:text-base">{checkInDate.toLocaleDateString("es-AR", { day: '2-digit', month: '2-digit' })}</p>
             <p className="text-[10px] lg:text-sm text-gray-500">{settings.checkInTime || "15:00"}</p>
           </div>
           <div className="bg-white rounded-xl lg:rounded-2xl p-3 lg:p-5 shadow-sm border border-gray-100">
-            <div className="flex items-center gap-2 text-gray-500 text-[10px] lg:text-sm mb-1 lg:mb-2">
-              <Calendar className="h-3 w-3 lg:h-4 lg:w-4" />Check-out
-            </div>
+            <div className="flex items-center gap-2 text-gray-500 text-[10px] lg:text-sm mb-1 lg:mb-2"><Calendar className="h-3 w-3 lg:h-4 lg:w-4" />Check-out</div>
             <p className="font-bold text-gray-900 text-sm lg:text-base">{checkOutDate.toLocaleDateString("es-AR", { day: '2-digit', month: '2-digit' })}</p>
             <p className="text-[10px] lg:text-sm text-gray-500">{settings.checkOutTime || "10:00"}</p>
           </div>
           <div className="bg-white rounded-xl lg:rounded-2xl p-3 lg:p-5 shadow-sm border border-gray-100">
-            <div className="flex items-center gap-2 text-gray-500 text-[10px] lg:text-sm mb-1 lg:mb-2">
-              <Hash className="h-3 w-3 lg:h-4 lg:w-4" />Código
-            </div>
+            <div className="flex items-center gap-2 text-gray-500 text-[10px] lg:text-sm mb-1 lg:mb-2"><Hash className="h-3 w-3 lg:h-4 lg:w-4" />Código</div>
             <p className="font-bold text-gray-900 text-sm lg:text-lg font-mono truncate">{reservation.reservation_code}</p>
           </div>
         </div>
+
+        {/* CAROUSEL DE FOTOS DE LA UNIDAD */}
+        {unitPhotos.length > 0 && (
+          <div className="bg-white rounded-xl lg:rounded-2xl p-3 lg:p-5 shadow-sm border border-gray-100">
+            <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
+              <Home className="h-5 w-5 text-green-600" />
+              Tu unidad
+            </h3>
+            <div className="relative rounded-xl overflow-hidden bg-gray-100">
+              <img src={unitPhotos[currentPhotoIndex]?.image_url || ''} alt={`Foto ${currentPhotoIndex + 1}`} className="w-full h-48 lg:h-64 object-cover" />
+              {unitPhotos.length > 1 && (
+                <>
+                  <button onClick={() => setCurrentPhotoIndex((currentPhotoIndex - 1 + unitPhotos.length) % unitPhotos.length)} className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white p-2 rounded-full shadow-lg">
+                    <ChevronLeft className="w-5 h-5" />
+                  </button>
+                  <button onClick={() => setCurrentPhotoIndex((currentPhotoIndex + 1) % unitPhotos.length)} className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white p-2 rounded-full shadow-lg">
+                    <ChevronRight className="w-5 w-5" />
+                  </button>
+                  <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1">
+                    {unitPhotos.map((_, idx) => (
+                      <button key={idx} onClick={() => setCurrentPhotoIndex(idx)} className={`h-2 rounded-full transition-all ${idx === currentPhotoIndex ? 'bg-white w-6' : 'bg-white/50 w-2'}`} />
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+            <p className="text-xs text-gray-500 mt-2 text-center">{currentPhotoIndex + 1} de {unitPhotos.length} fotos</p>
+            {reservation.units?.description && <p className="text-sm text-gray-600 mt-3">{reservation.units.description}</p>}
+            {reservation.units?.capacity && <p className="text-sm text-gray-600 mt-2 flex items-center gap-2"><Users className="h-4 w-4" />Capacidad: {reservation.units.capacity} personas</p>}
+          </div>
+        )}
 
         {/* PRE CHECK-IN */}
         <div className={`rounded-xl lg:rounded-2xl p-4 lg:p-6 border-2 shadow-lg ${preCheckinCompleted ? "border-green-200 bg-gradient-to-br from-green-50 to-emerald-50" : "border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50"}`}>
@@ -369,15 +424,15 @@ export default function GuestStayPage({ params }: Props) {
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 lg:gap-4">
               <div className="bg-gray-50 rounded-xl p-4 lg:p-5 border border-gray-200">
-                <div className="flex items-center gap-2 mb-1 lg:mb-2"><TrendingUp className="h-4 w-4 text-gray-500" /><p className="text-xs text-gray-500 font-medium">Total</p></div>
+                <div className="flex items-center gap-2 mb-1 lg:mb-2"><TrendingUp className="h-3 w-3 lg:h-4 lg:w-4 text-gray-500" /><p className="text-xs text-gray-500 font-medium">Total</p></div>
                 <p className="text-xl lg:text-2xl font-bold text-gray-900">{formatCurrency(totalAmount)}</p>
               </div>
               <div className="bg-green-50 rounded-xl p-4 lg:p-5 border border-green-200">
-                <div className="flex items-center gap-2 mb-1 lg:mb-2"><CheckCircle className="h-4 w-4 text-green-600" /><p className="text-xs text-green-600 font-medium">Ya pagado</p></div>
+                <div className="flex items-center gap-2 mb-1 lg:mb-2"><CheckCircle className="h-3 w-3 lg:h-4 lg:w-4 text-green-600" /><p className="text-xs text-green-600 font-medium">Ya pagado</p></div>
                 <p className="text-xl lg:text-2xl font-bold text-green-700">{formatCurrency(paidAmount)}</p>
               </div>
               <div className="bg-red-50 rounded-xl p-4 lg:p-5 border border-red-200">
-                <div className="flex items-center gap-2 mb-1 lg:mb-2"><AlertCircle className="h-4 w-4 text-red-600" /><p className="text-xs text-red-600 font-medium">Pendiente</p></div>
+                <div className="flex items-center gap-2 mb-1 lg:mb-2"><AlertCircle className="h-3 w-3 lg:h-4 lg:w-4 text-red-600" /><p className="text-xs text-red-600 font-medium">Pendiente</p></div>
                 <p className={`text-xl lg:text-2xl font-bold ${pendingAmount > 0 ? "text-red-700" : "text-green-700"}`}>{formatCurrency(pendingAmount)}</p>
                 {pendingAmount > 0 && <p className="text-xs text-gray-500 mt-1 lg:mt-2">A pagar al llegar</p>}
               </div>
@@ -386,33 +441,64 @@ export default function GuestStayPage({ params }: Props) {
         )}
 
         {/* UNIDAD + INVENTARIO */}
-        <ColorTab color="blue" icon={Home} title={`Tu unidad: ${reservation.units?.name}`} subtitle={reservation.units?.description || ""} defaultOpen={true}>
-          {reservation.units?.capacity && (<p className="text-sm text-gray-600 mb-4 flex items-center gap-2"><Users className="h-4 w-4" />Capacidad: {reservation.units.capacity} personas</p>)}
-          {unitInventory.length > 0 && (
-            <div className="mt-4">
-              <button onClick={() => setShowInventory(!showInventory)} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium mb-4">
-                <Package className="h-4 w-4" />{showInventory ? "Ocultar inventario" : "Ver inventario"}{showInventory ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-              </button>
-              {showInventory && (
-                <div className="space-y-3">
-                  {Object.entries(groupedInventory).map(([category, items]) => (
-                    <div key={category} className="border border-gray-200 rounded-lg p-4">
-                      <h5 className="font-medium text-gray-900 mb-3 text-sm">{category}</h5>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        {items.map((item: any, index: number) => (
-                          <div key={index} className="flex items-center justify-between text-sm bg-gray-50 rounded-lg px-3 py-2">
-                            <span className="text-gray-700 truncate">{item.name}</span>
-                            <Badge variant="secondary" className="text-xs flex-shrink-0 ml-2">x{item.quantity}</Badge>
-                          </div>
-                        ))}
+        {unitPhotos.length === 0 && (
+          <ColorTab color="blue" icon={Home} title={`Tu unidad: ${reservation.units?.name}`} subtitle={reservation.units?.description || ""} defaultOpen={true}>
+            {reservation.units?.capacity && (<p className="text-sm text-gray-600 mb-4 flex items-center gap-2"><Users className="h-4 w-4" />Capacidad: {reservation.units.capacity} personas</p>)}
+            {unitInventory.length > 0 && (
+              <div className="mt-4">
+                <button onClick={() => setShowInventory(!showInventory)} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium mb-4">
+                  <Package className="h-4 w-4" />{showInventory ? "Ocultar inventario" : "Ver inventario"}{showInventory ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </button>
+                {showInventory && (
+                  <div className="space-y-3">
+                    {Object.entries(groupedInventory).map(([category, items]) => (
+                      <div key={category} className="border border-gray-200 rounded-lg p-4">
+                        <h5 className="font-medium text-gray-900 mb-3 text-sm">{category}</h5>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                          {items.map((item: any, index: number) => (
+                            <div key={index} className="flex items-center justify-between text-sm bg-gray-50 rounded-lg px-3 py-2">
+                              <span className="text-gray-700 truncate">{item.name}</span>
+                              <Badge variant="secondary" className="text-xs flex-shrink-0 ml-2">x{item.quantity}</Badge>
+                            </div>
+                          ))}
+                        </div>
                       </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </ColorTab>
+        )}
+
+        {/* SERVICIOS - Scroll horizontal tipo ecommerce */}
+        {services.length > 0 && (
+          <ColorTab color="purple" icon={Star} title="Servicios disponibles" subtitle="Experiencias y servicios del alojamiento" defaultOpen={true}>
+            <div className="flex gap-4 overflow-x-auto pb-4 -mx-2 px-2 snap-x snap-mandatory">
+              {services.map((service, index) => (
+                <div key={index} className="flex-shrink-0 w-64 snap-start">
+                  <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                    {service.photos && service.photos.length > 0 && (
+                      <div className="w-full h-32 bg-gray-100 overflow-hidden">
+                        <img src={service.photos[0].image_url} alt={service.name} className="w-full h-full object-cover" />
+                      </div>
+                    )}
+                    <div className="p-4">
+                      <h4 className="font-bold text-gray-900 mb-1">{service.name}</h4>
+                      {service.description && (<p className="text-sm text-gray-600 mb-2 line-clamp-2">{service.description}</p>)}
+                      {service.price && (<p className="text-lg font-bold text-green-700 mb-2">{formatCurrency(service.price)}</p>)}
+                      {service.whatsapp && (
+                        <a href={`https://wa.me/${service.whatsapp.replace(/\D/g, "")}`} target="_blank" rel="noopener noreferrer" className="mt-2 w-full inline-flex items-center justify-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors text-sm font-medium">
+                          <MessageCircle className="h-4 w-4" />Reservar
+                        </a>
+                      )}
                     </div>
-                  ))}
+                  </div>
                 </div>
-              )}
+              ))}
             </div>
-          )}
-        </ColorTab>
+          </ColorTab>
+        )}
 
         {/* LLEGADA */}
         {arrivalInstructions?.enabled && (
@@ -524,7 +610,7 @@ export default function GuestStayPage({ params }: Props) {
           </ColorTab>
         )}
 
-        {/* CARDS INFERIORES: Wi-Fi, WhatsApp, Guía - 1 col móvil, 3 desktop */}
+        {/* CARDS INFERIORES: Wi-Fi, WhatsApp Ayuda, Guía */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 lg:gap-4">
           {/* Wi-Fi */}
           <div className="rounded-xl lg:rounded-2xl p-4 lg:p-6 border-2 border-green-200 bg-gradient-to-br from-green-50 to-emerald-50 shadow-sm">
@@ -548,17 +634,17 @@ export default function GuestStayPage({ params }: Props) {
             </div>
           </div>
 
-          {/* WhatsApp */}
+          {/* WhatsApp Ayuda */}
           <div className="rounded-xl lg:rounded-2xl p-4 lg:p-6 border-2 border-green-200 bg-gradient-to-br from-green-50 to-emerald-50 shadow-sm">
             <div className="flex items-start gap-3">
               <div className="h-10 w-10 lg:h-12 lg:w-12 rounded-lg lg:rounded-xl bg-green-600 flex items-center justify-center flex-shrink-0">
                 <MessageCircle className="h-5 w-5 lg:h-6 lg:w-6 text-white" />
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="font-bold text-gray-900 text-base lg:text-lg">¿Ayuda?</h3>
+                <h3 className="font-bold text-gray-900 text-base lg:text-lg">¿Necesitás ayuda?</h3>
                 <p className="text-xs text-gray-600 mt-1 mb-2">Contactanos por WhatsApp</p>
-                {settings.whatsappNumber && (
-                  <a href={`https://wa.me/${settings.whatsappNumber.replace(/\D/g, "")}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 lg:gap-2 bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700 transition-colors text-xs lg:text-sm font-medium shadow-sm">
+                {whatsappHelpNumber && (
+                  <a href={`https://wa.me/${whatsappHelpNumber.replace(/\D/g, "")}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 lg:gap-2 bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700 transition-colors text-xs lg:text-sm font-medium shadow-sm">
                     <MessageCircle className="h-3 w-3 lg:h-4 lg:w-4" />Enviar mensaje
                   </a>
                 )}
@@ -611,6 +697,16 @@ export default function GuestStayPage({ params }: Props) {
           </a>
         </div>
       </footer>
+
+      <style jsx>{`
+        @keyframes bounce-slow {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-20px); }
+        }
+        .animate-bounce-slow {
+          animation: bounce-slow 3s ease-in-out infinite;
+        }
+      `}</style>
     </div>
   );
 }

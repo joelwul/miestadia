@@ -11,7 +11,12 @@ import {
   X,
   Package,
   CheckCircle,
+  Upload,
 } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 
 interface Service {
   id: string;
@@ -19,6 +24,9 @@ interface Service {
   description?: string;
   price?: number;
   is_requestable: boolean;
+  order?: number;
+  active?: boolean;
+  photos?: { id: string; image_url: string; order_index: number }[];
 }
 
 interface Tenant {
@@ -37,6 +45,7 @@ export default function ServicesPage() {
   const [showModal, setShowModal] = useState(false);
   const [editingService, setEditingService] = useState<Service | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [uploading, setUploading] = useState<string | null>(null);
   const supabase = createClient();
 
   const [formData, setFormData] = useState({
@@ -44,6 +53,8 @@ export default function ServicesPage() {
     description: "",
     price: "",
     is_requestable: true,
+    active: true,
+    order: 0,
   });
 
   useEffect(() => {
@@ -60,19 +71,29 @@ export default function ServicesPage() {
           setLoading(false);
           return;
         }
-
         setTenant(tenantData);
 
         const { data: servicesData, error: servicesError } = await supabase
           .from("services")
           .select("*")
           .eq("tenant_id", tenantData.id)
-          .order("created_at", { ascending: false });
+          .order("order", { ascending: true });
 
         if (servicesError) {
           setError("Error al cargar servicios.");
         } else {
-          setServices(servicesData || []);
+          // Cargar fotos para cada servicio
+          const servicesWithPhotos = await Promise.all(
+            (servicesData || []).map(async (service: any) => {
+              const { data: photos } = await supabase
+                .from("service_photos")
+                .select("id, image_url, order_index")
+                .eq("service_id", service.id)
+                .order("order_index");
+              return { ...service, photos: photos || [] };
+            })
+          );
+          setServices(servicesWithPhotos);
         }
       } catch (err: any) {
         setError("Error: " + err.message);
@@ -88,7 +109,6 @@ export default function ServicesPage() {
       alert("El nombre es obligatorio.");
       return;
     }
-
     setActionLoading(true);
     try {
       if (editingService) {
@@ -99,17 +119,19 @@ export default function ServicesPage() {
             description: formData.description || null,
             price: formData.price ? parseFloat(formData.price) : null,
             is_requestable: formData.is_requestable,
+            active: formData.active,
+            order: formData.order,
           })
           .eq("id", editingService.id);
-
         if (error) throw error;
-
         setServices(services.map(s => s.id === editingService.id ? {
           ...s,
           name: formData.name,
           description: formData.description,
           price: formData.price ? parseFloat(formData.price) : null,
           is_requestable: formData.is_requestable,
+          active: formData.active,
+          order: formData.order,
         } : s));
       } else {
         const { data: newService, error } = await supabase
@@ -120,18 +142,17 @@ export default function ServicesPage() {
             description: formData.description || null,
             price: formData.price ? parseFloat(formData.price) : null,
             is_requestable: formData.is_requestable,
+            active: formData.active,
+            order: formData.order,
           })
           .select()
           .single();
-
         if (error) throw error;
-
-        setServices([newService, ...services]);
+        setServices([{ ...newService, photos: [] }, ...services]);
       }
-
       setShowModal(false);
       setEditingService(null);
-      setFormData({ name: "", description: "", price: "", is_requestable: true });
+      setFormData({ name: "", description: "", price: "", is_requestable: true, active: true, order: 0 });
     } catch (err: any) {
       alert("Error: " + err.message);
     } finally {
@@ -141,16 +162,13 @@ export default function ServicesPage() {
 
   const handleDelete = async (service: Service) => {
     if (!confirm(`¿Eliminar el servicio "${service.name}"?`)) return;
-
     setActionLoading(true);
     try {
       const { error } = await supabase
         .from("services")
         .delete()
         .eq("id", service.id);
-
       if (error) throw error;
-
       setServices(services.filter(s => s.id !== service.id));
     } catch (err: any) {
       alert("Error: " + err.message);
@@ -166,14 +184,75 @@ export default function ServicesPage() {
       description: service.description || "",
       price: service.price?.toString() || "",
       is_requestable: service.is_requestable,
+      active: service.active !== false,
+      order: service.order || 0,
     });
     setShowModal(true);
   };
 
   const openAddModal = () => {
     setEditingService(null);
-    setFormData({ name: "", description: "", price: "", is_requestable: true });
+    setFormData({ name: "", description: "", price: "", is_requestable: true, active: true, order: services.length });
     setShowModal(true);
+  };
+
+  // NUEVO: Upload de fotos
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, serviceId: string) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(serviceId);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${tenantSlug}-service-${serviceId}-${Date.now()}.${fileExt}`;
+      const { error: uploadError } = await supabase.storage
+        .from('tenant-assets')
+        .upload(fileName, file);
+      if (uploadError) throw uploadError;
+      const { data } = supabase.storage
+        .from('tenant-assets')
+        .getPublicUrl(fileName);
+      const { error: dbError } = await supabase
+        .from('service_photos')
+        .insert({
+          service_id: serviceId,
+          image_url: data.publicUrl,
+          order_index: 0,
+        });
+      if (dbError) throw dbError;
+      await loadData();
+    } catch (err: any) {
+      alert('Error subiendo foto: ' + err.message);
+    } finally {
+      setUploading(null);
+    }
+  };
+
+  const handleDeletePhoto = async (photoId: string, serviceId: string) => {
+    if (!confirm('¿Eliminar esta foto?')) return;
+    await supabase.from('service_photos').delete().eq('id', photoId);
+    await loadData();
+  };
+
+  const loadData = async () => {
+    if (!tenant) return;
+    const { data: servicesData } = await supabase
+      .from("services")
+      .select("*")
+      .eq("tenant_id", tenant.id)
+      .order("order", { ascending: true });
+    if (servicesData) {
+      const servicesWithPhotos = await Promise.all(
+        servicesData.map(async (service: any) => {
+          const { data: photos } = await supabase
+            .from("service_photos")
+            .select("id, image_url, order_index")
+            .eq("service_id", service.id)
+            .order("order_index");
+          return { ...service, photos: photos || [] };
+        })
+      );
+      setServices(servicesWithPhotos);
+    }
   };
 
   if (loading) {
@@ -230,46 +309,112 @@ export default function ServicesPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {services.map((service) => (
-            <div key={service.id} className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-md transition-shadow">
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex-1">
-                  <h3 className="font-bold text-gray-900 mb-1">{service.name}</h3>
-                  {service.description && (
-                    <p className="text-sm text-gray-600 mb-2">{service.description}</p>
+            <Card key={service.id} className="hover:shadow-md transition-shadow">
+              <CardContent className="p-6">
+                {/* NUEVO: Mostrar foto principal */}
+                {service.photos && service.photos.length > 0 && (
+                  <div className="mb-4 -mx-6 -mt-6">
+                    <img
+                      src={service.photos[0].image_url}
+                      alt={service.name}
+                      className="w-full h-40 object-cover rounded-t-xl"
+                    />
+                  </div>
+                )}
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex-1">
+                    <h3 className="font-bold text-gray-900 mb-1">{service.name}</h3>
+                    {service.description && (
+                      <p className="text-sm text-gray-600 mb-2">{service.description}</p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1 ml-2">
+                    <button
+                      onClick={() => openEditModal(service)}
+                      className="p-2 text-gray-400 hover:text-[#0F766E] hover:bg-gray-100 rounded-lg transition-colors"
+                      title="Editar"
+                    >
+                      <Edit className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(service)}
+                      disabled={actionLoading}
+                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                      title="Eliminar"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between">
+                  {service.price ? (
+                    <p className="text-lg font-bold text-[#0F766E]">${service.price.toLocaleString("es-AR")}</p>
+                  ) : (
+                    <p className="text-sm text-gray-500">Precio a consultar</p>
                   )}
+                  <div className="flex gap-1">
+                    {service.is_requestable && (
+                      <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full flex items-center gap-1">
+                        <CheckCircle className="w-3 h-3" />
+                        Solicitable
+                      </span>
+                    )}
+                    {service.active === false && (
+                      <span className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded-full">
+                        Inactivo
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <div className="flex items-center gap-1 ml-2">
-                  <button
-                    onClick={() => openEditModal(service)}
-                    className="p-2 text-gray-400 hover:text-[#0F766E] hover:bg-gray-100 rounded-lg transition-colors"
-                    title="Editar"
+                {/* NUEVO: Galería de fotos */}
+                {service.photos && service.photos.length > 0 && (
+                  <div className="mt-4">
+                    <p className="text-xs font-medium text-gray-700 mb-2">Fotos ({service.photos.length})</p>
+                    <div className="flex gap-2 overflow-x-auto">
+                      {service.photos.map((photo) => (
+                        <div key={photo.id} className="relative flex-shrink-0">
+                          <img
+                            src={photo.image_url}
+                            alt={service.name}
+                            className="w-16 h-16 object-cover rounded-lg border border-gray-200"
+                          />
+                          <button
+                            onClick={() => handleDeletePhoto(photo.id, service.id)}
+                            className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600"
+                          >
+                            <X className="w-2 h-2" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {/* NUEVO: Botón para subir foto */}
+                <div className="mt-4">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => document.getElementById(`upload-${service.id}`)?.click()}
+                    disabled={uploading === service.id}
+                    className="w-full"
                   >
-                    <Edit className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(service)}
-                    disabled={actionLoading}
-                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
-                    title="Eliminar"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                    {uploading === service.id ? (
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    ) : (
+                      <Upload className="w-4 h-4 mr-2" />
+                    )}
+                    {uploading === service.id ? 'Subiendo...' : 'Agregar foto'}
+                  </Button>
+                  <input
+                    id={`upload-${service.id}`}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => handleImageUpload(e, service.id)}
+                  />
                 </div>
-              </div>
-              <div className="flex items-center justify-between">
-                {service.price ? (
-                  <p className="text-lg font-bold text-[#0F766E]">${service.price.toLocaleString("es-AR")}</p>
-                ) : (
-                  <p className="text-sm text-gray-500">Precio a consultar</p>
-                )}
-                {service.is_requestable && (
-                  <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full flex items-center gap-1">
-                    <CheckCircle className="w-3 h-3" />
-                    Solicitable
-                  </span>
-                )}
-              </div>
-            </div>
+              </CardContent>
+            </Card>
           ))}
         </div>
       )}
@@ -317,6 +462,16 @@ export default function ServicesPage() {
                   placeholder="0"
                 />
               </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Orden</label>
+                <input
+                  type="number"
+                  value={formData.order}
+                  onChange={(e) => setFormData({ ...formData, order: parseInt(e.target.value) || 0 })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
+                  placeholder="0"
+                />
+              </div>
               <div className="flex items-center gap-2">
                 <input
                   type="checkbox"
@@ -327,6 +482,18 @@ export default function ServicesPage() {
                 />
                 <label htmlFor="is_requestable" className="text-sm text-gray-700">
                   Los huéspedes pueden solicitar este servicio
+                </label>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="active"
+                  checked={formData.active}
+                  onChange={(e) => setFormData({ ...formData, active: e.target.checked })}
+                  className="w-4 h-4 rounded border-gray-300"
+                />
+                <label htmlFor="active" className="text-sm text-gray-700">
+                  Servicio activo (visible para huéspedes)
                 </label>
               </div>
             </div>

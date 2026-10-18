@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { MapPin, Plus, Edit, Trash2, Save, X, Utensils, TreePalm, Landmark, ShoppingBag, Coffee, Waves } from 'lucide-react'
+import { MapPin, Plus, Edit, Trash2, Save, X, Utensils, TreePalm, Landmark, ShoppingBag, Coffee, Waves, Upload, Loader2 } from 'lucide-react'
 
 interface Props {
   params: Promise<{ tenantSlug: string }>
@@ -28,6 +28,7 @@ export default function DestinationPage({ params }: Props) {
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [uploading, setUploading] = useState<string | null>(null)
   const supabase = createClient()
 
   const [formData, setFormData] = useState({
@@ -67,7 +68,20 @@ export default function DestinationPage({ params }: Props) {
       .select('*')
       .eq('tenant_id', tid)
       .order('order', { ascending: true })
-    if (data) setPlaces(data)
+    if (data) {
+      // Cargar fotos para cada lugar
+      const placesWithPhotos = await Promise.all(
+        data.map(async (place: any) => {
+          const { data: photos } = await supabase
+            .from('destination_place_photos')
+            .select('id, image_url, order_index')
+            .eq('place_id', place.id)
+            .order('order_index')
+          return { ...place, photos: photos || [] }
+        })
+      )
+      setPlaces(placesWithPhotos)
+    }
     setLoading(false)
   }
 
@@ -114,8 +128,6 @@ export default function DestinationPage({ params }: Props) {
       return
     }
     setSaving(true)
-
-    // Construir contact_info como JSON
     const contactInfo: any = {}
     if (formData.phone) contactInfo.phone = formData.phone
     if (formData.website) contactInfo.website = formData.website
@@ -157,10 +169,45 @@ export default function DestinationPage({ params }: Props) {
 
   async function handleDelete(id: string) {
     if (!confirm('¿Eliminar este lugar?')) return
-    await supabase
-      .from('destination_places')
-      .delete()
-      .eq('id', id)
+    await supabase.from('destination_places').delete().eq('id', id)
+    await loadPlaces(tenantId)
+  }
+
+  // NUEVO: Upload de fotos
+  async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>, placeId: string) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(placeId)
+    try {
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${tenantSlug}-destination-${placeId}-${Date.now()}.${fileExt}`
+      const { error: uploadError } = await supabase.storage
+        .from('tenant-assets')
+        .upload(fileName, file)
+      if (uploadError) throw uploadError
+      const { data } = supabase.storage
+        .from('tenant-assets')
+        .getPublicUrl(fileName)
+      // Guardar en la tabla de fotos
+      const { error: dbError } = await supabase
+        .from('destination_place_photos')
+        .insert({
+          place_id: placeId,
+          image_url: data.publicUrl,
+          order_index: 0,
+        })
+      if (dbError) throw dbError
+      await loadPlaces(tenantId)
+    } catch (err: any) {
+      alert('Error subiendo foto: ' + err.message)
+    } finally {
+      setUploading(null)
+    }
+  }
+
+  async function handleDeletePhoto(photoId: string, placeId: string) {
+    if (!confirm('¿Eliminar esta foto?')) return
+    await supabase.from('destination_place_photos').delete().eq('id', photoId)
     await loadPlaces(tenantId)
   }
 
@@ -262,7 +309,7 @@ export default function DestinationPage({ params }: Props) {
                 />
               </div>
               <div>
-                <label className="text-sm font-medium text-gray-700">URL de imagen</label>
+                <label className="text-sm font-medium text-gray-700">URL de imagen (principal)</label>
                 <Input
                   value={formData.imageUrl}
                   onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
@@ -346,12 +393,35 @@ export default function DestinationPage({ params }: Props) {
                             <p className="text-sm text-gray-600 mt-1 line-clamp-2">{place.description}</p>
                           )}
                           <div className="flex flex-wrap gap-3 mt-2 text-xs text-gray-500">
-                            {place.address && <span> {place.address}</span>}
+                            {place.address && <span>📍 {place.address}</span>}
                             {contactInfo.phone && <span>📱 {contactInfo.phone}</span>}
                             {contactInfo.hours && <span>🕐 {contactInfo.hours}</span>}
                           </div>
                           {place.tips && (
                             <p className="text-xs text-blue-600 mt-2 italic">💡 {place.tips}</p>
+                          )}
+                          {/* NUEVO: Galería de fotos */}
+                          {place.photos && place.photos.length > 0 && (
+                            <div className="mt-3">
+                              <p className="text-xs font-medium text-gray-700 mb-2">Fotos ({place.photos.length})</p>
+                              <div className="flex gap-2 overflow-x-auto">
+                                {place.photos.map((photo: any) => (
+                                  <div key={photo.id} className="relative flex-shrink-0">
+                                    <img
+                                      src={photo.image_url}
+                                      alt={place.name}
+                                      className="w-20 h-20 object-cover rounded-lg border border-gray-200"
+                                    />
+                                    <button
+                                      onClick={() => handleDeletePhoto(photo.id, place.id)}
+                                      className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600"
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
                           )}
                         </div>
                       </div>
@@ -359,6 +429,26 @@ export default function DestinationPage({ params }: Props) {
                         <Button size="sm" variant="outline" onClick={() => handleEdit(place)}>
                           <Edit className="h-4 w-4" />
                         </Button>
+                        {/* NUEVO: Botón para subir foto */}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => document.getElementById(`upload-${place.id}`)?.click()}
+                          disabled={uploading === place.id}
+                        >
+                          {uploading === place.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Upload className="h-4 w-4" />
+                          )}
+                        </Button>
+                        <input
+                          id={`upload-${place.id}`}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => handleImageUpload(e, place.id)}
+                        />
                         <Button size="sm" variant="outline" onClick={() => handleDelete(place.id)} className="text-red-600">
                           <Trash2 className="h-4 w-4" />
                         </Button>
