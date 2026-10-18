@@ -20,6 +20,11 @@ export async function POST(request: Request) {
   try {
     const { tenant_id, plan, provider } = await request.json();
 
+    console.log('=== CREATE CHECKOUT ===');
+    console.log('tenant_id:', tenant_id);
+    console.log('plan:', plan);
+    console.log('provider:', provider);
+
     if (!tenant_id || !plan || !provider) {
       return NextResponse.json(
         { error: 'Faltan parámetros requeridos' },
@@ -35,25 +40,29 @@ export async function POST(request: Request) {
       .single();
 
     if (tenantError || !tenant) {
+      console.error('Error buscando tenant:', tenantError);
       return NextResponse.json(
         { error: 'Tenant no encontrado' },
         { status: 404 }
       );
     }
 
-    // Obtener email del tenant (prioridad: owner_email > settings.email > email)
-    const payerEmail = 
-      tenant.owner_email || 
-      tenant.settings?.email || 
-      tenant.email ||
-      null;
+    console.log('Tenant encontrado:', tenant.name);
+    console.log('owner_email:', tenant.owner_email);
+    console.log('settings:', tenant.settings);
+
+    // Obtener email del tenant (prioridad: owner_email > settings.email)
+    const payerEmail = tenant.owner_email || tenant.settings?.email || null;
 
     if (!payerEmail) {
+      console.error('No hay email configurado para el tenant');
       return NextResponse.json(
         { error: 'No hay email configurado para este tenant. Contactá a soporte.' },
         { status: 400 }
       );
     }
+
+    console.log('Email a usar:', payerEmail);
 
     const amount = plan === 'monthly' ? PRICES.monthly : PRICES.yearly;
     const amountARS = plan === 'monthly' ? PRICES_ARS.monthly : PRICES_ARS.yearly;
@@ -64,6 +73,7 @@ export async function POST(request: Request) {
     if (provider === 'mercadopago') {
       const MP_ACCESS_TOKEN = process.env.MP_ACCESS_TOKEN;
       if (!MP_ACCESS_TOKEN) {
+        console.error('MP_ACCESS_TOKEN no configurado');
         return NextResponse.json(
           { error: 'MP_ACCESS_TOKEN no configurado' },
           { status: 500 }
@@ -96,7 +106,7 @@ export async function POST(request: Request) {
         },
       };
 
-      console.log('Creando suscripción MP con email:', payerEmail);
+      console.log('Enviando a Mercado Pago:', JSON.stringify(preference, null, 2));
 
       const response = await fetch(
         'https://api.mercadopago.com/preapproval',
@@ -112,6 +122,8 @@ export async function POST(request: Request) {
       );
 
       const data = await response.json();
+
+      console.log('Respuesta de Mercado Pago:', data);
 
       if (!response.ok) {
         console.error('Error Mercado Pago:', data);
@@ -131,6 +143,9 @@ export async function POST(request: Request) {
           subscription_status: 'pending',
         })
         .eq('id', tenant_id);
+
+      console.log('Suscripción creada:', data.id);
+      console.log('URL de pago:', data.init_point);
 
       return NextResponse.json({ url: data.init_point });
     }
