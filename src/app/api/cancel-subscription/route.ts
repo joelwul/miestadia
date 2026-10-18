@@ -31,7 +31,20 @@ export async function POST(request: Request) {
       );
     }
 
-    // Cancelar en el proveedor externo si es necesario (ej: LemonSqueezy)
+    // Calcular fecha de fin: 30 días desde HOY (o desde la última factura)
+    const today = new Date();
+    const endDate = new Date(today);
+    endDate.setDate(endDate.getDate() + 30); // 30 días de acceso
+
+    // Si hay una suscripción activa, usar su fecha de fin si es posterior
+    if (tenant.subscription_ends_at) {
+      const currentEnd = new Date(tenant.subscription_ends_at);
+      if (currentEnd > endDate) {
+        endDate.setTime(currentEnd.getTime());
+      }
+    }
+
+    // Cancelar en el proveedor externo si es necesario
     if (provider === 'lemonsqueezy' && subscription_id) {
       try {
         const LS_API_KEY = process.env.LS_API_KEY;
@@ -50,18 +63,16 @@ export async function POST(request: Request) {
         }
       } catch (err) {
         console.error('Error cancelando en LemonSqueezy:', err);
-        // No fallamos si el error es externo, igual actualizamos la BD
       }
     }
 
-    // Actualizar el tenant: marcar como "cancelled" pero mantener subscription_ends_at
-    // para que siga activo hasta el final del período pagado
+    // Actualizar el tenant
     const { error: updateError } = await supabase
       .from('tenants')
       .update({
         subscription_status: 'cancelled',
-        subscription_cancelled_at: new Date().toISOString(),
-        // NO tocar subscription_ends_at - sigue vigente hasta esa fecha
+        subscription_cancelled_at: today.toISOString(),
+        subscription_ends_at: endDate.toISOString(), // ← 30 días desde hoy
       })
       .eq('id', tenant_id);
 
@@ -74,8 +85,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
-      message: 'Suscripción cancelada. Acceso mantenido hasta el final del período pagado.',
-      ends_at: tenant.subscription_ends_at,
+      message: 'Suscripción cancelada. Acceso mantenido por 30 días.',
+      ends_at: endDate.toISOString(),
     });
   } catch (err: any) {
     console.error('Error en cancel-subscription:', err);
