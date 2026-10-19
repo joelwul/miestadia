@@ -21,13 +21,9 @@ export async function POST(request: Request) {
     const { tenant_id, plan, provider, payer_email, payer_name } = await request.json();
 
     if (!tenant_id || !plan || !provider) {
-      return NextResponse.json(
-        { error: 'Faltan parámetros requeridos' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Faltan parámetros requeridos' }, { status: 400 });
     }
 
-    // Obtener datos del tenant
     const { data: tenant, error: tenantError } = await supabase
       .from('tenants')
       .select('*')
@@ -35,87 +31,67 @@ export async function POST(request: Request) {
       .single();
 
     if (tenantError || !tenant) {
-      return NextResponse.json(
-        { error: 'Tenant no encontrado' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Tenant no encontrado' }, { status: 404 });
     }
 
-    // Email: prioridad al que viene del frontend
     const finalEmail = payer_email || tenant.owner_email || tenant.settings?.email;
     const finalName = payer_name || tenant.owner_name || tenant.name || 'Usuario';
 
     if (!finalEmail) {
-      return NextResponse.json(
-        { error: 'No hay email configurado para este tenant. Contactá a soporte.' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'No hay email configurado' }, { status: 400 });
     }
 
     const amount = plan === 'monthly' ? PRICES.monthly : PRICES.yearly;
     const amountARS = plan === 'monthly' ? PRICES_ARS.monthly : PRICES_ARS.yearly;
 
-    // ============================================
-    // MERCADO PAGO
-    // ============================================
     if (provider === 'mercadopago') {
       const MP_ACCESS_TOKEN = process.env.MP_ACCESS_TOKEN;
       if (!MP_ACCESS_TOKEN) {
-        return NextResponse.json(
-          { error: 'MP_ACCESS_TOKEN no configurado' },
-          { status: 500 }
-        );
+        return NextResponse.json({ error: 'MP_ACCESS_TOKEN no configurado' }, { status: 500 });
       }
 
-      // Fecha de inicio: MAÑANA a las 10:00 AM
       const tomorrow = new Date();
       tomorrow.setDate(tomorrow.getDate() + 1);
       tomorrow.setHours(10, 0, 0, 0);
 
       const backUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://miestadia.online'}/${tenant.slug}/admin/billing`;
 
+      // ✅ ESTRUCTURA CORRECTA: payer_email a nivel raíz
       const preference = {
         reason: `Mi Estadía - Plan ${plan === 'monthly' ? 'Mensual' : 'Anual'}`,
         external_reference: tenant_id,
+        payer_email: finalEmail,  // ← A NIVEL RAÍZ, NO DENTRO DE "payer"
         auto_recurring: {
           frequency: plan === 'monthly' ? 1 : 12,
           frequency_type: plan === 'monthly' ? 'month' : 'year',
           transaction_amount: amountARS,
           currency_id: 'ARS',
           start_date: tomorrow.toISOString(),
-          end_date: null,
         },
         back_url: backUrl,
         notification_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://miestadia.online'}/api/webhooks/mercadopago`,
-        payer: {
-          email: finalEmail,
-          name: finalName,
-        },
       };
 
-      const response = await fetch(
-        'https://api.mercadopago.com/preapproval',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${MP_ACCESS_TOKEN}`,
-            'X-Idempotency-Key': `${tenant_id}-${plan}-${Date.now()}`,
-          },
-          body: JSON.stringify(preference),
-        }
-      );
+      const response = await fetch('https://api.mercadopago.com/preapproval', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${MP_ACCESS_TOKEN}`,
+          'X-Idempotency-Key': `${tenant_id}-${plan}-${Date.now()}`,
+        },
+        body: JSON.stringify(preference),
+      });
 
       const data = await response.json();
 
       if (!response.ok) {
+        console.error('Error Mercado Pago:', data);
         return NextResponse.json(
           { error: data.message || 'Error creando suscripción en Mercado Pago' },
           { status: response.status }
         );
       }
 
-      // Guardar referencia en la BD
       await supabase
         .from('tenants')
         .update({
@@ -129,9 +105,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ url: data.init_point });
     }
 
-    // ============================================
-    // LEMONSQUEEZY
-    // ============================================
     if (provider === 'lemonsqueezy') {
       const LS_API_KEY = process.env.LS_API_KEY;
       const LS_STORE_ID = process.env.LS_STORE_ID;
@@ -139,19 +112,13 @@ export async function POST(request: Request) {
       const LS_YEARLY_VARIANT_ID = process.env.LS_YEARLY_VARIANT_ID;
 
       if (!LS_API_KEY || !LS_STORE_ID) {
-        return NextResponse.json(
-          { error: 'Variables de LemonSqueezy no configuradas' },
-          { status: 500 }
-        );
+        return NextResponse.json({ error: 'Variables de LemonSqueezy no configuradas' }, { status: 500 });
       }
 
       const variantId = plan === 'monthly' ? LS_MONTHLY_VARIANT_ID : LS_YEARLY_VARIANT_ID;
 
       if (!variantId) {
-        return NextResponse.json(
-          { error: `Variant ID no configurado para plan ${plan}` },
-          { status: 500 }
-        );
+        return NextResponse.json({ error: `Variant ID no configurado para plan ${plan}` }, { status: 500 });
       }
 
       const checkoutData = {
@@ -176,28 +143,21 @@ export async function POST(request: Request) {
             test_mode: process.env.NODE_ENV !== 'production',
           },
           relationships: {
-            store: {
-              data: { type: 'stores', id: LS_STORE_ID },
-            },
-            variant: {
-              data: { type: 'variants', id: variantId },
-            },
+            store: { data: { type: 'stores', id: LS_STORE_ID } },
+            variant: { data: { type: 'variants', id: variantId } },
           },
         },
       };
 
-      const response = await fetch(
-        'https://api.lemonsqueezy.com/v1/checkouts',
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${LS_API_KEY}`,
-            'Accept': 'application/vnd.api+json',
-            'Content-Type': 'application/vnd.api+json',
-          },
-          body: JSON.stringify(checkoutData),
-        }
-      );
+      const response = await fetch('https://api.lemonsqueezy.com/v1/checkouts', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${LS_API_KEY}`,
+          'Accept': 'application/vnd.api+json',
+          'Content-Type': 'application/vnd.api+json',
+        },
+        body: JSON.stringify(checkoutData),
+      });
 
       const data = await response.json();
 
@@ -211,15 +171,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ url: data.data.attributes.url });
     }
 
-    return NextResponse.json(
-      { error: 'Proveedor no soportado' },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: 'Proveedor no soportado' }, { status: 400 });
   } catch (err: any) {
     console.error('Error en create-checkout:', err);
-    return NextResponse.json(
-      { error: err.message || 'Error interno del servidor' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: err.message || 'Error interno del servidor' }, { status: 500 });
   }
 }
