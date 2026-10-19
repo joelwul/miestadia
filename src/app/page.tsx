@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useMotionValue, useSpring } from "framer-motion";
 import {
   Globe,
   CalendarCheck,
@@ -13,13 +13,23 @@ import {
   CloudSun,
   Star,
   Zap,
-  ChevronLeft,
-  ChevronRight,
   Building2,
   Wifi,
   ShoppingBag,
   Compass,
   FileText,
+  Mail,
+  QrCode,
+  ExternalLink,
+  Plane,
+  Hotel,
+  Bed,
+  Key,
+  Clock,
+  Users,
+  TrendingUp,
+  Shield,
+  Sparkles,
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -71,7 +81,7 @@ const Navbar = () => (
 );
 
 // ============================================
-// HERO SECTION
+// HERO SECTION (SIN ÍCONO, TÍTULO EN 2 LÍNEAS)
 // ============================================
 const slides = ["/images/slides/slide-1.jpg", "/images/slides/slide-2.jpg", "/images/slides/slide-3.jpg", "/images/slides/slide-4.jpg"];
 
@@ -112,17 +122,32 @@ const Hero = () => {
         <Logo size={180} />
       </motion.div>
 
-      <motion.h1 initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3, duration: 1 }} className="relative z-10 mt-8 text-4xl md:text-6xl font-bold text-white tracking-tight leading-tight max-w-5xl">
-        🏨 Mi Estadía: La plataforma todo-en-uno
+      <motion.h1 
+        initial={{ opacity: 0, y: 40 }} 
+        animate={{ opacity: 1, y: 0 }} 
+        transition={{ delay: 0.3, duration: 1 }} 
+        className="relative z-10 mt-8 text-4xl md:text-6xl font-bold text-white tracking-tight leading-tight max-w-5xl"
+      >
+        Mi Estadía: La plataforma todo-en-uno
         <br />
         <span className="text-yellow-300">para multiplicar tus reservas directas.</span>
       </motion.h1>
 
-      <motion.p initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5, duration: 1 }} className="relative z-10 mt-6 max-w-3xl text-xl text-white/90 font-medium leading-relaxed">
+      <motion.p 
+        initial={{ opacity: 0, y: 30 }} 
+        animate={{ opacity: 1, y: 0 }} 
+        transition={{ delay: 0.5, duration: 1 }} 
+        className="relative z-10 mt-6 max-w-3xl text-xl text-white/90 font-medium leading-relaxed"
+      >
         Tu propia página web profesional, un motor de reservas integrado y un panel de huésped de 5 estrellas, todo en un solo lugar.
       </motion.p>
 
-      <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.7, duration: 1 }} className="relative z-10 mt-10 flex flex-col sm:flex-row gap-4">
+      <motion.div 
+        initial={{ opacity: 0, y: 30 }} 
+        animate={{ opacity: 1, y: 0 }} 
+        transition={{ delay: 0.7, duration: 1 }} 
+        className="relative z-10 mt-10 flex flex-col sm:flex-row gap-4"
+      >
         <Link href="/login" className="group px-8 py-4 rounded-full bg-[#EA580C] text-white font-bold text-lg hover:bg-[#C2410C] transition shadow-lg hover:shadow-xl flex items-center justify-center gap-2">
           Comenzar prueba gratis <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition" />
         </Link>
@@ -135,42 +160,217 @@ const Hero = () => {
 };
 
 // ============================================
-// 4 PILARES FUNDAMENTALES
+// ANIMACIÓN DE FONDO INTERACTIVA (PARTÍCULAS DE VIAJE)
+// ============================================
+const FloatingIcons = () => {
+  const mouseRef = useRef({ x: 0, y: 0 });
+  const [particles, setParticles] = useState<Array<{ id: number; x: number; y: number; icon: any; size: number; opacity: number }>>([]);
+
+  const travelIcons = [Plane, Hotel, Bed, Key, MapPin, Compass, Star, CloudSun, Clock, Users];
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      mouseRef.current = { x: e.clientX, y: e.clientY };
+      
+      // Crear partícula cada cierto movimiento
+      if (Math.random() > 0.92) {
+        const icon = travelIcons[Math.floor(Math.random() * travelIcons.length)];
+        const newParticle = {
+          id: Date.now() + Math.random(),
+          x: e.clientX + (Math.random() - 0.5) * 100,
+          y: e.clientY + (Math.random() - 0.5) * 100,
+          icon,
+          size: 16 + Math.random() * 24,
+          opacity: 0.3 + Math.random() * 0.4,
+        };
+        setParticles(prev => [...prev.slice(-15), newParticle]);
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (e.touches.length > 0) {
+        const touch = e.touches[0];
+        mouseRef.current = { x: touch.clientX, y: touch.clientY };
+        
+        if (Math.random() > 0.85) {
+          const icon = travelIcons[Math.floor(Math.random() * travelIcons.length)];
+          const newParticle = {
+            id: Date.now() + Math.random(),
+            x: touch.clientX + (Math.random() - 0.5) * 100,
+            y: touch.clientY + (Math.random() - 0.5) * 100,
+            icon,
+            size: 16 + Math.random() * 24,
+            opacity: 0.3 + Math.random() * 0.4,
+          };
+          setParticles(prev => [...prev.slice(-15), newParticle]);
+        }
+      }
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("touchmove", handleTouchMove);
+
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("touchmove", handleTouchMove);
+    };
+  }, []);
+
+  // Limpiar partículas antiguas
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setParticles(prev => prev.slice(-10));
+    }, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+      <AnimatePresence>
+        {particles.map((particle) => (
+          <motion.div
+            key={particle.id}
+            initial={{ opacity: 0, scale: 0, y: particle.y }}
+            animate={{ opacity: particle.opacity, scale: 1, y: particle.y - 100 }}
+            exit={{ opacity: 0, scale: 0 }}
+            transition={{ duration: 2, ease: "easeOut" }}
+            className="absolute text-[#0F766E]/30"
+            style={{ left: particle.x, top: particle.y }}
+          >
+            <particle.icon style={{ width: particle.size, height: particle.size }} />
+          </motion.div>
+        ))}
+      </AnimatePresence>
+    </div>
+  );
+};
+
+// ============================================
+// 4 PILARES FUNDAMENTALES (REORDENADOS: 4, 3, 1, 2)
 // ============================================
 const pillars = [
   {
-    icon: Globe,
-    title: "1. Tu Propia Página Web Profesional",
-    desc: "No necesitas saber programar. Web lista bajo tu marca con URL personalizada, logo, colores y galerías. 100% responsive, con reservador embebido, calendario en tiempo real y confirmaciones automáticas con QR.",
-    color: "bg-blue-50 text-blue-700 border-blue-200",
-    iconBg: "bg-blue-100 text-blue-600",
-  },
-  {
-    icon: Zap,
-    title: "2. Motor de Reservas Inteligente",
-    desc: "¿Te escribieron por WhatsApp? Usá nuestro Parser inteligente: pegá el mensaje y el sistema extrae los datos automáticamente. También soporta importación masiva por CSV para que nunca pierdas una venta.",
-    color: "bg-purple-50 text-purple-700 border-purple-200",
-    iconBg: "bg-purple-100 text-purple-600",
+    icon: LayoutDashboard,
+    title: "1. Panel de Administración",
+    subtitle: "Tu centro de comando",
+    desc: "Gestiona todo tu negocio desde un dashboard intuitivo y optimizado para móvil. Dashboard en tiempo real con llegadas, salidas y ocupación. Gestión de reservas con un clic, mensajería WhatsApp con plantillas, y control de inventario de unidades.",
+    color: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    iconBg: "bg-emerald-100 text-emerald-600",
+    interactive: (
+      <div className="mt-4 bg-white rounded-lg p-3 shadow-sm border border-gray-100">
+        <div className="grid grid-cols-3 gap-2 mb-3">
+          <div className="bg-blue-50 rounded p-2 text-center">
+            <p className="text-[10px] text-blue-600 font-bold">Llegadas</p>
+            <p className="text-lg font-bold text-blue-800">4</p>
+          </div>
+          <div className="bg-green-50 rounded p-2 text-center">
+            <p className="text-[10px] text-green-600 font-bold">Ocupación</p>
+            <p className="text-lg font-bold text-green-800">85%</p>
+          </div>
+          <div className="bg-amber-50 rounded p-2 text-center">
+            <p className="text-[10px] text-amber-600 font-bold">Ingresos</p>
+            <p className="text-lg font-bold text-amber-800">$2.4M</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 text-[10px] text-gray-600">
+          <TrendingUp className="w-3 h-3 text-green-500" />
+          <span>+12% vs mes anterior</span>
+        </div>
+      </div>
+    ),
   },
   {
     icon: Smartphone,
-    title: "3. Panel del Huésped (5 Estrellas)",
-    desc: "Digitaliza la estadía. Pre check-in con datos precargados, guía digital (Wi-Fi, mapas, reglas), upselling de servicios con botón a WhatsApp, guía del destino, clima en tiempo real y solicitud automática de reseñas en Google Maps.",
+    title: "2. Panel del Huésped (5 Estrellas)",
+    subtitle: "Experiencia premium digital",
+    desc: "Digitaliza la estadía y reduce las preguntas repetitivas a cero. Pre check-in con datos precargados, guía digital (Wi-Fi, mapas, reglas), upselling de servicios con botón a WhatsApp, guía del destino, clima en tiempo real y solicitud automática de reseñas en Google Maps.",
     color: "bg-amber-50 text-amber-700 border-amber-200",
     iconBg: "bg-amber-100 text-amber-600",
+    interactive: (
+      <div className="mt-4 bg-white rounded-lg p-3 shadow-sm border border-gray-100 space-y-2">
+        <div className="flex items-center gap-2">
+          <div className="bg-[#F0FDF4] p-1.5 rounded"><Wifi className="w-3 h-3 text-[#0F766E]" /></div>
+          <div className="flex-1">
+            <p className="text-[9px] text-gray-500">Red Wi-Fi</p>
+            <p className="text-[10px] font-bold text-gray-800">MiEstadia_Guest</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="bg-[#FFF7ED] p-1.5 rounded"><MapPin className="w-3 h-3 text-[#EA580C]" /></div>
+          <div className="flex-1">
+            <p className="text-[9px] text-gray-500">Ubicación</p>
+            <p className="text-[10px] font-bold text-gray-800">Ver en Google Maps</p>
+          </div>
+        </div>
+        <div className="bg-gradient-to-r from-blue-500 to-cyan-500 rounded p-2 text-white flex items-center justify-between">
+          <div><p className="text-[9px] opacity-80">Hoy</p><p className="text-sm font-bold">24°</p></div>
+          <CloudSun className="w-5 h-5 text-yellow-300" />
+        </div>
+      </div>
+    ),
   },
   {
-    icon: LayoutDashboard,
-    title: "4. Panel de Administración",
-    desc: "Tu centro de comando. Dashboard en tiempo real con llegadas, salidas y ocupación. Gestión de reservas con un clic, mensajería WhatsApp con plantillas, y control de inventario de unidades para que el huésped sepa qué esperar.",
-    color: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    iconBg: "bg-emerald-100 text-emerald-600",
+    icon: Globe,
+    title: "3. Tu Propia Página Web Profesional",
+    subtitle: "Adquirí tu web al instante",
+    desc: "No necesitas saber programar. Te damos una web lista para usar bajo tu propia marca. Tu propia URL: miestadia.online/tu-alojamiento (o conecta tu propio dominio). Personalización total: logo, colores, galerías. 100% responsive con reservador embebido y confirmaciones automáticas con QR.",
+    color: "bg-blue-50 text-blue-700 border-blue-200",
+    iconBg: "bg-blue-100 text-blue-600",
+    interactive: (
+      <div className="mt-4 space-y-3">
+        <div className="bg-white rounded-lg p-3 shadow-sm border border-gray-100">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-8 h-8 bg-[#0F766E] rounded flex items-center justify-center text-white text-xs font-bold">ME</div>
+            <div className="flex-1">
+              <p className="text-xs font-bold text-gray-800">Cabañas del Bosque</p>
+              <p className="text-[10px] text-gray-500 font-mono">miestadia.online/cabanas</p>
+            </div>
+          </div>
+          <div className="bg-gray-200 rounded h-16 flex items-center justify-center text-gray-400 text-[10px]">Galería de fotos</div>
+          <button className="w-full mt-2 bg-[#EA580C] text-white py-1.5 rounded text-[10px] font-bold">Ver Disponibilidad</button>
+        </div>
+        <div className="bg-[#0F766E]/10 border border-[#0F766E]/20 rounded-lg p-2 text-center">
+          <p className="text-[10px] text-[#0F766E] font-semibold">✨ Adquirí tu web:</p>
+          <p className="text-xs font-bold text-[#0F766E] font-mono">miestadia.online/tualojamiento</p>
+        </div>
+      </div>
+    ),
+  },
+  {
+    icon: Zap,
+    title: "4. Motor de Reservas Inteligente",
+    subtitle: "De WhatsApp a reserva en 1 clic",
+    desc: "¿Te escribieron por WhatsApp? Usá nuestro Parser inteligente: pegá el mensaje y el sistema extrae los datos automáticamente. También soporta importación masiva por CSV para que nunca pierdas una venta. Confirmaciones automáticas con email profesional, código QR y link al panel privado.",
+    color: "bg-purple-50 text-purple-700 border-purple-200",
+    iconBg: "bg-purple-100 text-purple-600",
+    interactive: (
+      <div className="mt-4 space-y-2">
+        <div className="bg-green-50 border border-green-200 rounded-lg p-2 text-[9px] text-gray-700">
+          <p className="font-bold text-green-800 mb-1">💬 Mensaje pegado:</p>
+          <p>"Hola, quiero reservar para Juan Pérez, del 15 al 20 de octubre, cabaña 3, total $50000"</p>
+        </div>
+        <div className="flex justify-center"><ArrowRight className="w-3 h-3 text-gray-400 rotate-90" /></div>
+        <div className="bg-white rounded-lg p-2 shadow-sm border border-gray-100 space-y-1">
+          <div className="flex justify-between text-[9px]"><span className="text-gray-500">Huésped:</span><span className="font-semibold text-green-600">Juan Pérez ✅</span></div>
+          <div className="flex justify-between text-[9px]"><span className="text-gray-500">Fechas:</span><span className="font-semibold text-green-600">15-20 Oct ✅</span></div>
+          <div className="flex justify-between text-[9px]"><span className="text-gray-500">Monto:</span><span className="font-semibold text-green-600">$50.000 ✅</span></div>
+        </div>
+      </div>
+    ),
   },
 ];
 
 const PillarsSection = () => (
-  <section id="pilares" className="py-24 px-4 bg-white">
-    <div className="max-w-7xl mx-auto">
+  <section id="pilares" className="py-24 px-4 bg-white relative overflow-hidden">
+    {/* Textura de fondo */}
+    <div className="absolute inset-0 opacity-5">
+      <div className="absolute top-10 left-10"><Plane className="w-32 h-32 text-[#0F766E]" /></div>
+      <div className="absolute top-40 right-20"><Hotel className="w-24 h-24 text-[#EA580C]" /></div>
+      <div className="absolute bottom-20 left-1/4"><Bed className="w-28 h-28 text-[#F59E0B]" /></div>
+      <div className="absolute bottom-40 right-1/3"><MapPin className="w-20 h-20 text-[#0F766E]" /></div>
+    </div>
+    
+    <div className="max-w-7xl mx-auto relative z-10">
       <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="text-center mb-16">
         <span className="text-sm font-semibold text-[#EA580C] uppercase tracking-wider">¿Por qué elegirnos?</span>
         <h2 className="mt-3 text-4xl md:text-5xl font-bold text-[#0F766E]">4 Pilares Fundamentales</h2>
@@ -184,14 +384,20 @@ const PillarsSection = () => (
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ delay: i * 0.1 }}
-            whileHover={{ y: -5 }}
-            className={`rounded-2xl p-8 border-2 transition-all duration-300 hover:shadow-xl ${pillar.color}`}
+            whileHover={{ y: -5, scale: 1.02 }}
+            className={`rounded-2xl p-8 border-2 transition-all duration-300 hover:shadow-2xl ${pillar.color}`}
           >
-            <div className={`w-14 h-14 rounded-xl flex items-center justify-center mb-6 ${pillar.iconBg}`}>
-              <pillar.icon className="w-7 h-7" />
+            <div className="flex items-start gap-4 mb-4">
+              <div className={`w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0 ${pillar.iconBg}`}>
+                <pillar.icon className="w-7 h-7" />
+              </div>
+              <div>
+                <h3 className="text-2xl font-bold text-gray-900">{pillar.title}</h3>
+                <p className="text-sm text-gray-600 font-medium">{pillar.subtitle}</p>
+              </div>
             </div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-4">{pillar.title}</h3>
-            <p className="text-gray-700 leading-relaxed text-lg">{pillar.desc}</p>
+            <p className="text-gray-700 leading-relaxed text-base">{pillar.desc}</p>
+            {pillar.interactive}
           </motion.div>
         ))}
       </div>
@@ -200,7 +406,7 @@ const PillarsSection = () => (
 );
 
 // ============================================
-// PHONE MOCKUPS ANIMADOS (MEJORADOS)
+// PHONE MOCKUPS ANIMADOS (CON EMAIL + QR)
 // ============================================
 const phoneScreens = [
   {
@@ -217,6 +423,33 @@ const phoneScreens = [
         </div>
         <div className="bg-gray-200 rounded-lg h-24 w-full flex items-center justify-center text-gray-400 text-xs">Galería de Fotos</div>
         <button className="w-full bg-[#EA580C] text-white py-2 rounded-lg text-sm font-bold shadow-md">Ver Disponibilidad</button>
+      </div>
+    ),
+  },
+  {
+    title: "Email con QR",
+    desc: "Confirmación automática al reservar",
+    icon: "",
+    gradient: "from-indigo-500 to-purple-600",
+    content: (
+      <div className="space-y-3">
+        <div className="bg-white rounded-lg p-3 shadow-sm border border-gray-100">
+          <div className="flex items-center gap-2 mb-2">
+            <Mail className="w-4 h-4 text-indigo-600" />
+            <p className="text-[10px] font-bold text-gray-800">¡Reserva confirmada!</p>
+          </div>
+          <p className="text-[9px] text-gray-600 mb-2">Hola Juan, tu check-in es el 15/10</p>
+          <div className="bg-gray-100 rounded p-2 flex items-center gap-2">
+            <QrCode className="w-10 h-10 text-gray-700" />
+            <div className="flex-1">
+              <p className="text-[9px] font-bold text-gray-800">Código: NUE-ABC123</p>
+              <p className="text-[8px] text-gray-500">Escaneá al llegar</p>
+            </div>
+          </div>
+        </div>
+        <button className="w-full bg-[#0F766E] text-white py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1">
+          <ExternalLink className="w-3 h-3" /> Acceder a mi panel
+        </button>
       </div>
     ),
   },
@@ -468,7 +701,7 @@ const PhoneMockups = () => {
 };
 
 // ============================================
-// PRICING & CTA (Mantenidos y pulidos)
+// PRICING & CTA
 // ============================================
 const Pricing = () => (
   <section id="precios" className="py-24 px-4 bg-white">
@@ -553,7 +786,8 @@ const Footer = () => (
 // ============================================
 export default function LandingPage() {
   return (
-    <main className="min-h-screen bg-white font-sans antialiased">
+    <main className="min-h-screen bg-white font-sans antialiased relative">
+      <FloatingIcons />
       <Navbar />
       <Hero />
       <PillarsSection />
