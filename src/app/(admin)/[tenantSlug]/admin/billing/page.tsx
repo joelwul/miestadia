@@ -14,7 +14,6 @@ import {
   ExternalLink,
   Loader2,
   XCircle,
-  DollarSign,
   TrendingUp,
 } from "lucide-react";
 import { PRICES, PRICES_ARS, USD_TO_ARS } from "@/lib/config";
@@ -56,11 +55,11 @@ export default function BillingPage() {
   useEffect(() => {
     async function load() {
       try {
-        // Obtener usuario autenticado
+        // Obtener usuario autenticado para el email
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
           setUserEmail(user.email || "");
-          setUserName(user.user_metadata?.full_name || user.email || "");
+          setUserName(user.user_metadata?.full_name || user.email?.split("@")[0] || "");
         }
 
         const { data: tenantData, error: tenantError } = await supabase
@@ -113,7 +112,7 @@ export default function BillingPage() {
   async function handleCheckout(plan: "monthly" | "yearly", provider: "lemonsqueezy" | "mercadopago") {
     if (!tenant) return;
 
-    // Usar el email del usuario autenticado como fallback
+    // Usar email del usuario autenticado como fallback
     const payerEmail = tenant.owner_email || userEmail;
     const payerName = tenant.owner_name || userName;
 

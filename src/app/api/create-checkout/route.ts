@@ -20,13 +20,6 @@ export async function POST(request: Request) {
   try {
     const { tenant_id, plan, provider, payer_email, payer_name } = await request.json();
 
-    console.log('=== CREATE CHECKOUT ===');
-    console.log('tenant_id:', tenant_id);
-    console.log('plan:', plan);
-    console.log('provider:', provider);
-    console.log('payer_email:', payer_email);
-    console.log('payer_name:', payer_name);
-
     if (!tenant_id || !plan || !provider) {
       return NextResponse.json(
         { error: 'Faltan parámetros requeridos' },
@@ -42,29 +35,22 @@ export async function POST(request: Request) {
       .single();
 
     if (tenantError || !tenant) {
-      console.error('Error buscando tenant:', tenantError);
       return NextResponse.json(
         { error: 'Tenant no encontrado' },
         { status: 404 }
       );
     }
 
-    console.log('Tenant encontrado:', tenant.name);
-
-    // Obtener email: prioridad al que viene del frontend, luego owner_email, luego settings.email
+    // Email: prioridad al que viene del frontend
     const finalEmail = payer_email || tenant.owner_email || tenant.settings?.email;
     const finalName = payer_name || tenant.owner_name || tenant.name || 'Usuario';
 
     if (!finalEmail) {
-      console.error('No hay email disponible');
       return NextResponse.json(
         { error: 'No hay email configurado para este tenant. Contactá a soporte.' },
         { status: 400 }
       );
     }
-
-    console.log('Email final:', finalEmail);
-    console.log('Nombre final:', finalName);
 
     const amount = plan === 'monthly' ? PRICES.monthly : PRICES.yearly;
     const amountARS = plan === 'monthly' ? PRICES_ARS.monthly : PRICES_ARS.yearly;
@@ -75,14 +61,13 @@ export async function POST(request: Request) {
     if (provider === 'mercadopago') {
       const MP_ACCESS_TOKEN = process.env.MP_ACCESS_TOKEN;
       if (!MP_ACCESS_TOKEN) {
-        console.error('MP_ACCESS_TOKEN no configurado');
         return NextResponse.json(
           { error: 'MP_ACCESS_TOKEN no configurado' },
           { status: 500 }
         );
       }
 
-      // Calcular fecha de inicio: MAÑANA a las 10:00 AM
+      // Fecha de inicio: MAÑANA a las 10:00 AM
       const tomorrow = new Date();
       tomorrow.setDate(tomorrow.getDate() + 1);
       tomorrow.setHours(10, 0, 0, 0);
@@ -108,8 +93,6 @@ export async function POST(request: Request) {
         },
       };
 
-      console.log('Enviando a Mercado Pago:', JSON.stringify(preference, null, 2));
-
       const response = await fetch(
         'https://api.mercadopago.com/preapproval',
         {
@@ -125,10 +108,7 @@ export async function POST(request: Request) {
 
       const data = await response.json();
 
-      console.log('Respuesta de Mercado Pago:', data);
-
       if (!response.ok) {
-        console.error('Error Mercado Pago:', data);
         return NextResponse.json(
           { error: data.message || 'Error creando suscripción en Mercado Pago' },
           { status: response.status }
@@ -145,9 +125,6 @@ export async function POST(request: Request) {
           subscription_status: 'pending',
         })
         .eq('id', tenant_id);
-
-      console.log('Suscripción creada:', data.id);
-      console.log('URL de pago:', data.init_point);
 
       return NextResponse.json({ url: data.init_point });
     }
@@ -192,30 +169,18 @@ export async function POST(request: Request) {
               email: finalEmail,
               name: finalName,
               custom: [
-                {
-                  key: 'tenant_id',
-                  value: tenant_id,
-                },
-                {
-                  key: 'tenant_slug',
-                  value: tenant.slug,
-                },
+                { key: 'tenant_id', value: tenant_id },
+                { key: 'tenant_slug', value: tenant.slug },
               ],
             },
             test_mode: process.env.NODE_ENV !== 'production',
           },
           relationships: {
             store: {
-              data: {
-                type: 'stores',
-                id: LS_STORE_ID,
-              },
+              data: { type: 'stores', id: LS_STORE_ID },
             },
             variant: {
-              data: {
-                type: 'variants',
-                id: variantId,
-              },
+              data: { type: 'variants', id: variantId },
             },
           },
         },
@@ -237,7 +202,6 @@ export async function POST(request: Request) {
       const data = await response.json();
 
       if (!response.ok) {
-        console.error('Error LemonSqueezy:', data);
         return NextResponse.json(
           { error: data.error?.message || 'Error creando checkout en LemonSqueezy' },
           { status: response.status }
