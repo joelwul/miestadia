@@ -56,14 +56,18 @@ export async function POST(request: Request) {
 
       const backUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://miestadia.online'}/${tenant.slug}/admin/billing`;
 
-      // ✅ ESTRUCTURA CORRECTA: payer_email a nivel raíz
+      // ✅ CORRECCIÓN: frequency_type solo acepta 'days' o 'months'
+      // Plan anual = 12 months
+      const frequency = plan === 'monthly' ? 1 : 12;
+      const frequencyType = 'months'; // ← SIEMPRE 'months', nunca 'year'
+
       const preference = {
         reason: `Mi Estadía - Plan ${plan === 'monthly' ? 'Mensual' : 'Anual'}`,
         external_reference: tenant_id,
-        payer_email: finalEmail,  // ← A NIVEL RAÍZ, NO DENTRO DE "payer"
+        payer_email: finalEmail,
         auto_recurring: {
-          frequency: plan === 'monthly' ? 1 : 12,
-          frequency_type: plan === 'monthly' ? 'month' : 'year',
+          frequency: frequency,
+          frequency_type: frequencyType,
           transaction_amount: amountARS,
           currency_id: 'ARS',
           start_date: tomorrow.toISOString(),
