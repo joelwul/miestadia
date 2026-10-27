@@ -30,6 +30,9 @@ import {
   TrendingUp,
   Shield,
   Sparkles,
+  X,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -69,19 +72,22 @@ const Navbar = () => (
       </Link>
       <div className="hidden md:flex items-center gap-8 text-sm font-medium text-gray-700">
         <a href="#pilares" className="hover:text-[#0F766E] transition">Beneficios</a>
-        <a href="#experiencia" className="hover:text-[#0F766E] transition">Experiencia</a>
+        <a href="#reservas" className="hover:text-[#0F766E] transition">Reservador</a>
+        <a href="#testimonios" className="hover:text-[#0F766E] transition">Testimonios</a>
         <a href="#precios" className="hover:text-[#0F766E] transition">Precios</a>
       </div>
       <div className="flex items-center gap-3">
         <Link href="/login" className="text-sm font-medium text-[#0F766E] hover:underline hidden sm:block">Ingresar</Link>
-        <Link href="/login" className="text-sm font-semibold bg-[#EA580C] text-white px-5 py-2.5 rounded-full hover:bg-[#C2410C] transition shadow-md">Probar gratis</Link>
+        <a href="https://wa.me/554891089578?text=Hola!%20Quiero%20mas%20info%20sobre%20Mi%20Estadia" target="_blank" rel="noopener noreferrer" className="text-sm font-semibold bg-[#EA580C] text-white px-5 py-2.5 rounded-full hover:bg-[#C2410C] transition shadow-md">
+          Probar gratis
+        </a>
       </div>
     </div>
   </motion.nav>
 );
 
 // ============================================
-// HERO SECTION (SIN ÍCONO, TÍTULO EN 2 LÍNEAS)
+// HERO SECTION (COMPACTO - 2 LÍNEAS)
 // ============================================
 const slides = ["/images/slides/slide-1.jpg", "/images/slides/slide-2.jpg", "/images/slides/slide-3.jpg", "/images/slides/slide-4.jpg"];
 
@@ -119,25 +125,24 @@ const Hero = () => {
       )}
       
       <motion.div initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1, type: "spring", bounce: 0.3 }} className="relative z-10">
-        <Logo size={180} />
+        <Logo size={140} />
       </motion.div>
 
       <motion.h1 
         initial={{ opacity: 0, y: 40 }} 
         animate={{ opacity: 1, y: 0 }} 
         transition={{ delay: 0.3, duration: 1 }} 
-        className="relative z-10 mt-8 text-4xl md:text-6xl font-bold text-white tracking-tight leading-tight max-w-5xl"
+        className="relative z-10 mt-6 text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-white tracking-tight leading-tight max-w-6xl"
       >
-        Mi Estadía: La plataforma todo-en-uno
-        <br />
-        <span className="text-yellow-300">para multiplicar tus reservas directas.</span>
+        Mi Estadía: La plataforma todo-en-uno para{" "}
+        <span className="text-yellow-300">multiplicar tus reservas directas.</span>
       </motion.h1>
 
       <motion.p 
         initial={{ opacity: 0, y: 30 }} 
         animate={{ opacity: 1, y: 0 }} 
         transition={{ delay: 0.5, duration: 1 }} 
-        className="relative z-10 mt-6 max-w-3xl text-xl text-white/90 font-medium leading-relaxed"
+        className="relative z-10 mt-6 max-w-3xl text-lg sm:text-xl text-white/90 font-medium leading-relaxed"
       >
         Tu propia página web profesional, un motor de reservas integrado y un panel de huésped de 5 estrellas, todo en un solo lugar.
       </motion.p>
@@ -146,12 +151,12 @@ const Hero = () => {
         initial={{ opacity: 0, y: 30 }} 
         animate={{ opacity: 1, y: 0 }} 
         transition={{ delay: 0.7, duration: 1 }} 
-        className="relative z-10 mt-10 flex flex-col sm:flex-row gap-4"
+        className="relative z-10 mt-8 flex flex-col sm:flex-row gap-4"
       >
         <Link href="/login" className="group px-8 py-4 rounded-full bg-[#EA580C] text-white font-bold text-lg hover:bg-[#C2410C] transition shadow-lg hover:shadow-xl flex items-center justify-center gap-2">
           Comenzar prueba gratis <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition" />
         </Link>
-        <a href="https://wa.me/5491131923742?text=Hola!%20Quiero%20mas%20info%20sobre%20Mi%20Estadia" target="_blank" rel="noopener noreferrer" className="px-8 py-4 rounded-full border-2 border-white text-white font-bold text-lg hover:bg-white hover:text-[#0F766E] transition flex items-center justify-center gap-2">
+        <a href="https://wa.me/554891089578?text=Hola!%20Quiero%20mas%20info%20sobre%20Mi%20Estadia" target="_blank" rel="noopener noreferrer" className="px-8 py-4 rounded-full border-2 border-white text-white font-bold text-lg hover:bg-white hover:text-[#0F766E] transition flex items-center justify-center gap-2">
           <MessageCircle className="w-5 h-5" /> Hablar por WhatsApp
         </a>
       </motion.div>
@@ -160,7 +165,7 @@ const Hero = () => {
 };
 
 // ============================================
-// ANIMACIÓN DE FONDO INTERACTIVA (PARTÍCULAS DE VIAJE)
+// ANIMACIÓN DE FONDO INTERACTIVA
 // ============================================
 const FloatingIcons = () => {
   const mouseRef = useRef({ x: 0, y: 0 });
@@ -172,7 +177,6 @@ const FloatingIcons = () => {
     const handleMouseMove = (e: MouseEvent) => {
       mouseRef.current = { x: e.clientX, y: e.clientY };
       
-      // Crear partícula cada cierto movimiento
       if (Math.random() > 0.92) {
         const icon = travelIcons[Math.floor(Math.random() * travelIcons.length)];
         const newParticle = {
@@ -216,7 +220,6 @@ const FloatingIcons = () => {
     };
   }, []);
 
-  // Limpiar partículas antiguas
   useEffect(() => {
     const interval = setInterval(() => {
       setParticles(prev => prev.slice(-10));
@@ -246,7 +249,262 @@ const FloatingIcons = () => {
 };
 
 // ============================================
-// 4 PILARES FUNDAMENTALES (REORDENADOS: 4, 3, 1, 2)
+// WIDGET DE RESERVAS EMBEBIDO
+// ============================================
+const EmbedWidget = () => {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <section id="reservas" className="py-24 px-4 bg-gradient-to-b from-white to-[#FDFBF7]">
+      <div className="max-w-6xl mx-auto">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }} 
+          whileInView={{ opacity: 1, y: 0 }} 
+          viewport={{ once: true }} 
+          className="text-center mb-12"
+        >
+          <span className="text-sm font-semibold text-[#EA580C] uppercase tracking-wider">Motor de Reservas</span>
+          <h2 className="mt-3 text-4xl md:text-5xl font-bold text-[#0F766E]">Reservador Embebido</h2>
+          <p className="mt-4 text-lg text-gray-600 max-w-2xl mx-auto">
+            Integración perfecta con tu sitio web. Tus huéspedes pueden reservar directamente sin salir de tu página.
+          </p>
+        </motion.div>
+
+        <div className="bg-white rounded-3xl shadow-2xl p-8 md:p-12 border-2 border-[#0F766E]/10">
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center gap-3 bg-[#0F766E]/10 px-6 py-3 rounded-full mb-4">
+              <Building2 className="w-6 h-6 text-[#0F766E]" />
+              <span className="font-bold text-[#0F766E]">Centro El Progreso - Chile</span>
+            </div>
+            <p className="text-gray-600">Así se ve el reservador en acción. Hacé clic para ver la demo completa.</p>
+          </div>
+
+          <div className="flex justify-center">
+            <button
+              onClick={() => setIsOpen(true)}
+              className="group bg-gradient-to-r from-[#0F766E] to-[#166534] text-white px-10 py-5 rounded-xl font-bold text-lg shadow-xl hover:shadow-2xl transition-all hover:scale-105 flex items-center gap-3"
+            >
+              <CalendarCheck className="w-6 h-6" />
+              📅 Reservar ahora
+              <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition" />
+            </button>
+          </div>
+
+          <div className="mt-8 grid md:grid-cols-3 gap-4 text-center">
+            <div className="bg-gray-50 rounded-xl p-4">
+              <CheckCircle className="w-8 h-8 text-green-600 mx-auto mb-2" />
+              <p className="text-sm font-semibold text-gray-800">Reservas en tiempo real</p>
+              <p className="text-xs text-gray-500 mt-1">Disponibilidad actualizada al instante</p>
+            </div>
+            <div className="bg-gray-50 rounded-xl p-4">
+              <Shield className="w-8 h-8 text-blue-600 mx-auto mb-2" />
+              <p className="text-sm font-semibold text-gray-800">Pago seguro</p>
+              <p className="text-xs text-gray-500 mt-1">Múltiples métodos de pago</p>
+            </div>
+            <div className="bg-gray-50 rounded-xl p-4">
+              <Mail className="w-8 h-8 text-purple-600 mx-auto mb-2" />
+              <p className="text-sm font-semibold text-gray-800">Confirmación automática</p>
+              <p className="text-xs text-gray-500 mt-1">Email con QR y panel de huésped</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Modal del Widget */}
+        {isOpen && (
+          <div 
+            className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4"
+            onClick={() => setIsOpen(false)}
+          >
+            <div 
+              className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden relative"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                onClick={() => setIsOpen(false)}
+                className="absolute top-4 right-4 w-10 h-10 bg-white rounded-full shadow-lg flex items-center justify-center hover:bg-gray-100 transition z-10"
+              >
+                <X className="w-5 h-5 text-gray-600" />
+              </button>
+              <iframe
+                src="https://miestadia.online/embed/centro-el-progreso-chile"
+                className="w-full h-[600px] border-none"
+                sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+                loading="lazy"
+              />
+            </div>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+};
+
+// ============================================
+// TESTIMONIOS / RESEÑAS (SCROLL HORIZONTAL)
+// ============================================
+const testimonials = [
+  {
+    name: "María González",
+    property: "Cabañas del Valle",
+    stars: 5,
+    text: "Mi Estadía transformó completamente mi negocio. Las reservas directas aumentaron un 150% y los huéspedes aman el panel digital. ¡Dejé de depender de las plataformas!",
+    impact: "Reservas directas +150%",
+  },
+  {
+    name: "Carlos Rodríguez",
+    property: "Hotel Boutique Centro",
+    stars: 5,
+    text: "La gestión se volvió súper eficiente. El parser de WhatsApp me ahorra horas de trabajo y las reseñas en Google aumentaron notablemente gracias a los emails automáticos.",
+    impact: "Reseñas Google +300%",
+  },
+  {
+    name: "Ana Paula Silva",
+    property: "Departamentos Costeros",
+    stars: 5,
+    text: "El pre-checkin digital es increíble. Los huéspedes llegan con todo listo y yo tengo toda la información organizada. Profesionalizó mi servicio al 100%.",
+    impact: "Tiempo de check-in -80%",
+  },
+  {
+    name: "Roberto Fernández",
+    property: "Posada El Mirador",
+    stars: 5,
+    text: "Antes perdía reservas por no responder rápido. Ahora el sistema automatizado hace todo por mí. Mis huéspedes reciben información profesional sin que yo haga nada.",
+    impact: "Conversión +200%",
+  },
+  {
+    name: "Luciana Martínez",
+    property: "Loft Urbano",
+    stars: 5,
+    text: "La web que me dieron es hermosa y el reservador funciona perfecto. Mis huéspedes pueden ver disponibilidad y reservar en segundos. Simplemente excelente.",
+    impact: "Ocupación 95% todo el año",
+  },
+  {
+    name: "Diego Hernández",
+    property: "Casa de Campo Los Sauces",
+    stars: 5,
+    text: "El upselling de servicios me genera ingresos extra increíbles. Los huéspedes reservan desayunos y tours directamente desde el panel. Una mina de oro.",
+    impact: "Ingresos extra +40%",
+  },
+];
+
+const Testimonials = () => {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(true);
+
+  const checkScroll = () => {
+    if (scrollRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
+      setCanScrollLeft(scrollLeft > 0);
+      setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 10);
+    }
+  };
+
+  const scroll = (direction: "left" | "right") => {
+    if (scrollRef.current) {
+      const scrollAmount = 400;
+      scrollRef.current.scrollBy({
+        left: direction === "left" ? -scrollAmount : scrollAmount,
+        behavior: "smooth",
+      });
+    }
+  };
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el) {
+      el.addEventListener("scroll", checkScroll);
+      checkScroll();
+      return () => el.removeEventListener("scroll", checkScroll);
+    }
+  }, []);
+
+  return (
+    <section id="testimonios" className="py-24 px-4 bg-white">
+      <div className="max-w-7xl mx-auto">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }} 
+          whileInView={{ opacity: 1, y: 0 }} 
+          viewport={{ once: true }} 
+          className="text-center mb-12"
+        >
+          <span className="text-sm font-semibold text-[#EA580C] uppercase tracking-wider">Testimonios</span>
+          <h2 className="mt-3 text-4xl md:text-5xl font-bold text-[#0F766E]">Lo que dicen nuestros anfitriones</h2>
+          <p className="mt-4 text-lg text-gray-600 max-w-2xl mx-auto">
+            Historias reales de anfitriones que transformaron su negocio con Mi Estadía.
+          </p>
+        </motion.div>
+
+        <div className="relative">
+          {/* Botones de navegación */}
+          <button
+            onClick={() => scroll("left")}
+            className={`absolute left-0 top-1/2 -translate-y-1/2 z-10 w-12 h-12 bg-white shadow-lg rounded-full flex items-center justify-center transition-all ${
+              canScrollLeft ? "opacity-100 hover:bg-gray-50" : "opacity-0 pointer-events-none"
+            }`}
+          >
+            <ChevronLeft className="w-6 h-6 text-gray-700" />
+          </button>
+          <button
+            onClick={() => scroll("right")}
+            className={`absolute right-0 top-1/2 -translate-y-1/2 z-10 w-12 h-12 bg-white shadow-lg rounded-full flex items-center justify-center transition-all ${
+              canScrollRight ? "opacity-100 hover:bg-gray-50" : "opacity-0 pointer-events-none"
+            }`}
+          >
+            <ChevronRight className="w-6 h-6 text-gray-700" />
+          </button>
+
+          {/* Cards con scroll */}
+          <div
+            ref={scrollRef}
+            className="flex gap-6 overflow-x-auto scroll-smooth pb-8 px-4 scrollbar-hide"
+            style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+          >
+            {testimonials.map((testimonial, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, x: 50 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.1 }}
+                className="flex-shrink-0 w-80 bg-gradient-to-br from-white to-gray-50 rounded-2xl p-6 border-2 border-gray-100 shadow-lg hover:shadow-xl transition-all"
+              >
+                <div className="flex items-center gap-1 mb-4">
+                  {[...Array(testimonial.stars)].map((_, j) => (
+                    <Star key={j} className="w-4 h-4 text-yellow-400 fill-yellow-400" />
+                  ))}
+                </div>
+                
+                <p className="text-gray-700 text-sm leading-relaxed mb-4 italic">
+                  "{testimonial.text}"
+                </p>
+
+                <div className="bg-[#0F766E]/10 rounded-lg p-3 mb-4">
+                  <p className="text-xs font-bold text-[#0F766E] text-center">
+                    {testimonial.impact}
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-3 pt-4 border-t border-gray-200">
+                  <div className="w-10 h-10 bg-gradient-to-br from-[#0F766E] to-[#166534] rounded-full flex items-center justify-center text-white font-bold">
+                    {testimonial.name.charAt(0)}
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-gray-900">{testimonial.name}</p>
+                    <p className="text-xs text-gray-500">{testimonial.property}</p>
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+// ============================================
+// 4 PILARES FUNDAMENTALES
 // ============================================
 const pillars = [
   {
@@ -362,7 +620,6 @@ const pillars = [
 
 const PillarsSection = () => (
   <section id="pilares" className="py-24 px-4 bg-white relative overflow-hidden">
-    {/* Textura de fondo */}
     <div className="absolute inset-0 opacity-5">
       <div className="absolute top-10 left-10"><Plane className="w-32 h-32 text-[#0F766E]" /></div>
       <div className="absolute top-40 right-20"><Hotel className="w-24 h-24 text-[#EA580C]" /></div>
@@ -406,26 +663,9 @@ const PillarsSection = () => (
 );
 
 // ============================================
-// PHONE MOCKUPS ANIMADOS (CON EMAIL + QR)
+// PHONE MOCKUPS ANIMADOS
 // ============================================
 const phoneScreens = [
-  {
-    title: "Web Profesional",
-    desc: "Tu marca, tu URL, tu negocio",
-    icon: "🌐",
-    gradient: "from-blue-500 to-cyan-500",
-    content: (
-      <div className="space-y-3">
-        <div className="bg-white rounded-xl p-3 shadow-sm border border-gray-100 text-center">
-          <div className="w-10 h-10 bg-[#0F766E] rounded-lg mx-auto mb-2 flex items-center justify-center text-white font-bold text-xs">ME</div>
-          <p className="text-xs font-bold text-gray-800">Cabañas del Bosque</p>
-          <p className="text-[10px] text-gray-500">miestadia.online/cabanas</p>
-        </div>
-        <div className="bg-gray-200 rounded-lg h-24 w-full flex items-center justify-center text-gray-400 text-xs">Galería de Fotos</div>
-        <button className="w-full bg-[#EA580C] text-white py-2 rounded-lg text-sm font-bold shadow-md">Ver Disponibilidad</button>
-      </div>
-    ),
-  },
   {
     title: "Email con QR",
     desc: "Confirmación automática al reservar",
@@ -450,6 +690,23 @@ const phoneScreens = [
         <button className="w-full bg-[#0F766E] text-white py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1">
           <ExternalLink className="w-3 h-3" /> Acceder a mi panel
         </button>
+      </div>
+    ),
+  },
+  {
+    title: "Web Profesional",
+    desc: "Tu marca, tu URL, tu negocio",
+    icon: "🌐",
+    gradient: "from-blue-500 to-cyan-500",
+    content: (
+      <div className="space-y-3">
+        <div className="bg-white rounded-xl p-3 shadow-sm border border-gray-100 text-center">
+          <div className="w-10 h-10 bg-[#0F766E] rounded-lg mx-auto mb-2 flex items-center justify-center text-white font-bold text-xs">ME</div>
+          <p className="text-xs font-bold text-gray-800">Cabañas del Bosque</p>
+          <p className="text-[10px] text-gray-500">miestadia.online/cabanas</p>
+        </div>
+        <div className="bg-gray-200 rounded-lg h-24 w-full flex items-center justify-center text-gray-400 text-xs">Galería de Fotos</div>
+        <button className="w-full bg-[#EA580C] text-white py-2 rounded-lg text-sm font-bold shadow-md">Ver Disponibilidad</button>
       </div>
     ),
   },
@@ -627,14 +884,10 @@ const PhoneMockups = () => {
         </motion.div>
 
         <div className="flex flex-col lg:flex-row items-center justify-center gap-16">
-          {/* Teléfono */}
           <div className="relative w-72 h-[580px] flex-shrink-0">
             <div className="absolute inset-0 bg-gradient-to-br from-gray-800 to-gray-900 rounded-[3rem] shadow-2xl p-3 ring-4 ring-gray-900/10">
               <div className="w-full h-full bg-white rounded-[2.5rem] overflow-hidden relative flex flex-col">
-                {/* Notch */}
                 <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-7 bg-gray-900 rounded-b-2xl z-20" />
-                
-                {/* Contenido de la pantalla con animación */}
                 <div className="flex-1 overflow-y-auto bg-gray-50 pt-12 px-4 pb-4 no-scrollbar">
                   <AnimatePresence mode="wait">
                     <motion.div
@@ -656,14 +909,11 @@ const PhoneMockups = () => {
                     </motion.div>
                   </AnimatePresence>
                 </div>
-
-                {/* Home indicator */}
                 <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-24 h-1 bg-gray-300 rounded-full z-20" />
               </div>
             </div>
           </div>
 
-          {/* Controles */}
           <div className="max-w-md w-full space-y-6">
             <div className="flex justify-center gap-2 mb-4">
               {phoneScreens.map((_, index) => (
@@ -701,7 +951,7 @@ const PhoneMockups = () => {
 };
 
 // ============================================
-// PRICING & CTA
+// PRICING
 // ============================================
 const Pricing = () => (
   <section id="precios" className="py-24 px-4 bg-white">
@@ -746,7 +996,7 @@ const FinalCTA = () => (
           <Link href="/login" className="group px-8 py-4 rounded-full bg-[#EA580C] text-white font-bold text-lg hover:bg-[#C2410C] transition shadow-xl hover:shadow-2xl flex items-center justify-center gap-2">
             Probar gratis 30 días <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition" />
           </Link>
-          <a href="https://wa.me/5491131923742?text=Hola!%20Quiero%20mas%20info%20sobre%20Mi%20Estadia" target="_blank" rel="noopener noreferrer" className="px-8 py-4 rounded-full border-2 border-white text-white font-bold text-lg hover:bg-white hover:text-[#0F766E] transition flex items-center justify-center gap-2">
+          <a href="https://wa.me/554891089578?text=Hola!%20Quiero%20mas%20info%20sobre%20Mi%20Estadia" target="_blank" rel="noopener noreferrer" className="px-8 py-4 rounded-full border-2 border-white text-white font-bold text-lg hover:bg-white hover:text-[#0F766E] transition flex items-center justify-center gap-2">
             <MessageCircle className="w-5 h-5" /> Hablar por WhatsApp
           </a>
         </div>
@@ -769,7 +1019,7 @@ const Footer = () => (
         <div>
           <h4 className="font-bold mb-4 text-[#F59E0B]">Contacto</h4>
           <ul className="space-y-3 text-gray-400 text-sm">
-            <li><a href="https://wa.me/5491131923742" target="_blank" rel="noopener noreferrer" className="hover:text-white transition flex items-center gap-2"><MessageCircle className="w-4 h-4" />WhatsApp</a></li>
+            <li><a href="https://wa.me/554891089578" target="_blank" rel="noopener noreferrer" className="hover:text-white transition flex items-center gap-2"><MessageCircle className="w-4 h-4" />WhatsApp</a></li>
             <li><Link href="/login" className="hover:text-white transition flex items-center gap-2">Ingresar al panel</Link></li>
           </ul>
         </div>
@@ -791,7 +1041,9 @@ export default function LandingPage() {
       <Navbar />
       <Hero />
       <PillarsSection />
+      <EmbedWidget />
       <PhoneMockups />
+      <Testimonials />
       <Pricing />
       <FinalCTA />
       <Footer />
