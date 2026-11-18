@@ -3,102 +3,28 @@ import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useParams } from "next/navigation";
 import {
-  Calendar,
-  Plus,
-  Search,
-  QrCode,
-  Edit,
-  Trash2,
-  Loader2,
-  AlertCircle,
-  CheckCircle,
-  Clock,
-  XCircle,
-  Send,
-  CheckSquare,
-  X,
-  Mail,
-  Phone,
-  Copy,
-  ExternalLink,
-  MessageSquare,
-  Upload,
-  UserCheck,
-  LogOut,
-  Star,
-  Home,
-  Bell,
-  DollarSign,
-  History,
-  Filter,
-  Info,
-  RefreshCw,
-  MoreVertical,
+  Calendar, Plus, Search, QrCode, Edit, Trash2, Loader2, AlertCircle,
+  CheckCircle, Clock, XCircle, Send, CheckSquare, X, Mail, Phone, Copy,
+  ExternalLink, MessageSquare, Upload, UserCheck, LogOut, Star, Home,
+  Bell, DollarSign, History, Filter, Info, RefreshCw, MoreVertical,
 } from "lucide-react";
 import Link from "next/link";
 
-interface Guest {
-  id: string;
-  first_name: string;
-  last_name: string;
-  email: string;
-  phone: string;
-}
-
-interface Unit {
-  id: string;
-  name: string;
-  type: string;
-  capacity: number;
-}
-
-interface Payment {
-  id: string;
-  reservation_id: string;
-  amount: number;
-  method: string;
-  date: string;
-  notes: string;
-}
-
+interface Guest { id: string; first_name: string; last_name: string; email: string; phone: string; }
+interface Unit { id: string; name: string; type: string; capacity: number; }
+interface Payment { id: string; reservation_id: string; amount: number; method: string; date: string; notes: string; }
 interface PreCheckin {
-  id: string;
-  reservation_id: string;
-  status: string;
-  document_number: string;
-  vehicle_plate: string;
-  emergency_contact_name: string;
-  emergency_contact_phone: string;
-  special_requests: string;
-  arrival_time: string;
+  id: string; reservation_id: string; status: string; document_number: string;
+  vehicle_plate: string; emergency_contact_name: string; emergency_contact_phone: string;
+  special_requests: string; arrival_time: string;
 }
-
 interface Reservation {
-  id: string;
-  tenant_id: string;
-  reservation_code: string;
-  guest_id: string;
-  unit_id: string;
-  check_in: string;
-  check_out: string;
-  status: string;
-  source: string;
-  total_amount: number;
-  paid_amount: number;
-  payment_status: string;
-  payment_method: string;
-  notes: string;
-  created_at: string;
-  guest?: Guest;
-  unit?: Unit;
-  preCheckin?: PreCheckin | null;
+  id: string; tenant_id: string; reservation_code: string; guest_id: string; unit_id: string;
+  check_in: string; check_out: string; status: string; source: string; total_amount: number;
+  paid_amount: number; payment_status: string; payment_method: string; notes: string;
+  created_at: string; guest?: Guest; unit?: Unit; preCheckin?: PreCheckin | null;
 }
-
-interface Tenant {
-  id: string;
-  name: string;
-  slug: string;
-}
+interface Tenant { id: string; name: string; slug: string; }
 
 type FilterType = "all" | "today" | "tomorrow" | "nextweek";
 type StatusFilterType = "all" | "booked" | "pre_checkin_completed" | "checked_in" | "checked_out" | "cancelled";
@@ -133,44 +59,22 @@ export default function ReservationsPage() {
   const supabase = createClient();
 
   const [formData, setFormData] = useState({
-    guest_id: "",
-    unit_id: "",
-    check_in: "",
-    check_out: "",
-    total_amount: "",
-    paid_amount: "",
-    payment_method: "cash",
-    notes: "",
-    new_guest_first_name: "",
-    new_guest_last_name: "",
-    new_guest_email: "",
-    new_guest_phone: "",
-    new_guest_nationality: "Argentina",
-    new_guest_document: "",
-    create_new_guest: false,
+    guest_id: "", unit_id: "", check_in: "", check_out: "", total_amount: "", paid_amount: "",
+    payment_method: "cash", notes: "", new_guest_first_name: "", new_guest_last_name: "",
+    new_guest_email: "", new_guest_phone: "", new_guest_nationality: "Argentina",
+    new_guest_document: "", create_new_guest: false,
   });
-
   const [checkinData, setCheckinData] = useState({
-    document_number: "",
-    vehicle_plate: "",
-    emergency_contact: "",
-    observations: "",
-    attended_by: "",
-    additional_payment: "",
-    payment_method: "cash",
+    document_number: "", vehicle_plate: "", emergency_contact: "", observations: "",
+    attended_by: "", additional_payment: "", payment_method: "cash",
   });
-
   const [paymentData, setPaymentData] = useState({ amount: "", method: "cash", notes: "" });
 
   async function loadData() {
     setRefreshing(true);
     try {
       const { data: tenantData, error: tenantError } = await supabase
-        .from("tenants")
-        .select("id, name, slug")
-        .eq("slug", tenantSlug)
-        .single();
-
+        .from("tenants").select("id, name, slug").eq("slug", tenantSlug).single();
       if (tenantError || !tenantData) {
         setError("Alojamiento no encontrado.");
         setLoading(false);
@@ -178,40 +82,20 @@ export default function ReservationsPage() {
         return;
       }
       setTenant(tenantData);
-
       const { data: reservationsData } = await supabase
-        .from("reservations")
-        .select("*")
-        .eq("tenant_id", tenantData.id)
-        .order("check_in", { ascending: true });
-
+        .from("reservations").select("*").eq("tenant_id", tenantData.id).order("check_in", { ascending: true });
       const { data: guestsData } = await supabase
-        .from("guests")
-        .select("id, first_name, last_name, email, phone")
-        .eq("tenant_id", tenantData.id);
-
+        .from("guests").select("id, first_name, last_name, email, phone").eq("tenant_id", tenantData.id);
       const { data: unitsData } = await supabase
-        .from("units")
-        .select("id, name, type, capacity")
-        .eq("tenant_id", tenantData.id)
-        .eq("status", "active");
-
+        .from("units").select("id, name, type, capacity").eq("tenant_id", tenantData.id).eq("status", "active");
       const { data: paymentsData } = await supabase
-        .from("reservation_payments")
-        .select("id, reservation_id, amount, payment_method as method, payment_date as date, notes")
-        .eq("tenant_id", tenantData.id)
-        .order("payment_date", { ascending: false });
-
+        .from("reservation_payments").select("id, reservation_id, amount, payment_method as method, payment_date as date, notes").eq("tenant_id", tenantData.id).order("payment_date", { ascending: false });
       const { data: preCheckinsData } = await supabase
-        .from("pre_checkins")
-        .select("*")
-        .eq("tenant_id", tenantData.id);
-
+        .from("pre_checkins").select("*").eq("tenant_id", tenantData.id);
       setGuests(guestsData || []);
       setUnits(unitsData || []);
       setPayments(paymentsData || []);
       setPreCheckins(preCheckinsData || []);
-
       const enriched: Reservation[] = (reservationsData || []).map((res: any) => {
         const preCheckin = (preCheckinsData || []).find((pc: any) => pc.reservation_id === res.id);
         return {
@@ -230,33 +114,12 @@ export default function ReservationsPage() {
     }
   }
 
-  useEffect(() => {
-    loadData();
-  }, [tenantSlug]);
+  useEffect(() => { loadData(); }, [tenantSlug]);
 
-  const getToday = () => {
-    const t = new Date();
-    t.setHours(0, 0, 0, 0);
-    return t;
-  };
-  const getTomorrow = () => {
-    const t = new Date();
-    t.setDate(t.getDate() + 1);
-    t.setHours(0, 0, 0, 0);
-    return t;
-  };
-  const getNextWeekStart = () => {
-    const t = new Date();
-    t.setDate(t.getDate() + 7);
-    t.setHours(0, 0, 0, 0);
-    return t;
-  };
-  const getNextWeekEnd = () => {
-    const t = new Date();
-    t.setDate(t.getDate() + 13);
-    t.setHours(23, 59, 59, 999);
-    return t;
-  };
+  const getToday = () => { const t = new Date(); t.setHours(0, 0, 0, 0); return t; };
+  const getTomorrow = () => { const t = new Date(); t.setDate(t.getDate() + 1); t.setHours(0, 0, 0, 0); return t; };
+  const getNextWeekStart = () => { const t = new Date(); t.setDate(t.getDate() + 7); t.setHours(0, 0, 0, 0); return t; };
+  const getNextWeekEnd = () => { const t = new Date(); t.setDate(t.getDate() + 13); t.setHours(23, 59, 59, 999); return t; };
 
   const getRealStatus = (res: Reservation): string => {
     if (res.status === "cancelled") return "cancelled";
@@ -276,29 +139,19 @@ export default function ReservationsPage() {
     const nextWeekEnd = getNextWeekEnd();
     const guestName = `${res.guest?.first_name || ""} ${res.guest?.last_name || ""}`.toLowerCase();
     const realStatus = getRealStatus(res);
-
     const matchesSearch =
       searchTerm === "" ||
       guestName.includes(searchTerm.toLowerCase()) ||
       res.reservation_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      res.unit?.name.toLowerCase().includes(searchTerm.toLowerCase());
-
+      (res.unit?.name || "").toLowerCase().includes(searchTerm.toLowerCase());
     if (!matchesSearch) return false;
     if (dateFrom && checkIn < new Date(dateFrom)) return false;
     if (dateTo && checkIn > new Date(dateTo)) return false;
-
     switch (filter) {
-      case "today":
-        if (checkIn.toDateString() !== today.toDateString()) return false;
-        break;
-      case "tomorrow":
-        if (checkIn.toDateString() !== tomorrow.toDateString()) return false;
-        break;
-      case "nextweek":
-        if (checkIn < nextWeekStart || checkIn > nextWeekEnd) return false;
-        break;
+      case "today": if (checkIn.toDateString() !== today.toDateString()) return false; break;
+      case "tomorrow": if (checkIn.toDateString() !== tomorrow.toDateString()) return false; break;
+      case "nextweek": if (checkIn < nextWeekStart || checkIn > nextWeekEnd) return false; break;
     }
-
     if (statusFilter !== "all" && realStatus !== statusFilter) return false;
     return true;
   });
@@ -313,7 +166,6 @@ export default function ReservationsPage() {
       default: return "bg-gray-100 text-gray-800 border-gray-200";
     }
   };
-
   const getStatusLabel = (status: string) => {
     switch (status) {
       case "booked": return "Reservada";
@@ -324,7 +176,6 @@ export default function ReservationsPage() {
       default: return status;
     }
   };
-
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "booked": return <CheckCircle className="w-4 h-4" />;
@@ -359,7 +210,7 @@ export default function ReservationsPage() {
       case "checkout":
         return `¡Hola ${firstName}! 📅\n\nTe recordamos que tu check-out en *${tenant.name}* es el ${checkOut}.\n\nPor favor dejá la unidad en las condiciones acordadas.\n\n¡Gracias por elegirnos!\n\n— ${tenant.name}`;
       case "postcheckout":
-        return `¡Hola ${firstName}! \n\nEsperamos que hayas disfrutado tu estadía en *${tenant.name}*.\n\n¿Nos ayudarías dejando una reseña en Google Maps? Nos ayuda mucho a crecer:\nhttps://g.page/r/TU_LINK_AQUI\n\n¡Te esperamos de vuelta!\n\n— ${tenant.name}`;
+        return `¡Hola ${firstName}! \n\nEsperamos que hayas disfrutado tu estadía en *${tenant.name}*.\n\n¿Nos ayudarías dejando una reseña en Google Maps? Nos ayuda mucho a crecer.\n\n¡Te esperamos de vuelta!\n\n— ${tenant.name}`;
       default:
         return "";
     }
@@ -372,12 +223,10 @@ export default function ReservationsPage() {
     setActiveModal("whatsapp");
     setMobileActionMenu(null);
   };
-
   const handleWhatsAppTypeChange = (type: WhatsAppType) => {
     setWhatsAppType(type);
     if (selectedReservation) setWhatsAppMessage(getWhatsAppMessageTemplate(type, selectedReservation));
   };
-
   const sendWhatsApp = () => {
     if (!selectedReservation?.guest) return;
     const phone = selectedReservation.guest.phone?.replace(/\D/g, "") || "";
@@ -414,7 +263,6 @@ export default function ReservationsPage() {
       if (checkinData.observations) updates.notes = checkinData.observations;
       const { error } = await supabase.from("reservations").update(updates).eq("id", selectedReservation.id);
       if (error) throw error;
-
       if (checkinData.additional_payment && parseFloat(checkinData.additional_payment) > 0) {
         const paymentAmount = parseFloat(checkinData.additional_payment);
         const currentPaid = selectedReservation.paid_amount || 0;
@@ -425,11 +273,8 @@ export default function ReservationsPage() {
           return;
         }
         await supabase.from("reservation_payments").insert({
-          tenant_id: tenant!.id,
-          reservation_id: selectedReservation.id,
-          amount: paymentAmount,
-          payment_method: checkinData.payment_method,
-          payment_date: new Date().toISOString(),
+          tenant_id: tenant!.id, reservation_id: selectedReservation.id, amount: paymentAmount,
+          payment_method: checkinData.payment_method, payment_date: new Date().toISOString(),
           notes: `Pago en check-in. Atendido por: ${checkinData.attended_by}`,
         });
         const newPaid = currentPaid + paymentAmount;
@@ -452,7 +297,6 @@ export default function ReservationsPage() {
     setActiveModal("checkout");
     setMobileActionMenu(null);
   };
-
   const handleCheckOut = async () => {
     if (!selectedReservation) return;
     setActionLoading("checkout");
@@ -505,12 +349,8 @@ export default function ReservationsPage() {
     setActionLoading("payment");
     try {
       const { error } = await supabase.from("reservation_payments").insert({
-        tenant_id: tenant!.id,
-        reservation_id: selectedReservation.id,
-        amount: paymentAmount,
-        payment_method: paymentData.method,
-        payment_date: new Date().toISOString(),
-        notes: paymentData.notes,
+        tenant_id: tenant!.id, reservation_id: selectedReservation.id, amount: paymentAmount,
+        payment_method: paymentData.method, payment_date: new Date().toISOString(), notes: paymentData.notes,
       });
       if (error) throw error;
       const newPaid = currentPaid + paymentAmount;
@@ -545,7 +385,11 @@ export default function ReservationsPage() {
     try {
       let guestId = formData.guest_id;
       if (formData.create_new_guest) {
-        const { data: newGuest, error: guestError } = await supabase.from("guests").insert({ tenant_id: tenant!.id, first_name: formData.new_guest_first_name, last_name: formData.new_guest_last_name, email: formData.new_guest_email, phone: formData.new_guest_phone, nationality: formData.new_guest_nationality, document_number: formData.new_guest_document }).select().single();
+        const { data: newGuest, error: guestError } = await supabase.from("guests").insert({
+          tenant_id: tenant!.id, first_name: formData.new_guest_first_name, last_name: formData.new_guest_last_name,
+          email: formData.new_guest_email, phone: formData.new_guest_phone, nationality: formData.new_guest_nationality,
+          document_number: formData.new_guest_document,
+        }).select().single();
         if (guestError) throw guestError;
         guestId = newGuest.id;
         setGuests([...guests, newGuest]);
@@ -557,22 +401,36 @@ export default function ReservationsPage() {
       const paid = parseFloat(formData.paid_amount) || 0;
       if (paid > total) { alert("El monto pagado no puede ser mayor al total."); setActionLoading(null); return; }
       const reservationCode = generateReservationCode();
-      const { error } = await supabase.from("reservations").insert({ tenant_id: tenant!.id, reservation_code: reservationCode, guest_id: guestId, unit_id: formData.unit_id, check_in: formData.check_in, check_out: formData.check_out, status: "booked", source: "manual", total_amount: total, paid_amount: paid, payment_status: paid > 0 ? (paid >= total ? "paid" : "partial") : "pending", payment_method: formData.payment_method || null, notes: formData.notes });
+      const { error } = await supabase.from("reservations").insert({
+        tenant_id: tenant!.id, reservation_code: reservationCode, guest_id: guestId, unit_id: formData.unit_id,
+        check_in: formData.check_in, check_out: formData.check_out, status: "booked", source: "manual",
+        total_amount: total, paid_amount: paid,
+        payment_status: paid > 0 ? (paid >= total ? "paid" : "partial") : "pending",
+        payment_method: formData.payment_method || null, notes: formData.notes,
+      });
       if (error) throw error;
       if (paid > 0) {
         const { data: newRes } = await supabase.from("reservations").select("id").eq("reservation_code", reservationCode).single();
         if (newRes) {
-          await supabase.from("reservation_payments").insert({ tenant_id: tenant!.id, reservation_id: newRes.id, amount: paid, payment_method: formData.payment_method, payment_date: new Date().toISOString(), notes: "Pago inicial al crear reserva" });
+          await supabase.from("reservation_payments").insert({
+            tenant_id: tenant!.id, reservation_id: newRes.id, amount: paid,
+            payment_method: formData.payment_method, payment_date: new Date().toISOString(),
+            notes: "Pago inicial al crear reserva",
+          });
         }
       }
       const { data: newRes } = await supabase.from("reservations").select("*").eq("reservation_code", reservationCode).single();
       if (newRes) {
-        const enriched: Reservation = { ...newRes, guest: guests.find((g) => g.id === newRes.guest_id) || (formData.create_new_guest ? { id: newRes.guest_id, first_name: formData.new_guest_first_name, last_name: formData.new_guest_last_name, email: formData.new_guest_email, phone: formData.new_guest_phone } : undefined), unit: units.find((u) => u.id === newRes.unit_id), preCheckin: null };
+        const enriched: Reservation = {
+          ...newRes,
+          guest: guests.find((g) => g.id === newRes.guest_id) || (formData.create_new_guest ? { id: newRes.guest_id, first_name: formData.new_guest_first_name, last_name: formData.new_guest_last_name, email: formData.new_guest_email, phone: formData.new_guest_phone } : undefined),
+          unit: units.find((u) => u.id === newRes.unit_id),
+          preCheckin: null,
+        };
         setReservations([enriched, ...reservations]);
         try {
           await fetch("/api/send-confirmation-email", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
+            method: "POST", headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ reservationId: newRes.id, tenantId: tenant!.id }),
           });
         } catch (emailErr) {
@@ -597,7 +455,13 @@ export default function ReservationsPage() {
       else if (parsed.observations) realNotes = parsed.observations;
       else realNotes = "";
     } catch (e) { realNotes = reservation.notes || ""; }
-    setFormData({ guest_id: reservation.guest_id, unit_id: reservation.unit_id, check_in: reservation.check_in, check_out: reservation.check_out, total_amount: reservation.total_amount.toString(), paid_amount: reservation.paid_amount.toString(), payment_method: reservation.payment_method || "cash", notes: realNotes, new_guest_first_name: "", new_guest_last_name: "", new_guest_email: "", new_guest_phone: "", new_guest_nationality: "Argentina", new_guest_document: "", create_new_guest: false });
+    setFormData({
+      guest_id: reservation.guest_id, unit_id: reservation.unit_id, check_in: reservation.check_in,
+      check_out: reservation.check_out, total_amount: reservation.total_amount.toString(),
+      paid_amount: reservation.paid_amount.toString(), payment_method: reservation.payment_method || "cash",
+      notes: realNotes, new_guest_first_name: "", new_guest_last_name: "", new_guest_email: "",
+      new_guest_phone: "", new_guest_nationality: "Argentina", new_guest_document: "", create_new_guest: false,
+    });
     setActiveModal("edit");
     setMobileActionMenu(null);
   };
@@ -609,11 +473,24 @@ export default function ReservationsPage() {
       const total = formData.total_amount ? parseFloat(formData.total_amount) : selectedReservation.total_amount;
       const paid = formData.paid_amount ? parseFloat(formData.paid_amount) : selectedReservation.paid_amount;
       if (paid > total) { alert("El monto pagado no puede ser mayor al total."); setActionLoading(null); return; }
-      const { error } = await supabase.from("reservations").update({ guest_id: formData.guest_id || selectedReservation.guest_id, unit_id: formData.unit_id || selectedReservation.unit_id, check_in: formData.check_in || selectedReservation.check_in, check_out: formData.check_out || selectedReservation.check_out, total_amount: total, paid_amount: paid, payment_method: formData.payment_method || selectedReservation.payment_method, notes: formData.notes }).eq("id", selectedReservation.id);
+      const { error } = await supabase.from("reservations").update({
+        guest_id: formData.guest_id || selectedReservation.guest_id,
+        unit_id: formData.unit_id || selectedReservation.unit_id,
+        check_in: formData.check_in || selectedReservation.check_in,
+        check_out: formData.check_out || selectedReservation.check_out,
+        total_amount: total, paid_amount: paid,
+        payment_method: formData.payment_method || selectedReservation.payment_method,
+        notes: formData.notes,
+      }).eq("id", selectedReservation.id);
       if (error) throw error;
       const { data: updatedRes } = await supabase.from("reservations").select("*").eq("id", selectedReservation.id).single();
       if (updatedRes) {
-        const enriched: Reservation = { ...updatedRes, guest: guests.find((g) => g.id === updatedRes.guest_id), unit: units.find((u) => u.id === updatedRes.unit_id), preCheckin: preCheckins.find((pc) => pc.reservation_id === updatedRes.id) || null };
+        const enriched: Reservation = {
+          ...updatedRes,
+          guest: guests.find((g) => g.id === updatedRes.guest_id),
+          unit: units.find((u) => u.id === updatedRes.unit_id),
+          preCheckin: preCheckins.find((pc) => pc.reservation_id === updatedRes.id) || null,
+        };
         setReservations(reservations.map((r) => (r.id === updatedRes.id ? enriched : r)));
       }
       setActiveModal("none");
@@ -657,66 +534,32 @@ export default function ReservationsPage() {
           <p className="text-sm text-gray-500 mt-1">{filteredReservations.length} {filteredReservations.length === 1 ? "reserva" : "reservas"}</p>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
-          <button
-            onClick={() => loadData()}
-            disabled={refreshing}
-            className="flex items-center gap-2 px-3 py-2 border border-gray-300 bg-white text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors disabled:opacity-50"
-          >
+          <button onClick={() => loadData()} disabled={refreshing} className="flex items-center gap-2 px-3 py-2 border border-gray-300 bg-white text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors disabled:opacity-50">
             <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
             <span className="hidden sm:inline">{refreshing ? 'Actualizando...' : 'Actualizar'}</span>
           </button>
-          <button
-            onClick={() => { setAddMethod("manual"); setActiveModal("add"); }}
-            className="flex items-center gap-2 px-3 py-2 bg-[#0F766E] text-white rounded-lg text-sm font-medium hover:bg-[#0F766E]/90 transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">Nueva reserva</span>
+          <button onClick={() => { setAddMethod("manual"); setActiveModal("add"); }} className="flex items-center gap-2 px-3 py-2 bg-[#0F766E] text-white rounded-lg text-sm font-medium hover:bg-[#0F766E]/90 transition-colors">
+            <Plus className="w-4 h-4" /><span className="hidden sm:inline">Nueva reserva</span>
           </button>
         </div>
       </div>
 
       {/* FILTROS */}
       <div className="bg-white border border-gray-200 rounded-xl p-3 lg:p-4 space-y-3">
-        {/* Búsqueda */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Buscar por nombre, código o unidad..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0F766E]"
-          />
+          <input type="text" placeholder="Buscar por nombre, código o unidad..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#0F766E]" />
         </div>
-
-        {/* Fechas - scroll horizontal en móvil */}
         <div className="flex items-center gap-2 overflow-x-auto pb-1">
           <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="px-2 py-1.5 border border-gray-300 rounded-lg text-xs lg:text-sm flex-shrink-0" />
           <span className="text-gray-500 text-xs flex-shrink-0">-</span>
           <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="px-2 py-1.5 border border-gray-300 rounded-lg text-xs lg:text-sm flex-shrink-0" />
         </div>
-
-        {/* Filtros de fecha - scroll horizontal */}
         <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-          {[
-            { key: "all", label: "Todas" },
-            { key: "today", label: "Hoy" },
-            { key: "tomorrow", label: "Mañana" },
-            { key: "nextweek", label: "Semana" },
-          ].map((f) => (
-            <button
-              key={f.key}
-              onClick={() => setFilter(f.key as FilterType)}
-              className={`px-3 py-1.5 rounded-lg text-xs lg:text-sm font-medium whitespace-nowrap transition-colors flex-shrink-0 ${
-                filter === f.key ? "bg-[#0F766E] text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-              }`}
-            >
-              {f.label}
-            </button>
+          {[{ key: "all", label: "Todas" }, { key: "today", label: "Hoy" }, { key: "tomorrow", label: "Mañana" }, { key: "nextweek", label: "Semana" }].map((f) => (
+            <button key={f.key} onClick={() => setFilter(f.key as FilterType)} className={`px-3 py-1.5 rounded-lg text-xs lg:text-sm font-medium whitespace-nowrap transition-colors flex-shrink-0 ${filter === f.key ? "bg-[#0F766E] text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}>{f.label}</button>
           ))}
         </div>
-
-        {/* FILTROS DE ESTADO - scroll horizontal */}
         <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1">
           <Filter className="w-4 h-4 text-gray-600 flex-shrink-0" />
           {[
@@ -727,33 +570,14 @@ export default function ReservationsPage() {
             { key: "checked_out", label: "Check-out", count: statusCounts.checked_out, color: "gray" },
             { key: "cancelled", label: "Cancelada", count: statusCounts.cancelled, color: "red" },
           ].map((item) => (
-            <button
-              key={item.key}
-              onClick={() => setStatusFilter(item.key as StatusFilterType)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors flex items-center gap-1.5 flex-shrink-0 ${
-                statusFilter === item.key ? "bg-[#0F766E] text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-              }`}
-            >
-              <span className={`w-2 h-2 rounded-full ${
-                item.color === "blue" ? "bg-blue-500" :
-                item.color === "green" ? "bg-green-500" :
-                item.color === "purple" ? "bg-purple-500" :
-                item.color === "red" ? "bg-red-500" :
-                "bg-gray-400"
-              }`} />
+            <button key={item.key} onClick={() => setStatusFilter(item.key as StatusFilterType)} className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors flex items-center gap-1.5 flex-shrink-0 ${statusFilter === item.key ? "bg-[#0F766E] text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}>
+              <span className={`w-2 h-2 rounded-full ${item.color === "blue" ? "bg-blue-500" : item.color === "green" ? "bg-green-500" : item.color === "purple" ? "bg-purple-500" : item.color === "red" ? "bg-red-500" : "bg-gray-400"}`} />
               {item.label}
-              {item.count > 0 && (
-                <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
-                  statusFilter === item.key ? "bg-white/20" : "bg-gray-200"
-                }`}>
-                  {item.count}
-                </span>
-              )}
+              {item.count > 0 && <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${statusFilter === item.key ? "bg-white/20" : "bg-gray-200"}`}>{item.count}</span>}
             </button>
           ))}
           <button onClick={() => setActiveModal("legend")} className="ml-auto flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-100 transition-colors flex-shrink-0" title="Ver leyenda de colores">
-            <Info className="w-4 h-4" />
-            <span className="hidden sm:inline">¿Qué significa cada color?</span>
+            <Info className="w-4 h-4" /><span className="hidden sm:inline">¿Qué significa cada color?</span>
           </button>
         </div>
       </div>
@@ -775,7 +599,6 @@ export default function ReservationsPage() {
             const realStatus = getRealStatus(reservation);
             return (
               <div key={reservation.id} className="bg-white border border-gray-200 rounded-xl p-3 lg:p-6 hover:shadow-md transition-shadow">
-                {/* Header de la reserva */}
                 <div className="flex items-start justify-between gap-2 mb-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -789,12 +612,8 @@ export default function ReservationsPage() {
                       </span>
                     </div>
                   </div>
-                  {/* Menú móvil (3 puntos) */}
                   <div className="relative lg:hidden flex-shrink-0">
-                    <button
-                      onClick={() => setMobileActionMenu(mobileActionMenu === reservation.id ? null : reservation.id)}
-                      className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg"
-                    >
+                    <button onClick={() => setMobileActionMenu(mobileActionMenu === reservation.id ? null : reservation.id)} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg">
                       <MoreVertical className="w-5 h-5" />
                     </button>
                     {mobileActionMenu === reservation.id && (
@@ -830,7 +649,6 @@ export default function ReservationsPage() {
                       </>
                     )}
                   </div>
-                  {/* Acciones desktop */}
                   <div className="hidden lg:flex items-center gap-1 flex-shrink-0">
                     {reservation.status === "booked" || realStatus === "pre_checkin_completed" ? (
                       <button onClick={() => openCheckInModal(reservation)} className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg" title="Check-in">
@@ -858,32 +676,13 @@ export default function ReservationsPage() {
                     </button>
                   </div>
                 </div>
-
-                {/* Info grid - 2 cols en móvil, 5 en desktop */}
                 <div className="grid grid-cols-2 lg:grid-cols-5 gap-2 lg:gap-4 text-xs lg:text-sm">
-                  <div>
-                    <p className="text-gray-500 text-[10px] lg:text-xs">Código</p>
-                    <p className="font-mono font-semibold text-gray-900 truncate">{reservation.reservation_code || "—"}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-500 text-[10px] lg:text-xs">Check-in</p>
-                    <p className="font-semibold text-gray-900">{new Date(reservation.check_in).toLocaleDateString("es-AR", { day: '2-digit', month: '2-digit' })}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-500 text-[10px] lg:text-xs">Check-out</p>
-                    <p className="font-semibold text-gray-900">{new Date(reservation.check_out).toLocaleDateString("es-AR", { day: '2-digit', month: '2-digit' })}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-500 text-[10px] lg:text-xs">Unidad</p>
-                    <p className="font-semibold text-gray-900 truncate">{reservation.unit?.name || "—"}</p>
-                  </div>
-                  <div className="col-span-2 lg:col-span-1">
-                    <p className="text-gray-500 text-[10px] lg:text-xs">Pago</p>
-                    <p className="font-semibold text-gray-900">${reservation.paid_amount || 0} / ${reservation.total_amount || 0}</p>
-                  </div>
+                  <div><p className="text-gray-500 text-[10px] lg:text-xs">Código</p><p className="font-mono font-semibold text-gray-900 truncate">{reservation.reservation_code || "—"}</p></div>
+                  <div><p className="text-gray-500 text-[10px] lg:text-xs">Check-in</p><p className="font-semibold text-gray-900">{new Date(reservation.check_in).toLocaleDateString("es-AR", { day: '2-digit', month: '2-digit' })}</p></div>
+                  <div><p className="text-gray-500 text-[10px] lg:text-xs">Check-out</p><p className="font-semibold text-gray-900">{new Date(reservation.check_out).toLocaleDateString("es-AR", { day: '2-digit', month: '2-digit' })}</p></div>
+                  <div><p className="text-gray-500 text-[10px] lg:text-xs">Unidad</p><p className="font-semibold text-gray-900 truncate">{reservation.unit?.name || "—"}</p></div>
+                  <div className="col-span-2 lg:col-span-1"><p className="text-gray-500 text-[10px] lg:text-xs">Pago</p><p className="font-semibold text-gray-900">${reservation.paid_amount || 0} / ${reservation.total_amount || 0}</p></div>
                 </div>
-
-                {/* Contacto */}
                 <div className="mt-2 lg:mt-3 flex flex-wrap items-center gap-2 lg:gap-4 text-xs">
                   {reservation.guest?.email && (
                     <span className="text-gray-600 flex items-center gap-1 min-w-0">
@@ -904,7 +703,7 @@ export default function ReservationsPage() {
         </div>
       )}
 
-      {/* MODAL: Leyenda de colores */}
+      {/* MODAL: Leyenda */}
       {activeModal === "legend" && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
